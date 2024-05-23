@@ -1,4 +1,4 @@
 file bin/dbg_kernel.bin
-break last_step
+break kmain
 
 target remote :1234

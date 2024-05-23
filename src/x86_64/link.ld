@@ -1,7 +1,7 @@
 OUTPUT_FORMAT(elf64-x86-64)
 ENTRY(_start)
 
-kernel_pa = 0x10000;
+kernel_pa = 0x100000;
 kernel_va = 0xFFFFFF8000000000;
 
 SECTIONS

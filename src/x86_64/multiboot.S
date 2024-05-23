@@ -5,10 +5,10 @@
 
 .align 8
 multiboot_header:
-    .long multiboot2_magic
+    .long multiboot2_header_magic
     .long 0
     .long multiboot_header_end - multiboot_header
-    .long -(multiboot2_magic + 0 + (multiboot_header_end - multiboot_header))
+    .long -(multiboot2_header_magic + 0 + (multiboot_header_end - multiboot_header))
 
 multiboot_fb:
     .short 5
@@ -51,7 +51,7 @@ _start:
     add $0x1000, %edi
 
     mov $0x3, %ebx //present, available
-    mov $256, %ecx //identity map first mb
+    mov $512, %ecx //identity map first 2 mb, keep multiboot info available
 
 .paging_loop:
     mov %ebx, (%edi)

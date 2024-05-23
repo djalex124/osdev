@@ -29,7 +29,7 @@ bin/kernel.bin: $(all_obj)
 	@/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_flags) -MMD -MP $< -o $@ -lgcc
 
 %.o: %.S 
-	@/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_flags) -MMD -MP $< -o $@ -lgcc
+	@/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_flags) -DASSEMBLY -MMD -MP $< -o $@ -lgcc
 
 bin/boot.iso: bin/kernel.bin
 	@cp bin/kernel.bin grub/boot/kernel.bin
