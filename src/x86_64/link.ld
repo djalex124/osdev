@@ -10,14 +10,14 @@ SECTIONS
 
     .multiboot :
     {
-        kernel/multiboot.o (.text)
+        src/x86_64/multiboot.o (.text)
     }
 
     . += kernel_va;
 
     .text : AT(ADDR(.text) - kernel_va)
     {
-        *(EXCLUDE_FILE(*kernel/multiboot.o) .text)
+        *(EXCLUDE_FILE(*src/x86_64/multiboot.o) .text)
         *(.rodata*)
         . = ALIGN(4096);
     }

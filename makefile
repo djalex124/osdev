@@ -1,18 +1,26 @@
 build_speed:= -O2
 
 kernel_flags := -g -ggdb -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall -c
-kernel_link  := -g -ggdb -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -T kernel/link.ld
+kernel_link  := -g -ggdb -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -T src/x86_64/link.ld
 
 all: run
 
-kernel_src := $(wildcard kernel/*.c)
-kernel_gas := $(wildcard kernel/*.S)
+boot_c := $(wildcard src/x86_64/*.c)
+boot_s := $(wildcard src/x86_64/*.S)
 
-kernel_obj_src = $(kernel_src:.c=.o)
-kernel_obj_gas = $(kernel_gas:.S=.o)
+boot_obj_c = $(boot_c:.c=.o)
+boot_obj_s = $(boot_s:.S=.o)
 
-bin/kernel.bin: $(kernel_obj_src) $(kernel_obj_gas)
-	/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_link) $(kernel_obj_gas) $(kernel_obj_src)  -o bin/kernel.bin -nostdlib -lgcc
+kernel_c := $(wildcard src/kernel/*.c)
+kernel_s := $(wildcard src/kernel/*.S)
+
+kernel_obj_c = $(kernel_c:.c=.o)
+kernel_obj_s = $(kernel_s:.S=.o)
+
+all_obj := $(boot_obj_c) $(boot_obj_s) $(kernel_obj_c) $(kernel_obj_s)
+
+bin/kernel.bin: $(all_obj)
+	/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_link) $(all_obj) -o bin/kernel.bin -nostdlib -lgcc
 	@nm bin/kernel.bin > bin/kernel.map
 	@cp bin/kernel.bin bin/dbg_kernel.bin
 	@objcopy --strip-debug bin/kernel.bin
@@ -34,7 +42,6 @@ debug: bin/boot.iso
 	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none -s -S -d int
 
 clean:
-#	@rm $(kernel_obj_src)
-	@rm -f $(kernel_obj_gas)
+	@rm -f $(all_obj)
 	@rm -f bin/kernel.bin
 	@rm -f bin/boot.iso
