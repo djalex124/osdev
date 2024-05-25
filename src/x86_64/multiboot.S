@@ -1,3 +1,4 @@
+#include <memory.h>
 #include <multiboot.h>
 
 .section .text

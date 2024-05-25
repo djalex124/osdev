@@ -3,10 +3,6 @@
 #define multiboot2_header_magic 0xE85250D6
 #define multiboot2_boot_magic   0x36D76289
 
-#define kernel_virtual   0xFFFFFF8000000000
-#define phys_from_virt(x) ((x) - kernel_virtual)
-#define virt_from_phys(x) ((x) + kernel_virtual)
-
 #ifndef ASSEMBLY
 
 #include <stdint.h>

@@ -1,16 +1,14 @@
 #include <stdint.h>
+#include <mem.h>
 #include <multiboot.h>
 
 void khalt(void);
 
-void kmain(uint64_t mboot_magic, void* mboot_ptr)
+static uint8_t kerror = 0;
+
+void kmultiboot(void *mboot_ptr)
 {
-    if (mboot_magic != multiboot2_boot_magic)
-        return; // should hang
-
-    struct multiboot_tag* mboot_info;
-    uint32_t size = *(uint64_t *) mboot_ptr;
-
+    struct multiboot_tag *mboot_info;
     struct multiboot_framebuffer_tag *framebuffer;
 
     for (mboot_info = (struct multiboot_tag *) (mboot_ptr + 8);
@@ -22,6 +20,7 @@ void kmain(uint64_t mboot_magic, void* mboot_ptr)
             case 6:
             {
                 struct multiboot_mmap_entry *mmap;
+                kmem_init(mmap);
             }
             break;
             case 8:
@@ -31,6 +30,17 @@ void kmain(uint64_t mboot_magic, void* mboot_ptr)
             break;
         }
     }
+
+    kmem_page(framebuffer->addr, virt_from_phys(framebuffer->addr), 0b11);
+}
+
+void kmain(uint64_t mboot_magic, void *mboot_ptr)
+{
+    if (mboot_magic != multiboot2_boot_magic)
+        kerror++;
+
+    kmultiboot(mboot_ptr);
+    kmem_unpage(0);
     
     khalt();
 }
