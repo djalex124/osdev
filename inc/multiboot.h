@@ -38,6 +38,13 @@ struct multiboot_mmap_tag
     struct multiboot_mmap_entry entries[];
 };
 
+struct multiboot_string_tag
+{
+    uint32_t type;
+    uint32_t size;
+    char string[];
+};
+
 struct multiboot_tag
 {
     uint32_t type;

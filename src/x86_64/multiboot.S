@@ -1,4 +1,4 @@
-#include <memory.h>
+#include <mem.h>
 #include <multiboot.h>
 
 .section .text
