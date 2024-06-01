@@ -39,7 +39,7 @@ run: bin/boot.iso
 	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none
 
 debug: bin/boot.iso
-	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none -s -S -d int
+	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none -s -d int
 
 clean:
 	@rm -f $(all_obj)

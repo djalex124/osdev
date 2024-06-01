@@ -10,7 +10,10 @@
 
 void kmem_init(struct multiboot_mmap_tag *mmap);
 
-void kmem_page(uint64_t physical, uint64_t address, uint16_t flags);
+void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags);
 void kmem_unpage(uint64_t address);
+
+void* kmem_alloc(uint64_t size);
+void kmem_free(void* addr);
 
 #endif
