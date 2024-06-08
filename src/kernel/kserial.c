@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 static inline uint8_t inb(uint16_t p)
 {
@@ -85,4 +86,46 @@ void kserial_outn(uint64_t n, uint8_t b)
 {
     baditoa(n, baditoa_buffer, b);
     kserial_outs(baditoa_buffer);
+}
+
+void kserial_outf(const char *fmt, ...)
+{
+    va_list arg;
+    va_start(arg, fmt);
+
+    uint64_t i;
+    char *s;
+    
+    for (int count = 0; count < str_len(fmt); count++)
+    {
+        if (fmt[count] != '%')
+        {
+            kserial_outc(fmt[count]);
+            continue;
+        }
+
+        count++;
+
+        switch (fmt[count])
+        {
+            case 's':
+                s = va_arg(arg, char *);
+                kserial_outs(s);
+                break;
+            case 'b':
+                i = va_arg(arg, uint64_t);
+                kserial_outn(i, 2);
+                break;
+            case 'd':
+                i = va_arg(arg, uint64_t);
+                kserial_outn(i, 10);
+                break;
+            case 'x':
+                i = va_arg(arg, uint64_t);
+                kserial_outn(i, 16);
+                break;
+        }
+    }
+
+    va_end(arg);
 }
