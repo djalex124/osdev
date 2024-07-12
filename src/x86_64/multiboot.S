@@ -48,18 +48,8 @@ _start:
     add $0x8, %edi
     movl $0x3003, (%edi) //p2 at 0x3000
     add $0x1000, %edi
-    movl $0x4003, (%edi) //p1 at 0x4000
-    add $0x1000, %edi
-
-    mov $0x3, %ebx //present, available
-    mov $512, %ecx //identity map first 2 mb, keep multiboot info available
-
-.paging_loop:
-    mov %ebx, (%edi)
-    add $0x1000, %ebx
-    add $0x8, %edi
-    loop .paging_loop
-
+    movl $0x83, (%edi)   //large page for first 2 mb
+    
     pop %edi
 
     movl %cr4, %eax

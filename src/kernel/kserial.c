@@ -124,6 +124,9 @@ void kserial_outf(const char *fmt, ...)
                 i = va_arg(arg, uint64_t);
                 kserial_outn(i, 16);
                 break;
+            default:
+                kserial_outc(fmt[count]);
+                break;
         }
     }
 

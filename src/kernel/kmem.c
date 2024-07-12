@@ -50,12 +50,10 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
 
     while (size)
     {
+        uint64_t *ptab3, *ptab2;
         size_t p4_index = (address >> 39) & 0x1FF;
         size_t p3_index = (address >> 30) & 0x1FF;
         size_t p2_index = (address >> 21) & 0x1FF;
-        size_t p1_index = (address >> 12) & 0x1FF;
-
-        uint64_t *ptab3, *ptab2, *ptab1;
 
         if (!ptab4[p4_index] & 0x1)
             ptab4[p4_index] = (uint64_t)kmem_earlyalloc() | flags;
@@ -65,21 +63,85 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
             ptab3[p3_index] = (uint64_t)kmem_earlyalloc() | flags;
 
         ptab2 = (uint64_t *)(ptab3[p3_index] & 0xFFFFFFFFFFFFF000);
-        if (!ptab2[p2_index] & 0x1)
-            ptab2[p2_index] = (uint64_t)kmem_earlyalloc() | flags;
 
-        ptab1 = (uint64_t *)(ptab2[p2_index] & 0xFFFFFFFFFFFFF000);
-        ptab1[p1_index] = physical | flags;
+        if (size >= 0x200000) //2mb page?
+        {
+            kserial_outf("\r\nkmem_page: large page for 0x%x", physical);
+            ptab2[p2_index] = physical | flags | (1 << 7); // huge bit?
 
-        physical += 0x1000;
-        address += 0x1000;
-        size -= 0x1000;
+            physical += 0x200000;
+            address += 0x200000;
+            size -= 0x200000;
+        }
+        else
+        {
+            size_t p1_index = (address >> 12) & 0x1FF;
+            uint64_t *ptab1;
+
+            if (!ptab2[p2_index] & 0x1)
+                ptab2[p2_index] = (uint64_t)kmem_earlyalloc() | flags;
+
+            ptab1 = (uint64_t *)(ptab2[p2_index] & 0xFFFFFFFFFFFFF000);
+            ptab1[p1_index] = physical | flags;
+
+            physical += 0x1000;
+            address += 0x1000;
+            size -= 0x1000;
+        }
     }
 }
 
-void kmem_unpage(uint64_t address)
+void kmem_unpage(uint64_t address, uint64_t size)
 {
-    // reverse of paging algorithm
+    kserial_outf("\r\nkmem_unpage: attempt to unpage > virt=0x%x length=0x%x",
+        address, size);
+
+    size += address & 0xFFF;
+    address &= -0x1000ull;
+
+    uint64_t *ptab4 = (uint64_t*)0x1000;
+
+    while (size)
+    {
+        uint64_t *ptab3, *ptab2;
+        size_t p4_index = (address >> 39) & 0x1FF;
+        size_t p3_index = (address >> 30) & 0x1FF;
+        size_t p2_index = (address >> 21) & 0x1FF;
+
+        if (!ptab4[p4_index] & 0x1)
+            break;;
+
+        ptab3 = (uint64_t *)(ptab4[p4_index] & 0xFFFFFFFFFFFFF000);
+        if (!ptab3[p3_index] & 0x1)
+            break;;
+
+        ptab2 = (uint64_t *)(ptab3[p3_index] & 0xFFFFFFFFFFFFF000);
+
+        if (size >= 0x200000) //2mb page?
+        {
+            kserial_outf("\r\nkmem_unpage: unpage large page of 0x%x", address);
+            if (ptab2[p2_index] & 0x1)
+                ptab2[p2_index] &= ~1;
+
+            address += 0x200000;
+            size -= 0x200000;
+        }
+        else
+        {
+            size_t p1_index = (address >> 12) & 0x1FF;
+            uint64_t *ptab1;
+
+            if (!ptab2[p2_index] & 0x1)
+                break;
+
+            ptab1 = (uint64_t *)(ptab2[p2_index] & 0xFFFFFFFFFFFFF000);
+            if (ptab1[p1_index] & 0x1)
+                ptab1[p1_index] &= ~1;
+
+            address += 0x1000;
+            size -= 0x1000;
+        }
+    }
 }
 
 //physical memory management?

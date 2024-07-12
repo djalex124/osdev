@@ -56,7 +56,9 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
     }
 
     kmultiboot(mboot_ptr);
-    kmem_unpage(0);
+    kmem_unpage(0, 0x200000);
+
+    kmem_page(0, kernel_virtual, 0x200000, 0x3);
     
     kserial_outf("\r\nkmain: reached end of kernel logic");
     khalt();
@@ -66,7 +68,7 @@ void kscreen(uint64_t fb, uint16_t width, uint16_t height, uint8_t bpp, uint32_t
 {
     //screen.c coming soon, settle with this for now
 
-    kmem_page(fb, fb, width * height * bpp, 0b11); // identity mapped
+    kmem_page(fb, virt_from_phys(fb), width * height * bpp, 0b11); // identity mapped
     kserial_outf("\r\nkscreen: addr at 0x%x width %d height %d bpp %d pitch %d", fb, width, height, bpp, pitch);
 
     uint32_t default_color = 0x34568B;
@@ -75,7 +77,7 @@ void kscreen(uint64_t fb, uint16_t width, uint16_t height, uint8_t bpp, uint32_t
     {
         for (int x = 0; x < width; x++)
         {
-            *((uint32_t*)(fb + y*pitch +x*(bpp/8)))=default_color;
+            *((uint32_t*)(virt_from_phys(fb) + y*pitch + x*(bpp/8)))=default_color;
         }
     }
 }
