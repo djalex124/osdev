@@ -3,6 +3,7 @@
 #include <mem.h>
 #include <multiboot.h>
 #include <serial.h>
+#include <desc.h>
 
 void khalt(void);
 void kscreen(uint64_t fb, uint16_t width, uint16_t height, uint8_t bpp, uint32_t pitch);
@@ -59,6 +60,9 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
     kmem_unpage(0, 0x200000);
 
     kmem_page(0, kernel_virtual, 0x200000, 0x3);
+
+    kdesc_install();
+    asm("sti");
     
     kserial_outf("\r\nkmain: reached end of kernel logic");
     khalt();
@@ -86,5 +90,5 @@ void khalt(void)
 {
     kserial_outf("\r\nkhalt: halting indefinitely!");
     while(1)
-        __asm__("hlt");
+        asm("hlt");
 }

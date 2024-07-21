@@ -1,7 +1,7 @@
 build_speed:= -O2
 
-kernel_flags := -g -ggdb -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall -c
-kernel_link  := -g -ggdb -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -T src/x86_64/link.ld
+kernel_flags := -g -ggdb -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall -c
+kernel_link  := -g -ggdb -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -fno-pie -T src/x86_64/link.ld
 
 all: run
 

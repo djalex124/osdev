@@ -145,16 +145,16 @@ void kmem_unpage(uint64_t address, uint64_t size)
 }
 
 //physical memory management?
-//
+//currently: UNFINISHED
 
 void* kmem_alloc(uint64_t size)
 {
-
+    return 0;
 }
 
 void kmem_free(void* addr)
 {
-
+    return;
 }
 
 void kmem_init(struct multiboot_mmap_tag *mmap)

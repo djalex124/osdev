@@ -18,6 +18,12 @@ SECTIONS
     .text : AT(ADDR(.text) - kernel_va)
     {
         *(EXCLUDE_FILE(*src/x86_64/multiboot.o) .text)
+        . = ALIGN(4096);
+    }
+
+    .rodata : AT(ADDR(.rodata) - kernel_va)
+    {
+        _rodata = .;
         *(.rodata*)
         . = ALIGN(4096);
     }
