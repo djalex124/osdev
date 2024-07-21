@@ -10,6 +10,7 @@ _start64:
 
 entry64: // jump to correct RIP
 .extern kmain
+    xor %rbp, %rbp
     call kmain
 
     hlt

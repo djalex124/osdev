@@ -62,9 +62,9 @@ typedef struct
     uint64_t rip, cs, eflags, user_rsp, ss;
 }__attribute__((packed)) kframe_int;
 
-struct kframe
+struct kstackframe
 {
-    struct kframe* rbp;
+    struct kstackframe* rbp;
     uint64_t rip;
 };
 

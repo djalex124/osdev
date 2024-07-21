@@ -3,13 +3,36 @@
 #include <desc.h>
 
 void kwrapper_isr(kframe_int *k)
-{
-    kserial_outf("\r\nkwrapper_isr: isr num %d from addr 0x%x", k->int_no, k->rbp);
+{   
+    kserial_outf("\r\nkisr: isr num %d err code %b", k->int_no, k->err_code);
+    kserial_outf("\r\nkisr: rax 0x%x rbx 0x%x rcx 0x%x rdx 0x%x",
+        k->rax, k->rbx, k->rcx, k->rdx);
+    kserial_outf("\r\nkisr: rsp 0x%x rbp 0x%x rsi 0x%x rdi 0x%x",
+        k->rsp, k->rbp, k->rsi, k->rdi);
+    kserial_outf("\r\nkisr: r8  0x%x r9  0x%x r10 0x%x r11 0x%x",
+        k->r8, k->r9, k->r10, k->r11);
+    kserial_outf("\r\nkisr: r12 0x%x r13 0x%x r14 0x%x r15 0x%x",
+        k->r12, k->r13, k->r14, k->r15);
+    kserial_outf("\r\nkisr: rip 0x%x cs  0x%x ss 0x%x",
+        k->rip, k->cs, k->ss);
+    kserial_outf("\r\nkisr: eflags %b user_rsp 0x%x",
+        k->eflags, k->user_rsp);
+
+    //should attempt fix or ret if non crashing isr before stack trace and hlt
+
+    struct kstackframe* stack = (struct kstackframe*)k->rbp;
+    kserial_outf("\r\nkisr: stack trace");
+    kserial_outf("\r\nkisr: > 0x%x", k->rip);
+    for(unsigned frame = 0; stack && frame < 5; ++frame)
+    {
+        kserial_outf("\r\nkisr: > 0x%x", stack->rip);
+        stack = stack->rbp;
+    }
 }
 
 void kwrapper_irq(kframe_int *k)
 {
-    kserial_outf("\r\nkwrapper_irq: isr num %d brake from addr 0x%x", k->int_no, k->rbp);
+    kserial_outf("\r\nkirq: irq num %d", k->int_no);
 }
 
 static gdt_entry kgdt_table[6];

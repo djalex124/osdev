@@ -19,21 +19,18 @@ uint64_t* kmem_earlyalloc()
 {
     if ((kmem_earlyalloc_start + 0x1000) > kmem_earlyalloc_end)
     {
-        kserial_outf("\r\nkmem_earlyalloc: out of early memory? halting");
+        kserial_outf("\r\nkm_ea: out of early memory? halting");
         for(;;);
     }
     uint64_t page = kmem_earlyalloc_start;
     kmem_earlyalloc_start += 0x1000;
-    kserial_outf("\r\nkmem_earlyalloc: new page table at 0x%x", page);
+    kserial_outf("\r\nkm_ea: new page table at 0x%x", page);
     memset((uintptr_t *)page, 0, 0x1000);
     return (uintptr_t *)page;
 }
 
 void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags)
 {
-    kserial_outf("\r\nkmem_page: attempt to page > phys=0x%x virt=0x%x length=0x%x flags=%b",
-        physical, address, size, flags);
-
     /*
         Preferable paging algorithm
 
@@ -66,7 +63,6 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
 
         if (size >= 0x200000) //2mb page?
         {
-            kserial_outf("\r\nkmem_page: large page for 0x%x", physical);
             ptab2[p2_index] = physical | flags | (1 << 7); // huge bit?
 
             physical += 0x200000;
@@ -93,7 +89,7 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
 
 void kmem_unpage(uint64_t address, uint64_t size)
 {
-    kserial_outf("\r\nkmem_unpage: attempt to unpage > virt=0x%x length=0x%x",
+    kserial_outf("\r\nkm_up: attempt to unpage > virt=0x%x length=0x%x",
         address, size);
 
     size += address & 0xFFF;
@@ -119,7 +115,7 @@ void kmem_unpage(uint64_t address, uint64_t size)
 
         if (size >= 0x200000) //2mb page?
         {
-            kserial_outf("\r\nkmem_unpage: unpage large page of 0x%x", address);
+            kserial_outf("\r\nkm_up: unpage large page of 0x%x", address);
             if (ptab2[p2_index] & 0x1)
                 ptab2[p2_index] &= ~1;
 
@@ -160,13 +156,13 @@ void kmem_free(void* addr)
 void kmem_init(struct multiboot_mmap_tag *mmap)
 {
     struct multiboot_mmap_entry *mmap_entries;
-    kserial_outf("\r\nkmem_init: available=1 reserved=2 acpi_reclaim=3 nvs=4 bad=5");
+    kserial_outf("\r\nkm_i: available=1 reserved=2 acpi_reclaim=3 nvs=4 bad=5");
 
     for (mmap_entries = mmap->entries;
         (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap->size;
         mmap_entries = (struct multiboot_mmap_entry *) ((uint64_t) mmap_entries + mmap->entry_size))
     {
-        kserial_outf("\r\nkmem_init: mmap entry > start=0x%x len=0x%x end=0x%x type=%d", 
+        kserial_outf("\r\nkm_i: mmap entry > start=0x%x len=0x%x end=0x%x type=%d", 
             mmap_entries->address, mmap_entries->length, mmap_entries->address + mmap_entries->length, mmap_entries->type);
         switch (mmap_entries->type)
         {
@@ -177,8 +173,8 @@ void kmem_init(struct multiboot_mmap_tag *mmap)
         }
     }
 
-    kserial_outf("\r\nkmem_init: os reserved 0x0 - 0x4FFF");
+    kserial_outf("\r\nkm_i: os reserved 0x0 - 0x4FFF");
     kmem_earlyalloc_start = 0x5000;
-    kserial_outf("\r\nkmem_init: early kernel mem from 0x%x to 0x%x", kmem_earlyalloc_start, kmem_earlyalloc_end);
-    kserial_outf("\r\nkmem_init: kernel residing in 0x100000 - 0x%x", phys_from_virt((uint64_t)_end)); //when available, page kernel with global bit
+    kserial_outf("\r\nkm_i: early kernel mem from 0x%x to 0x%x", kmem_earlyalloc_start, kmem_earlyalloc_end);
+    kserial_outf("\r\nkm_i: kernel residing in 0x100000 - 0x%x", phys_from_virt((uint64_t)_end)); //when available, page kernel with global bit
 }

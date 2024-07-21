@@ -94,6 +94,8 @@ void kserial_outf(const char *fmt, ...)
         {
             case 's':
                 s = va_arg(arg, char *);
+                if (s == 0)
+                    break;
                 kserial_outs(s);
                 break;
             case 'b':

@@ -18,23 +18,23 @@ void kmultiboot(void *mboot_ptr)
          mboot_info->type != 0;
          mboot_info = (struct multiboot_tag *) ((uint8_t *) mboot_info + ((mboot_info->size + 7) & ~7)))
     {
-        kserial_outf("\r\nkmultiboot: mboot tag found > %d", mboot_info->type);
+        kserial_outf("\r\nkmboot: mboot tag found > %d", mboot_info->type);
         switch (mboot_info->type)
         {
             case 2:
             {
-                kserial_outf("\r\nkmultiboot: booted through > %s", ((struct multiboot_string_tag *)mboot_info)->string);
+                kserial_outf("\r\nkmboot: booted through > %s", ((struct multiboot_string_tag *)mboot_info)->string);
             }
             break;
             case 6:
             {
-                kserial_outf("\r\nkmultiboot: mmap found > 0x%x", (uintptr_t)mboot_info);
+                kserial_outf("\r\nkmboot: mmap found > 0x%x", (uintptr_t)mboot_info);
                 mmap = (struct multiboot_mmap_tag *) mboot_info;
             }
             break;
             case 8:
             {
-                kserial_outf("\r\nkmultiboot: framebuffer info found > 0x%x", (uintptr_t)mboot_info);
+                kserial_outf("\r\nkmboot: fb info found > 0x%x", (uintptr_t)mboot_info);
                 framebuffer = (struct multiboot_framebuffer_tag *) mboot_info;
             }
             break;
@@ -72,8 +72,8 @@ void kscreen(uint64_t fb, uint16_t width, uint16_t height, uint8_t bpp, uint32_t
 {
     //screen.c coming soon, settle with this for now
 
-    kmem_page(fb, virt_from_phys(fb), width * height * bpp, 0b11); // identity mapped
-    kserial_outf("\r\nkscreen: addr at 0x%x width %d height %d bpp %d pitch %d", fb, width, height, bpp, pitch);
+    kmem_page(fb, virt_from_phys(fb), width * height * bpp, 0b11);
+    kserial_outf("\r\nkscr: addr at 0x%x width %d height %d bpp %d pitch %d", fb, width, height, bpp, pitch);
 
     uint32_t default_color = 0x34568B;
 
