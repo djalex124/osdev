@@ -156,7 +156,7 @@ void kmem_free(void* addr)
 void kmem_init(struct multiboot_mmap_tag *mmap)
 {
     struct multiboot_mmap_entry *mmap_entries;
-    kserial_outf("\r\nkm_i: available=1 reserved=2 acpi_reclaim=3 nvs=4 bad=5");
+    kserial_outf("\r\nkm_i: avail=1 resv=2 acpi_reclaim=3 nvs=4 bad=5");
 
     for (mmap_entries = mmap->entries;
         (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap->size;
@@ -175,6 +175,6 @@ void kmem_init(struct multiboot_mmap_tag *mmap)
 
     kserial_outf("\r\nkm_i: os reserved 0x0 - 0x4FFF");
     kmem_earlyalloc_start = 0x5000;
-    kserial_outf("\r\nkm_i: early kernel mem from 0x%x to 0x%x", kmem_earlyalloc_start, kmem_earlyalloc_end);
-    kserial_outf("\r\nkm_i: kernel residing in 0x100000 - 0x%x", phys_from_virt((uint64_t)_end)); //when available, page kernel with global bit
+    kserial_outf("\r\nkm_i: early kernel mapping 0x%x - 0x%x", kmem_earlyalloc_start, kmem_earlyalloc_end);
+    kserial_outf("\r\nkm_i: kernel residing 0x100000 - 0x%x", phys_from_virt((uint64_t)_end)); //when available, page kernel with global bit
 }

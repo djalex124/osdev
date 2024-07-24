@@ -18,7 +18,6 @@ void kmultiboot(void *mboot_ptr)
          mboot_info->type != 0;
          mboot_info = (struct multiboot_tag *) ((uint8_t *) mboot_info + ((mboot_info->size + 7) & ~7)))
     {
-        kserial_outf("\r\nkmboot: mboot tag found > %d", mboot_info->type);
         switch (mboot_info->type)
         {
             case 2:
@@ -48,7 +47,7 @@ void kmultiboot(void *mboot_ptr)
 void kmain(uint64_t mboot_magic, void *mboot_ptr)
 {
     kserial_init();
-    kserial_outf("ConcatenOS Alpha Dev > Built on %s at %s", __DATE__, __TIME__);
+    kserial_outf("\r\nConcatenOS Alpha Dev > Built on %s at %s", __DATE__, __TIME__);
 
     if (mboot_magic != multiboot2_boot_magic)
     {

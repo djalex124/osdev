@@ -64,7 +64,7 @@ kcommon_irq:
     push %r14
     push %r15
     
-    mov %rsp, %rcx
+    mov %rsp, %rdi
     cld
 
     call kwrapper_irq

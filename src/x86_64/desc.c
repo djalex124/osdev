@@ -32,7 +32,13 @@ void kwrapper_isr(kframe_int *k)
 
 void kwrapper_irq(kframe_int *k)
 {
-    kserial_outf("\r\nkirq: irq num %d", k->int_no);
+    kserial_outf("\r\nkirq: irq num %x", k->int_no);
+    if (k->int_no >= 8)
+        outb(0xA0, 0x20);
+    outb(0x20, 0x20);
+
+    if (k->int_no == 1)
+        inb(0x60);
 }
 
 static gdt_entry kgdt_table[6];
@@ -182,16 +188,18 @@ void kdesc_install()
     kdesc_setidt(47, (uint64_t)kirq15, 0x8E);
 
     outb(0x20, 0x11);
-    outb(0xA0, 0x11);       // PIC Remap Shenanigans!
-    outb(0x21, 0x0);        // Basically, disable all
-    outb(0xA1, 0x8);        // interrupts. We will
-    outb(0x21, 0x4);        // work with them AFTER
-    outb(0xA1, 0x2);        // memory management is
-    outb(0x21, 0x1);        // done.
+    outb(0xA0, 0x11);
+    outb(0x21, 0x20);
+    outb(0xA1, 0x28);
+    outb(0x21, 0x4);
+    outb(0xA1, 0x2);
+    outb(0x21, 0x1);
     outb(0xA1, 0x1);
-    outb(0x21, 0xFF);
-    outb(0xA1, 0xFF);
+    outb(0x21, 0x1); // Disable PIT
+    outb(0xA1, 0x1); // for now ...
     
     kdesc_setdescriptors();
     kdesc_reload();
+
+    kserial_outf("\r\nkdesc: interrupt descriptors set");
 }
