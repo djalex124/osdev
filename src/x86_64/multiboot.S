@@ -35,18 +35,14 @@ _start:
 
     push %edi
 
-    mov $0x1000, %edi //p4 at 0x1000
+    mov $phys_from_virt(boot_tab4), %edi //p4 at 0x1000
     mov %edi, %cr3
-    xor %eax, %eax
-    mov $0x1000, %ecx
-    rep stosl
-    mov %cr3, %edi
 
-    movl $0x2003, (%edi) //p3 at 0x2000
+    movl $(phys_from_virt(boot_tab3) + 3), (%edi) //p3 at 0x2000
     add $0xFF8, %edi
-    movl $0x2003, (%edi) //also map to higher half
+    movl $(phys_from_virt(boot_tab3) + 3), (%edi) //also map to higher half
     add $0x8, %edi
-    movl $0x3003, (%edi) //p2 at 0x3000
+    movl $(phys_from_virt(boot_tab2) + 3), (%edi) //p2 at 0x3000
     add $0x1000, %edi
     movl $0x83, (%edi)   //large page for first 2 mb
     
@@ -93,6 +89,17 @@ gdtp:
     .long 0
 
 .section .bss
+
 stack_bottom:
 .skip 0x1000
+.global stack_top
 stack_top:
+
+.align 0x1000
+.global boot_tab4
+boot_tab4:
+.skip 0x1000
+boot_tab3:
+.skip 0x1000
+boot_tab2:
+.skip 0x1000

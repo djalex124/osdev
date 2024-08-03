@@ -4,9 +4,9 @@
 #include <multiboot.h>
 #include <serial.h>
 #include <desc.h>
+#include <screen.h>
 
 void khalt(void);
-void kscreen(uint64_t fb, uint16_t width, uint16_t height, uint8_t bpp, uint32_t pitch);
 
 void kmultiboot(void *mboot_ptr)
 {
@@ -40,8 +40,9 @@ void kmultiboot(void *mboot_ptr)
         }
     }
 
+    kscreen_set(framebuffer);
     kmem_init(mmap);
-    kscreen(framebuffer->addr, framebuffer->width, framebuffer->height, framebuffer->bpp, framebuffer->pitch);
+    kscreen_init();
 }
 
 void kmain(uint64_t mboot_magic, void *mboot_ptr)
@@ -55,34 +56,14 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
         khalt();
     }
 
-    kmultiboot(mboot_ptr);
-    kmem_unpage(0, 0x200000);
-
-    kmem_page(0, kernel_virtual, 0x200000, 0x3);
-
     kdesc_install();
     asm("sti");
-    
+
+    kmultiboot(mboot_ptr);
+    kscreen_clr(default_color);
+
     kserial_outf("\r\nkmain: reached end of kernel logic");
     khalt();
-}
-
-void kscreen(uint64_t fb, uint16_t width, uint16_t height, uint8_t bpp, uint32_t pitch)
-{
-    //screen.c coming soon, settle with this for now
-
-    kmem_page(fb, virt_from_phys(fb), width * height * bpp, 0b11);
-    kserial_outf("\r\nkscr: addr at 0x%x width %d height %d bpp %d pitch %d", fb, width, height, bpp, pitch);
-
-    uint32_t default_color = 0x34568B;
-
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            *((uint32_t*)(virt_from_phys(fb) + y*pitch + x*(bpp/8)))=default_color;
-        }
-    }
 }
 
 void khalt(void)

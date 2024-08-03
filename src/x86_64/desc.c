@@ -17,6 +17,49 @@ void kwrapper_isr(kframe_int *k)
         k->rip, k->cs, k->ss);
     kserial_outf("\r\nkisr: eflags %b user_rsp 0x%x",
         k->eflags, k->user_rsp);
+    if (k->int_no == 0xD && k->err_code != 0)
+    {
+        kserial_outf("\r\nkisr: gpf from ");
+        uint16_t which = (k->err_code >> 1) & 3;
+        if (which == 0b00)
+            kserial_outf("gdt");
+        else if (which == 0b01 || which == 0b11)
+            kserial_outf("idt");
+        else if (which == 0b10)
+            kserial_outf("ldt");
+        kserial_outf(" at index %d", k->err_code >> 3);
+    }
+    else if (k->int_no == 0xE)
+    {
+        uint64_t cr2;
+        asm volatile ("mov %%cr2, %0" : "=r"(cr2));
+        kserial_outf("\r\nkisr: cr2 0x%x", cr2);
+        kserial_outf("\r\nkisr: page fault code: |");
+        if (k->err_code & 1)
+        {    
+            kserial_outf("present|");
+            if (k->err_code & (1 << 2))
+                kserial_outf("user|");
+            else
+                kserial_outf("system|");
+        }
+        else
+            kserial_outf("non-present|");
+        if (k->err_code & (1 << 1))
+            kserial_outf("write|");
+        else
+            kserial_outf("read|");
+        if (k->err_code & (1 << 3))
+            kserial_outf("reserved bits|");
+        if (k->err_code & (1 << 4))
+            kserial_outf("nx bit|");
+        if (k->err_code & (1 << 5))
+            kserial_outf("pk violation|");
+        if (k->err_code & (1 << 6))
+            kserial_outf("ss access|");
+        if (k->err_code & (1 << 14))
+            kserial_outf("sgx violation|");
+    }
 
     //should attempt fix or ret if non crashing isr before stack trace and hlt
 
@@ -28,6 +71,8 @@ void kwrapper_isr(kframe_int *k)
         kserial_outf("\r\nkisr: > 0x%x", stack->rip);
         stack = stack->rbp;
     }
+
+    while (1) asm("hlt");
 }
 
 void kwrapper_irq(kframe_int *k)
