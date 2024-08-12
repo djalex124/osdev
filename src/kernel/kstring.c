@@ -16,4 +16,12 @@ void* memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size) {
 	return dstptr;
 }
 
+size_t str_len(const char* s)
+{
+    size_t len = 0;
+    while (s[len])
+        len++;
+    return len;
+}
+
 //the plan is to use cpuid to check for quickest possible mem functions

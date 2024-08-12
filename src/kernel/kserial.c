@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <serial.h>
+#include <kstring.h>
 
 void kserial_init()
 {
@@ -23,14 +24,6 @@ void kserial_outc(char c)
 {
     while (!kserial_empty());
     outb(PORT1, c);
-}
-
-size_t str_len(const char* s)
-{
-    size_t len = 0;
-    while (s[len])
-        len++;
-    return len;
 }
 
 void kserial_outs(char *s)
@@ -78,7 +71,9 @@ void kserial_outf(const char *fmt, ...)
     va_start(arg, fmt);
 
     uint64_t i;
+    int64_t d;
     char *s;
+    char c;
     
     for (int count = 0; count < str_len(fmt); count++)
     {
@@ -98,13 +93,19 @@ void kserial_outf(const char *fmt, ...)
                     break;
                 kserial_outs(s);
                 break;
+            case 'c':
+                c = va_arg(arg, int);
+                if (c == 0)
+                    break;
+                kserial_outc(c);
+                break;
             case 'b':
                 i = va_arg(arg, uint64_t);
                 kserial_outn(i, 2);
                 break;
             case 'd':
-                i = va_arg(arg, uint64_t);
-                kserial_outn(i, 10);
+                d = va_arg(arg, int64_t);
+                kserial_outn(d, 10);
                 break;
             case 'x':
                 i = va_arg(arg, uint64_t);

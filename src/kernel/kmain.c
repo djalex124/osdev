@@ -5,6 +5,7 @@
 #include <serial.h>
 #include <desc.h>
 #include <screen.h>
+#include <debug.h>
 
 void khalt(void);
 
@@ -27,13 +28,17 @@ void kmultiboot(void *mboot_ptr)
             break;
             case 6:
             {
+#ifdef AQUA_DEBUG
                 kserial_outf("\r\nkmboot: mmap found > 0x%x", (uintptr_t)mboot_info);
+#endif
                 mmap = (struct multiboot_mmap_tag *) mboot_info;
             }
             break;
             case 8:
             {
+#ifdef AQUA_DEBUG
                 kserial_outf("\r\nkmboot: fb info found > 0x%x", (uintptr_t)mboot_info);
+#endif
                 framebuffer = (struct multiboot_framebuffer_tag *) mboot_info;
             }
             break;
@@ -48,7 +53,7 @@ void kmultiboot(void *mboot_ptr)
 void kmain(uint64_t mboot_magic, void *mboot_ptr)
 {
     kserial_init();
-    kserial_outf("\r\nConcatenOS Alpha Dev > Built on %s at %s", __DATE__, __TIME__);
+    kserial_outf("\r\n--- ConcatenOS Alpha Dev ---\r\n--- Built %s %s UTC-6 ---", __DATE__, __TIME__);
 
     if (mboot_magic != multiboot2_boot_magic)
     {
@@ -61,6 +66,8 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
 
     kmultiboot(mboot_ptr);
     kscreen_clr(default_color);
+
+    asm volatile ("int $3"); // test call for dbg handler
 
     kserial_outf("\r\nkmain: reached end of kernel logic");
     khalt();

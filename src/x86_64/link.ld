@@ -13,6 +13,15 @@ SECTIONS
         src/x86_64/multiboot.o (.text)
     }
 
+    .debug :
+    {
+        . = ALIGN(4096);
+        _debug_info = .;
+        *(.debug_info)
+        _debug_abbrev = .;
+        *(.debug_abbrev)
+    }
+
     . += kernel_va;
 
     .text : AT(ADDR(.text) - kernel_va)
@@ -50,7 +59,7 @@ SECTIONS
         *(COMMON)
         . = ALIGN(4096);
     }
-
+    
    _end = .;
 
    /DISCARD/ :

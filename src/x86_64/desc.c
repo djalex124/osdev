@@ -1,9 +1,11 @@
 #include <stdint.h>
 #include <serial.h>
+#include <debug.h>
 #include <desc.h>
 
 void kwrapper_isr(kframe_int *k)
 {   
+    kserial_outf("\r\n --- exception ---");
     kserial_outf("\r\nkisr: isr num %d err code %b", k->int_no, k->err_code);
     kserial_outf("\r\nkisr: rax 0x%x rbx 0x%x rcx 0x%x rdx 0x%x",
         k->rax, k->rbx, k->rcx, k->rdx);
@@ -68,7 +70,11 @@ void kwrapper_isr(kframe_int *k)
     kserial_outf("\r\nkisr: > 0x%x", k->rip);
     for(unsigned frame = 0; stack && frame < 5; ++frame)
     {
+#ifdef AQUA_DEBUG
+        kserial_outf("\r\nkisr: > 0x%x function > %s", stack->rip, kdbg_trace(stack->rip));
+#else
         kserial_outf("\r\nkisr: > 0x%x", stack->rip);
+#endif
         stack = stack->rbp;
     }
 
