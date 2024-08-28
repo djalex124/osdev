@@ -7,6 +7,7 @@ void kwrapper_isr(kframe_int *k)
 {   
     kserial_outf("\r\n --- exception ---");
     kserial_outf("\r\nkisr: isr num %d err code %b", k->int_no, k->err_code);
+#ifdef AQUA_DEBUG
     kserial_outf("\r\nkisr: rax 0x%x rbx 0x%x rcx 0x%x rdx 0x%x",
         k->rax, k->rbx, k->rcx, k->rdx);
     kserial_outf("\r\nkisr: rsp 0x%x rbp 0x%x rsi 0x%x rdi 0x%x",
@@ -35,7 +36,7 @@ void kwrapper_isr(kframe_int *k)
     {
         uint64_t cr2;
         asm volatile ("mov %%cr2, %0" : "=r"(cr2));
-        kserial_outf("\r\nkisr: cr2 0x%x", cr2);
+        kserial_outf("\r\nkisr: cr2 [0x%x]", cr2);
         kserial_outf("\r\nkisr: page fault code: |");
         if (k->err_code & 1)
         {    
@@ -62,21 +63,28 @@ void kwrapper_isr(kframe_int *k)
         if (k->err_code & (1 << 14))
             kserial_outf("sgx violation|");
     }
+#endif
 
     //should attempt fix or ret if non crashing isr before stack trace and hlt
 
     struct kstackframe* stack = (struct kstackframe*)k->rbp;
     kserial_outf("\r\nkisr: stack trace");
-    kserial_outf("\r\nkisr: > 0x%x", k->rip);
+#ifdef AQUA_DEBUG
+        kdbg_trace(k->rip);
+#else
+        kserial_outf("\r\nkisr: [0x%x]", k->rip);
+#endif
     for(unsigned frame = 0; stack && frame < 5; ++frame)
     {
 #ifdef AQUA_DEBUG
-        kserial_outf("\r\nkisr: > 0x%x function > %s", stack->rip, kdbg_trace(stack->rip));
+        kdbg_trace(stack->rip);
 #else
-        kserial_outf("\r\nkisr: > 0x%x", stack->rip);
+        kserial_outf("\r\nkisr: [0x%x]", stack->rip);
 #endif
         stack = stack->rbp;
     }
+
+    kserial_outf("\r\nkisr: end of trace");
 
     while (1) asm("hlt");
 }

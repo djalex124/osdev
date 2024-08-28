@@ -13,6 +13,8 @@ SECTIONS
         src/x86_64/multiboot.o (.text)
     }
 
+#ifdef AQUA_DEBUG
+
     .debug :
     {
         . = ALIGN(4096);
@@ -20,7 +22,14 @@ SECTIONS
         *(.debug_info)
         _debug_abbrev = .;
         *(.debug_abbrev)
+        _debug_str = .;
+        *(.debug_str)
+        _debug_line_str = .;
+        *(.debug_line_str)
+        _debug_line_str_end = .;
     }
+
+#endif
 
     . += kernel_va;
 

@@ -1,6 +1,7 @@
 #include <screen.h>
 #include <serial.h>
 #include <mem.h>
+#include <debug.h>
 
 static struct multiboot_framebuffer_tag screen_info;
 
@@ -26,7 +27,7 @@ void kscreen_set(struct multiboot_framebuffer_tag* fb_tag)
 
 void kscreen_init()
 {
-    kserial_outf("\r\nkscr: width %d height %d bpp %d pitch %d", screen_info.width, screen_info.height, screen_info.bpp, screen_info.pitch);
+    kserial_outf("\r\nkscr: [%d]x[%d] @ %d bpp", screen_info.width, screen_info.height, screen_info.bpp);
     kmem_page(screen_info.addr, screen_info.addr, screen_info.width * screen_info.height * screen_info.bpp, 0b11);
-    kserial_outf("\r\nkscr: framebuffer at 0x%x", screen_info.addr);
+    kdebug_outf("\r\nkscr: p [%d] framebuffer [0x%x]", screen_info.pitch, screen_info.addr);
 }

@@ -22,26 +22,16 @@ void kmultiboot(void *mboot_ptr)
         switch (mboot_info->type)
         {
             case 2:
-            {
-                kserial_outf("\r\nkmboot: booted through > %s", ((struct multiboot_string_tag *)mboot_info)->string);
-            }
-            break;
+                kserial_outf("\r\nkmboot: booted via [%s]", ((struct multiboot_string_tag *)mboot_info)->string);
+                break;
             case 6:
-            {
-#ifdef AQUA_DEBUG
-                kserial_outf("\r\nkmboot: mmap found > 0x%x", (uintptr_t)mboot_info);
-#endif
+                kdebug_outf("\r\nkmboot: mmap [0x%x]", (uintptr_t)mboot_info);
                 mmap = (struct multiboot_mmap_tag *) mboot_info;
-            }
-            break;
+                break;
             case 8:
-            {
-#ifdef AQUA_DEBUG
-                kserial_outf("\r\nkmboot: fb info found > 0x%x", (uintptr_t)mboot_info);
-#endif
+                kdebug_outf("\r\nkmboot: fb [0x%x]", (uintptr_t)mboot_info);
                 framebuffer = (struct multiboot_framebuffer_tag *) mboot_info;
-            }
-            break;
+                break;
         }
     }
 
@@ -53,7 +43,8 @@ void kmultiboot(void *mboot_ptr)
 void kmain(uint64_t mboot_magic, void *mboot_ptr)
 {
     kserial_init();
-    kserial_outf("\r\n--- ConcatenOS Alpha Dev ---\r\n--- Built %s %s UTC-6 ---", __DATE__, __TIME__);
+    kserial_outf("\r\n[ConcatenOS Alpha Dev]\r\n[Built %s %s UTC-6]", __DATE__, __TIME__);
+    kdebug_outf("\r\n[DEBUG BUILD]");
 
     if (mboot_magic != multiboot2_boot_magic)
     {
@@ -66,8 +57,6 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
 
     kmultiboot(mboot_ptr);
     kscreen_clr(default_color);
-
-    asm volatile ("int $3"); // test call for dbg handler
 
     kserial_outf("\r\nkmain: reached end of kernel logic");
     khalt();

@@ -3,6 +3,7 @@
 #include <mem.h>
 #include <serial.h>
 #include <kstring.h>
+#include <debug.h>
 
 extern uint64_t _end[];
 
@@ -18,7 +19,7 @@ uint64_t* kmem_earlyalloc()
     }
     uint64_t page = kmem_earlyalloc_start;
     kmem_earlyalloc_start += 0x1000;
-#ifdef kmem_paging_debug
+#ifdef AQUA_DEBUG_PAGING
     kserial_outf("\r\nkm_ea: new page table at 0x%x", page);
 #endif
     memset((uintptr_t *)page, 0, 0x1000);
@@ -36,7 +37,7 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
         plug into smarter physical memory manager
     */
 
-#ifdef AQUA_DEBUG
+#ifdef AQUA_DEBUG_PAGING
     kserial_outf("\r\nkm_p: attempt to page > phys=0x%x virt=0x%x length=0x%x",
         physical, address, size);
 #endif
@@ -86,14 +87,14 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
         }
     }
 
-#ifdef AQUA_DEBUG
+#ifdef AQUA_DEBUG_PAGING
     kserial_outf("\r\nkm_p: done");
 #endif
 }
 
 void kmem_unpage(uint64_t address, uint64_t size)
 {
-#ifdef AQUA_DEBUG
+#ifdef AQUA_DEBUG_PAGING
     kserial_outf("\r\nkm_up: attempt to unpage > virt=0x%x length=0x%x",
         address, size);
 #endif
@@ -119,7 +120,7 @@ void kmem_unpage(uint64_t address, uint64_t size)
 
         if (size >= 0x200000) //2mb page?
         {
-#ifdef AQUA_DEBUG
+#ifdef AQUA_DEBUG_PAGING
             kserial_outf("\r\nkm_up: unpage large page of 0x%x", address);
 #endif
             if (ptab2[p2_index] & 0x1)
@@ -165,17 +166,26 @@ void kmem_free(void* addr)
 
 extern uintptr_t boot_tab4;
 
+#ifdef AQUA_DEBUG
+static char* kmem_type[5] = {
+    "available",
+    "reserved",
+    "acpi reclaimable",
+    "non-volatile storage",
+    "bad ram"
+};
+#endif
+
 void kmem_init(struct multiboot_mmap_tag *mmap)
 {
     struct multiboot_mmap_entry *mmap_entries;
-    kserial_outf("\r\nkm_i: avail=1 resv=2 acpi_reclaim=3 nvs=4 bad=5");
 
     for (mmap_entries = mmap->entries;
         (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap->size;
         mmap_entries = (struct multiboot_mmap_entry *) ((uint64_t) mmap_entries + mmap->entry_size))
     {
-        kserial_outf("\r\nkm_i: mmap entry > start=0x%x len=0x%x end=0x%x type=%d", 
-            mmap_entries->address, mmap_entries->length, mmap_entries->address + mmap_entries->length, mmap_entries->type);
+        kdebug_outf("\r\nkm_i: mmap [0x%x] - [0x%x] %s", 
+            mmap_entries->address, mmap_entries->address + mmap_entries->length, kmem_type[mmap_entries->type - 1]);
         switch (mmap_entries->type)
         {
             case 1:
@@ -191,10 +201,8 @@ void kmem_init(struct multiboot_mmap_tag *mmap)
 	if (kmem_earlyalloc_start == 0) // dont overwrite bios data
 		kmem_earlyalloc_start += 0x1000;
 
-#ifdef AQUA_DEBUG
-    kserial_outf("\r\nkm_i: kernel pts 0x%x - 0x%x", kmem_earlyalloc_start, kmem_earlyalloc_end);
-    kserial_outf("\r\nkm_i: kernel residing 0x100000 - 0x%x", phys_from_virt((uint64_t)_end)); //when available, page kernel with global bit
-#endif
+    kdebug_outf("\r\nkm_i: kernel pts [0x%x] - [0x%x]", kmem_earlyalloc_start, kmem_earlyalloc_end);
+    kdebug_outf("\r\nkm_i: kernel [0x100000] - [0x%x]", phys_from_virt((uint64_t)_end)); //when available, page kernel with global bit
 
     kmem_earlyalloc_start+=kernel_virtual;
     kmem_earlyalloc_end+=kernel_virtual;
@@ -205,7 +213,5 @@ void kmem_init(struct multiboot_mmap_tag *mmap)
 
     asm volatile("mov %0, %%cr3" ::"r"(phys_from_virt((uintptr_t)ptab4)));
     
-#ifdef AQUA_DEBUG
-    kserial_outf("\r\n --- kmem_init done ---");
-#endif
+    kdebug_outf("\r\nkm_i: done");
 }

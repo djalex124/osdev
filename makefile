@@ -1,7 +1,9 @@
-build_speed = 
+build_speed = -O2
 
-kernel_flags = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -g -ggdb -gdwarf-5 -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall -c
-kernel_link  = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -g -ggdb -gdwarf-5 -fno-pie -T src/x86_64/link.ld
+gcc = x86_64-elf-gcc
+
+kernel_flags = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf-5 -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
+kernel_link  = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf-5 -fno-pie -T bin/link.ld
 
 all: run
 
@@ -19,18 +21,21 @@ kernel_obj_s = $(kernel_s:.S=.o)
 
 all_obj := $(boot_obj_c) $(boot_obj_s) $(kernel_obj_c) $(kernel_obj_s)
 
-bin/kernel.bin: $(all_obj)
-	/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_link) $(all_obj) -o bin/kernel.bin -nostdlib -lgcc
+bin/link.ld:
+	@$(gcc) -E -P -x c $(kernel_flags) src/x86_64/link.ld >bin/link.ld
+
+bin/kernel.bin: $(all_obj) bin/link.ld
+	@$(gcc) $(kernel_link) $(all_obj) -o bin/kernel.bin -nostdlib -lgcc
 	@objcopy --strip-debug bin/kernel.bin
 
-bin/dbg_kernel.bin: $(all_obj)
-	/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_link) $(all_obj) -o bin/dbg_kernel.bin -nostdlib -lgcc
+bin/dbg_kernel.bin: $(all_obj) bin/link.ld
+	@$(gcc) $(kernel_link) $(all_obj) -o bin/dbg_kernel.bin -nostdlib -lgcc
 
 %.o: %.c 
-	@/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_flags) -MMD -MP $< -o $@ -lgcc
+	@$(gcc) $(kernel_flags) -c -MMD -MP $< -o $@ -lgcc
 
 %.o: %.S 
-	@/home/alexk/ccx86_64/bin/x86_64-elf-gcc $(kernel_flags) -DASSEMBLY -MMD -MP $< -o $@ -lgcc
+	@$(gcc) $(kernel_flags) -c -DASSEMBLY -MMD -MP $< -o $@ -lgcc
 
 bin/boot.iso: bin/kernel.bin
 	@cp bin/kernel.bin grub/boot/kernel.bin
@@ -40,16 +45,15 @@ bin/dbg_boot.iso: bin/dbg_kernel.bin
 	@cp bin/dbg_kernel.bin grub/boot/kernel.bin
 	@grub-mkrescue -o bin/dbg_boot.iso grub
 
-run: build_speed += -O2
 run: bin/boot.iso
 	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none
 
-debug: build_speed += -O0
 debug: kernel_flags += -DAQUA_DEBUG
 debug: bin/dbg_boot.iso
 	@qemu-system-x86_64 -m 2048 -cdrom bin/dbg_boot.iso -net none -s -d int
 
 clean:
+	@rm -f bin/link.ld
 	@rm -f $(all_obj)
 	@rm -f bin/kernel.bin bin/dbg_kernel.bin
 	@rm -f bin/boot.iso bin/dbg_boot.iso
