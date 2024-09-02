@@ -43,17 +43,17 @@ bin/boot.iso: bin/kernel.bin
 
 bin/dbg_boot.iso: bin/dbg_kernel.bin
 	@cp bin/dbg_kernel.bin grub/boot/kernel.bin
-	@grub-mkrescue -o bin/dbg_boot.iso grub
+	@grub-mkrescue -o bin/boot.iso grub
 
 run: bin/boot.iso
 	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none
 
 debug: kernel_flags += -DAQUA_DEBUG
 debug: bin/dbg_boot.iso
-	@qemu-system-x86_64 -m 2048 -cdrom bin/dbg_boot.iso -net none -s -d int
+	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none -s -d int
 
 clean:
 	@rm -f bin/link.ld
 	@rm -f $(all_obj)
 	@rm -f bin/kernel.bin bin/dbg_kernel.bin
-	@rm -f bin/boot.iso bin/dbg_boot.iso
+	@rm -f bin/boot.iso

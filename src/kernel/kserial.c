@@ -59,12 +59,6 @@ void baditoa(uint64_t i, char buf[], int b)
     }
 }
 
-void kserial_outn(uint64_t n, uint8_t b)
-{
-    baditoa(n, baditoa_buffer, b);
-    kserial_outs(baditoa_buffer);
-}
-
 void kserial_outf(const char *fmt, ...)
 {
     va_list arg;
@@ -74,6 +68,9 @@ void kserial_outf(const char *fmt, ...)
     int64_t d;
     char *s;
     char c;
+    int length;
+    int len;
+    int j;
     
     for (int count = 0; count < str_len(fmt); count++)
     {
@@ -85,13 +82,43 @@ void kserial_outf(const char *fmt, ...)
 
         count++;
 
+        length = 0;
+        len = 0;
+        j = 0;
+
+        if (fmt[count] >= '0' && fmt[count] <= '9')
+        {
+            while (fmt[count] >= '0' && fmt[count] <= '9')
+            {
+                length = 10 * length + fmt[count] - '0';
+                count++;
+            }
+        }
+        else if (fmt[count] == '*')
+        {
+            length = va_arg(arg, int);
+            count++;
+        }
+
         switch (fmt[count])
         {
             case 's':
                 s = va_arg(arg, char *);
-                if (s == 0)
+                if (length == 0)
+                {
+                    kserial_outs(s);
                     break;
-                kserial_outs(s);
+                }
+                len = str_len(s);
+                j = 0;
+                while (j < length)
+                {
+                    if (j > len)
+                        kserial_outc(' ');
+                    else
+                        kserial_outc(s[j]);
+                    j++;
+                }
                 break;
             case 'c':
                 c = va_arg(arg, int);
@@ -101,15 +128,39 @@ void kserial_outf(const char *fmt, ...)
                 break;
             case 'b':
                 i = va_arg(arg, uint64_t);
-                kserial_outn(i, 2);
+                baditoa(i, baditoa_buffer, 2);
+                if (length == 0)
+                {
+                    kserial_outs(baditoa_buffer);
+                    break;
+                }
+                for (len = str_len(baditoa_buffer); length > len; length--)
+                    kserial_outc('0');
+                kserial_outs(baditoa_buffer);
                 break;
             case 'd':
                 d = va_arg(arg, int64_t);
-                kserial_outn(d, 10);
+                baditoa(d, baditoa_buffer, 10);
+                if (length == 0)
+                {
+                    kserial_outs(baditoa_buffer);
+                    break;
+                }
+                for (len = str_len(baditoa_buffer); length > len; length--)
+                    kserial_outc('0');
+                kserial_outs(baditoa_buffer);
                 break;
             case 'x':
                 i = va_arg(arg, uint64_t);
-                kserial_outn(i, 16);
+                baditoa(i, baditoa_buffer, 16);
+                if (length == 0)
+                {
+                    kserial_outs(baditoa_buffer);
+                    break;
+                }
+                for (len = str_len(baditoa_buffer); length > len; length--)
+                    kserial_outc('0');
+                kserial_outs(baditoa_buffer);
                 break;
             default:
                 kserial_outc(fmt[count]);

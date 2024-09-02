@@ -6,3 +6,4 @@
 void* memset(void* bufptr, uint64_t value, size_t size);
 void* memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size);
 size_t str_len(const char* s);
+int str_cmp(const char* a, const char* b, size_t n);

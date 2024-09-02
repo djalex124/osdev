@@ -7,6 +7,13 @@
 
 #include <stdint.h>
 
+struct mutliboot_acpi_tag
+{
+    uint32_t type;
+    uint32_t size;
+    uint8_t rsdp[];
+};
+
 struct multiboot_framebuffer_tag
 {
     uint32_t type;

@@ -6,6 +6,7 @@
 #include <desc.h>
 #include <screen.h>
 #include <debug.h>
+#include <acpi.h>
 
 void khalt(void);
 
@@ -14,6 +15,7 @@ void kmultiboot(void *mboot_ptr)
     struct multiboot_tag *mboot_info;
     struct multiboot_mmap_tag *mmap = 0;
     struct multiboot_framebuffer_tag *framebuffer = 0;
+    struct mutliboot_acpi_tag *acpi = 0;
 
     for (mboot_info = (struct multiboot_tag *) (mboot_ptr + 8);
          mboot_info->type != 0;
@@ -32,12 +34,21 @@ void kmultiboot(void *mboot_ptr)
                 kdebug_outf("\r\nkmboot: fb [0x%x]", (uintptr_t)mboot_info);
                 framebuffer = (struct multiboot_framebuffer_tag *) mboot_info;
                 break;
+            case 14:
+                kdebug_outf("\r\nkmboot: acpi v1");
+                acpi = (struct mutliboot_acpi_tag *) mboot_info;
+                break;
+            case 15:
+                kdebug_outf("\r\nkmboot: acpi v2");
+                acpi = (struct mutliboot_acpi_tag *) mboot_info;
+                break;
         }
     }
 
     kscreen_set(framebuffer);
     kmem_init(mmap);
     kscreen_init();
+    kacpi_init(acpi);
 }
 
 void kmain(uint64_t mboot_magic, void *mboot_ptr)

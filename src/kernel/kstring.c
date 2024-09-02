@@ -24,4 +24,13 @@ size_t str_len(const char* s)
     return len;
 }
 
+int str_cmp(const char* a, const char* b, size_t n)
+{
+	while ((*a == *b) && *a && n)
+		++a, ++b, --n;
+	if (n == 0)
+		return 0;
+	return ((int) (uint8_t) *a) - ((int) (uint8_t) *b);
+}
+
 //the plan is to use cpuid to check for quickest possible mem functions

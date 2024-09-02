@@ -2,7 +2,6 @@
 
 #include <debug.h>
 #include <stdint.h>
-#include <serial.h>
 #include <kstring.h>
 
 typedef struct __attribute__((packed))
