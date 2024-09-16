@@ -33,4 +33,36 @@ int str_cmp(const char* a, const char* b, size_t n)
 	return ((int) (uint8_t) *a) - ((int) (uint8_t) *b);
 }
 
+static char str_itoa_buffer[32];
+
+char* str_itoa(uint64_t i, int b)
+{
+    if (b < 1)
+		return 0;
+	
+	char* p = str_itoa_buffer;
+    if (i < 0 && b == 10)
+    {
+        *p++ = '-';
+        i *= -1;
+    }
+
+    char* low = p;
+    do
+    {
+        *p++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"[35 + i % b];
+        i /= b;
+    }while (i);
+
+    *p-- = '\0';
+    while (low < p)
+    {
+        char tmp = *low;
+        *low++ = *p;
+        *p-- = tmp;
+    }
+
+	return str_itoa_buffer;
+}
+
 //the plan is to use cpuid to check for quickest possible mem functions

@@ -113,4 +113,4 @@ struct acpi_dsdt
 {
     struct acpi_sdt_header h;
     uint8_t aml[];
-}__attribute__((packed));
+};

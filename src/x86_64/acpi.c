@@ -3,6 +3,8 @@
 #include <mem.h>
 #include <kstring.h>
 
+uint8_t* aml = 0;
+
 int kacpi_header_check(struct acpi_sdt_header *sdt)
 {
     uint8_t check = 0;
@@ -13,95 +15,24 @@ int kacpi_header_check(struct acpi_sdt_header *sdt)
     return 0;
 }
 
-void kacpi_aml_decode(uint8_t* aml, uint64_t end)
+void kacpi_aml_decode(uint64_t end)
 {
-    kdebug_outf("\r\nkacpi: aml decoding to %x", end);
-    while ((uint64_t)aml < end)
+    //kdebug_outf("\r\nkacpi: aml decoding to %x", end);
+    kdebug_outf("\r\nkacpi: aml decoding temp disabled");
+    /*while ((uint64_t)aml < end)
     {
         kdebug_outf("\r\nkacpi: aml [%2x]", *aml);
         switch (*aml)
         {
-            case 0x10:  // scope op
-                kdebug_outf(" defscope"); // name string : <rootchar namepath> | <prefixpath namepath>
-                aml++;
-                // rootchar = 0x5C prefixpath = nothing | <'^' prefixpath>
-                if (*aml == 0x5C)
-                    kdebug_outf("|rootchar");
-                else if (*aml == 0x5E)
-                {
-                    kdebug_outf("|prefixpath");
-                    aml++;
-                }
-                else
-                    kdebug_outf("|prefixpath");
-                aml++;
-                // namepath = nameseg | dualnamepath | multinamepath | nullname
-                if (*aml == 0x2E)
-                {
-                    kdebug_outf("|dualnamepath");
-                }
-                else if (*aml == 0x2F)
-                {
-                    kdebug_outf("|multinamepath");
-                }
-                else if (*aml == 0)
-                {
-                    kdebug_outf("|nullname");
-                }
-                else
-                {
-                    kdebug_outf("|nameseg");
-                    aml++;
-                    char* nameseg = (char*)aml;
-                    kdebug_outf("=%4s", nameseg);
-                    aml += 4;
-                }
-                kdebug_outf("|package_lead_byte=%8b", *aml);
-                int byte_count = *aml >> 6;
-                while (byte_count)
-                {
-                    aml++;
-                    kdebug_outf("-%2x", *aml);
-                    byte_count--;
-                }
-                aml++;
-                if (*aml == 0x5C)
-                    kdebug_outf("|rootchar");
-                else if (*aml == 0x5E)
-                {
-                    kdebug_outf("|prefixpath");
-                    aml++;
-                }
-                else
-                    kdebug_outf("|prefixpath");
-                aml++;
-                if (*aml == 0x2E)
-                {
-                    kdebug_outf("|dualnamepath");
-                }
-                else if (*aml == 0x2F)
-                {
-                    kdebug_outf("|multinamepath");
-                }
-                else if (*aml == 0)
-                {
-                    kdebug_outf("|nullname");
-                }
-                else
-                {
-                    kdebug_outf("|nameseg");
-                    aml++;
-                    char* nameseg = (char*)aml;
-                    kdebug_outf("=%x%x%x%x", (char)nameseg[0], (char)nameseg[1], (char)nameseg[2], (char)nameseg[3]);
-                    aml += 4;
-                }
+            case 0x10: // scope op - pkg - namestr - termlist
+                kdebug_outf(" DefScope");
                 break;
             default:
                 kdebug_outf(" %c", *aml);
                 break;
         }
         aml++;
-    }
+    }*/
 }
 
 void kacpi_init(struct mutliboot_acpi_tag *acpi_tag)
@@ -140,7 +71,8 @@ void kacpi_init(struct mutliboot_acpi_tag *acpi_tag)
         if (kacpi_header_check(&dsdt->h))
             goto checksum;
         kdebug_outf("\r\nkacpi: dsdt [%x]", (uint64_t)dsdt);
-        kacpi_aml_decode(dsdt->aml, (uint64_t)dsdt + dsdt->h.length);
+        aml = dsdt->aml;
+        kacpi_aml_decode((uint64_t)dsdt + dsdt->h.length);
     }
     else if (table->revision == 2)
     {
@@ -155,5 +87,4 @@ void kacpi_init(struct mutliboot_acpi_tag *acpi_tag)
 
     checksum:
     kdebug_outf("\r\nkacpi: invalid checksum!");
-    return;
 }

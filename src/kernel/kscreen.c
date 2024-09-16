@@ -25,6 +25,13 @@ void kscreen_set(struct multiboot_framebuffer_tag* fb_tag)
     screen_info.pitch = fb_tag->pitch;
 }
 
+extern char _font_start[];
+
+void kscreen_putc(char c, int cx, int cy, uint64_t fg, uint64_t bg)
+{
+    
+}
+
 void kscreen_init()
 {
     kserial_outf("\r\nkscr: [%d]x[%d] @ %d bpp", screen_info.width, screen_info.height, screen_info.bpp);
