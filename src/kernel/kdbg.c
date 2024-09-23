@@ -2,6 +2,8 @@
 
 #include <debug.h>
 #include <stdint.h>
+#include <serial.h>
+#include <screen.h>
 #include <kstring.h>
 
 typedef struct __attribute__((packed))
@@ -68,7 +70,7 @@ uint64_t kdbg_sleb128(uint8_t* num, int64_t* value)
     *value = result;
     return count;
 }
-/*
+
 const char* kdbg_tags[] =
 {
     "null", "TAG_array_type", "TAG_class_type", "TAG_entry_point",
@@ -146,9 +148,11 @@ const char* kdbg_ats[] =
     "AT_call_data_value", "AT_noreturn", "AT_alignment", "AT_export_symbols",
     "AT_deleted", "AT_defaulted", "AT_loclists_base",
 };
-*/
+
 static char kdbg_string[64];
 static char kdbg_file[64];
+
+#define kdbg_verbose 0
 
 void kdbg_trace(uint64_t addr)
 {
@@ -181,6 +185,9 @@ void kdbg_trace(uint64_t addr)
             {
                 if (entry->children == 1)
                     level++;
+#if kdbg_verbose
+                kserial_outf("\r\nkdbg: <%x><%x>: Abbrev Num %x (%s)", level, (uint64_t)ptr, check, kdbg_tags[entry->tag]);
+#endif
             }
 
             for (index = 0; ; index+=2)
@@ -194,10 +201,20 @@ void kdbg_trace(uint64_t addr)
                     continue;
                 }
 
+                if (entry->data[index] == 0x21) //is optional, will always print
+                    index += 2;
+#if kdbg_verbose
+                if (check == entry->type)
+                    kserial_outf("\r\nkdbg:   <%x>  %s", (uint64_t)ptr + size, kdbg_ats[entry->data[index]]);
+#endif
                 uint8_t type = entry->data[index + 1];
                 switch (type)
                 {
                     case 0x1E: // DW_FORM_data16
+#if kdbg_verbose
+                        if (check == entry->type)
+                            kserial_outf("  : 0x%x%x", *ptr_right(ptr, size + 1), *ptr_right(ptr, size + 9));
+#endif
                         size += 16;
                         break;
                     case 0x1: // DW_FORM_addr
@@ -207,13 +224,13 @@ void kdbg_trace(uint64_t addr)
                             size++;
                             break;
                         }
-                        if((check == entry->type) && (entry->tag == 0x2e))
+                        if(check == entry->type)
                         {
-                            switch (entry->data[index])
-                            {
-                                case 0x11:
-                                    low = *ptr_right(ptr, size + 1);
-                            }
+#if kdbg_verbose
+                            kserial_outf("  : <0x%x>", *ptr_right(ptr, size + 1));
+#endif
+                            if (entry->tag == 0x2e && entry->data[index] == 0x11)
+                                low = *ptr_right(ptr, size + 1);
                         }
                         size += debug->pointer_size;
                         break;
@@ -222,46 +239,31 @@ void kdbg_trace(uint64_t addr)
                     case 0x14:// DW_FORM_ref8
                     case 0x20:// DW_FORM_ref_sig8
                     case 0x24:// DW_FORM_ref_sup8
-                        if((check == entry->type) && (entry->tag == 0x2e))
+                        if(check == entry->type)
                         {
-                            switch (entry->data[index])
-                            {
-                                case 0x12:
-                                    high = *ptr_right(ptr, size + 1);
-                            }
+#if kdbg_verbose
+                            kserial_outf("  : 0x%x", *ptr_right(ptr, size + 1));
+#endif
+                            if (entry->tag == 0x2e && entry->data[index] == 0x12)
+                                high = *ptr_right(ptr, size + 1);
                         }
                         size += 8;
                         break;
                     case 0xE: // DW_FORM_strp
-                        if(check == entry->type)
-                        {
-                            switch (entry->tag)
-                            {
-                                case 0x11:
-                                    char* strp = (char*)(uintptr_t)((uint32_t)*ptr_right(ptr, size + 1));
-                                    if (entry->data[index] == 0x3)
-                                        memcpy(kdbg_file, strp, str_len(strp) + 1);
-                                    break;
-                                case 0x2e:
-                                    strp = (char*)(uintptr_t)((uint32_t)*ptr_right(ptr, size + 1));
-                                    memcpy(kdbg_string, strp, str_len(strp) + 1);
-                                    break;
-                            }
-                        }
-                        size += 4;
-                        break;
                     case 0x1F:// DW_FORM_line_strp
                         if(check == entry->type)
                         {
+                            char* strp = (char*)(uintptr_t)((uint32_t)*ptr_right(ptr, size + 1));
+#if kdbg_verbose
+                            kserial_outf("  : \"%s\"", strp);
+#endif
                             switch (entry->tag)
                             {
                                 case 0x11:
-                                    char* strp = (char*)(uintptr_t)((uint32_t)*ptr_right(ptr, size + 1));
                                     if (entry->data[index] == 0x3)
                                         memcpy(kdbg_file, strp, str_len(strp) + 1);
                                     break;
                                 case 0x2e:
-                                    strp = (char*)(uintptr_t)((uint32_t)*ptr_right(ptr, size + 1));
                                     memcpy(kdbg_string, strp, str_len(strp) + 1);
                                     break;
                             }
@@ -274,41 +276,75 @@ void kdbg_trace(uint64_t addr)
                     case 0x1D:// DW_FORM_strp_sup
                     case 0x28:// DW_FORM_strx4
                     case 0x2C:// DW_FORM_addrx4
+#if kdbg_verbose
+                        if(check == entry->type)
+                            kserial_outf("  : <0x%x>", *(uint32_t *)ptr_right(ptr, size + 1));
+#endif
                         size += 4;
                         break;
                     case 0x4: // DW_FORM_block4
                     case 0x6: // DW_FORM_data4
+#if kdbg_verbose
+                        if(check == entry->type)
+                            kserial_outf("  : 0x%x", *(uint32_t *)ptr_right(ptr, size + 1));
+#endif
                         size += 4;
                         break;
                     case 0x27:// DW_FORM_strx3
                     case 0x2B:// DW_FORM_addrx3
+#if kdbg_verbose                    
+                        if(check == entry->type)
+                            kserial_outf("  : <0x%x>", *(uint32_t *)ptr_right(ptr, size + 1));
+#endif                            
                         size += 3;
                         break;
                     case 0x3: // DW_FORM_block2
                     case 0x5: // DW_FORM_data2
+#if kdbg_verbose                    
+                        if(check == entry->type)
+                            kserial_outf("  : 0x%x", *(uint16_t *)ptr_right(ptr, size + 1));
+#endif                            
+                        size += 2;
+                        break;
                     case 0x12:// DW_FORM_ref2
                     case 0x26:// DW_FORM_strx2
                     case 0x2A:// DW_FORM_addrx2
+#if kdbg_verbose                    
+                        if(check == entry->type)
+                            kserial_outf("  : <0x%x>", *(uint16_t *)ptr_right(ptr, size + 1));
+#endif                            
                         size += 2;
                         break;
                     case 0xA: // DW_FORM_block1
                     case 0xB: // DW_FORM_data1
                     case 0xC: // DW_FORM_flag
+                        if(check == entry->type)
+                        {
+#if kdbg_verbose                            
+                            kserial_outf("  : 0x%x", *(uint8_t *)ptr_right(ptr, size + 1));
+#endif                            
+                            if (entry->tag == 0x2e)
+                            {
+                                switch (entry->data[index])
+                                {
+                                    case 0x3b:
+                                        line = (uint8_t)*ptr_right(ptr, size + 1);
+                                        break;
+                                    case 0x39:
+                                        column = (uint8_t)*ptr_right(ptr, size + 1);
+                                        break;
+                                }
+                            }
+                        }
+                        size += 1;
+                        break;
                     case 0x11:// DW_FORM_ref1
                     case 0x25:// DW_FORM_strx1
                     case 0x29:// DW_FORM_addrx1
-                        if((check == entry->type) && (entry->tag == 0x2e))
-                        {
-                            switch (entry->data[index])
-                            {
-                                case 0x3b:
-                                    line = (uint8_t)*ptr_right(ptr, size + 1);
-                                    break;
-                                case 0x39:
-                                    column = (uint8_t)*ptr_right(ptr, size + 1);
-                                    break;
-                            }
-                        }
+#if kdbg_verbose                    
+                        if (check == entry->type)
+                            kserial_outf("  : <0x%x>", *(uint8_t *)ptr_right(ptr, size + 1));
+#endif                            
                         size += 1;
                         break;
                     case 0x9: // DW_FORM_block
@@ -321,6 +357,10 @@ void kdbg_trace(uint64_t addr)
                     case 0x23:// DW_FORM_rnglistx
                         leb_size = 0;
                         leb_size = kdbg_uleb128((uint8_t *)((uint64_t)ptr + size + 1), &uleb_num);
+#if kdbg_verbose                        
+                        if (check == entry->type)
+                            kserial_outf("  : 0x%x", uleb_num);
+#endif                            
                         size += leb_size;
                         break;
                     case 0xD: // DW_FORM_sdata
@@ -328,25 +368,33 @@ void kdbg_trace(uint64_t addr)
                         leb_size = 0;
                         index++;
                         leb_size = kdbg_sleb128(&entry->data[index + 1], &sleb_num);
-                        if((check == entry->type) && (entry->tag == 0x2e))
+                        if(check == entry->type)
                         {
-                            switch (entry->data[index])
+#if kdbg_verbose                            
+                            kserial_outf("  : 0x%x", (uint64_t)sleb_num);
+#endif                            
+                            if (entry->tag == 0x2e)
                             {
-                                case 0x3b:
-                                    line = (uint64_t)sleb_num;
-                                    break;
-                                case 0x39:
-                                    column = (uint64_t)sleb_num;
-                                    break;
+                                switch (entry->data[index])
+                                {
+                                    case 0x3b:
+                                        line = (uint64_t)sleb_num;
+                                        break;
+                                    case 0x39:
+                                        column = (uint64_t)sleb_num;
+                                        break;
+                                }
                             }
                         }
                         break;
                     case 0x8: // DW_FORM_string
                         char *str = (char *)((uint64_t)ptr + size + 1);
                         uint64_t str_size = str_len(str) + 1;
-                        size += str_size;
                         if(check == entry->type)
                         {
+#if kdbg_verbose                            
+                            kserial_outf("  : \"%s\"", str);
+#endif                            
                             switch (entry->tag)
                             {
                                 case 0x11:
@@ -357,9 +405,16 @@ void kdbg_trace(uint64_t addr)
                                     break;
                             }
                         }
+                        size += str_size;
                         break;
                     case 0x18:// DW_FORM_exprloc
                         leb_size = kdbg_uleb128((uint8_t *)((uint64_t)ptr + size + 1), &uleb_num);
+#if kdbg_verbose                        
+                        if (check == entry->type)
+                            kserial_outf("  : 0x%x", uleb_num);
+#endif                            
+                        if (uleb_num > 100)
+                            size += 1; // bogus
                         size += uleb_num + 1;
                         break;
                     case 0x19:// DW_FORM_flag_present
@@ -373,12 +428,15 @@ void kdbg_trace(uint64_t addr)
             if (check==entry->type)
                 break;
         }
-
+        
         if (entry->tag == 0x2e)
         {
             if ((addr >= low) && (addr <= low + high))
             {
-                kserial_outf("\r\nkdbg: (%x) [%s] line:%d column:%d function:%s", addr, kdbg_file, line, column, kdbg_string);
+#if kdbg_verbose                
+                kserial_outf("\r\nkdbg: (0x%x) [%s] line:%d column:%d function:%s", addr, kdbg_file, line, column, kdbg_string);
+#endif                
+                kscreen_putf("\r\nkdbg: (0x%x) [%s] line:%d column:%d function:%s", addr, kdbg_file, line, column, kdbg_string);
                 break;
             }
             high = 0;

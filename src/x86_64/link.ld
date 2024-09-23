@@ -13,6 +13,11 @@ SECTIONS
         src/x86_64/multiboot.o (.text)
     }
 
+    .font :
+    {
+        bin/font.o
+    }
+
 #ifdef AQUA_DEBUG
 
     .debug :

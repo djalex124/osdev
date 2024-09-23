@@ -19,7 +19,8 @@ kernel_s := $(wildcard src/kernel/*.S)
 kernel_obj_c = $(kernel_c:.c=.o)
 kernel_obj_s = $(kernel_s:.S=.o)
 
-all_obj := $(boot_obj_c) $(boot_obj_s) $(kernel_obj_c) $(kernel_obj_s)
+build_obj := $(boot_obj_c) $(boot_obj_s) $(kernel_obj_c) $(kernel_obj_s)
+all_obj := $(build_obj)
 
 bin/link.ld:
 	@$(gcc) -E -P -x c $(kernel_flags) src/x86_64/link.ld >bin/link.ld
@@ -54,6 +55,6 @@ debug: bin/dbg_boot.iso
 
 clean:
 	@rm -f bin/link.ld
-	@rm -f $(all_obj)
+	@rm -f $(build_obj)
 	@rm -f bin/kernel.bin bin/dbg_kernel.bin
 	@rm -f bin/boot.iso

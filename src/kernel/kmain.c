@@ -23,15 +23,10 @@ void kmultiboot(void *mboot_ptr)
     {
         switch (mboot_info->type)
         {
-            case 2:
-                kserial_outf("\r\nkmboot: booted via [%s]", ((struct multiboot_string_tag *)mboot_info)->string);
-                break;
             case 6:
-                kdebug_outf("\r\nkmboot: mmap [0x%x]", (uintptr_t)mboot_info);
                 mmap = (struct multiboot_mmap_tag *) mboot_info;
                 break;
             case 8:
-                kdebug_outf("\r\nkmboot: fb [0x%x]", (uintptr_t)mboot_info);
                 framebuffer = (struct multiboot_framebuffer_tag *) mboot_info;
                 break;
             case 14:
@@ -51,15 +46,21 @@ void kmultiboot(void *mboot_ptr)
     kacpi_init(acpi);
 }
 
+#ifdef AQUA_DEBUG
+#define AQUA_VERSION "0.0/D"
+#else
+#define AQUA_VERSION "0.0"
+#endif
+
 void kmain(uint64_t mboot_magic, void *mboot_ptr)
 {
+#ifdef AQUA_DEBUG
     kserial_init();
-    kserial_outf("\r\n[ConcatenOS Alpha Dev]\r\n[Built %s %s UTC-6]", __DATE__, __TIME__);
-    kdebug_outf("\r\n[DEBUG BUILD]");
+#endif
 
     if (mboot_magic != multiboot2_boot_magic)
     {
-        kserial_outf("\r\nkmain: incorrect multiboot magic?");
+        kdebug_outf("\r\nkmain: incorrect multiboot magic?");
         khalt();
     }
 
@@ -69,13 +70,14 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
     kmultiboot(mboot_ptr);
     kscreen_clr(default_color);
 
-    kserial_outf("\r\nkmain: reached end of kernel logic");
+    kscreen_putf("%m%n[AQUA Kernel (%s) - Alpha Dev]\r\n[Built %s UTC-6]", default_color, 0, AQUA_VERSION, __TIMESTAMP__); 
+
     khalt();
 }
 
 void khalt(void)
 {
-    kserial_outf("\r\nkhalt: halting indefinitely!");
+    kdebug_outf("\r\nkhalt: halting indefinitely!");
     while(1)
         asm("hlt");
 }

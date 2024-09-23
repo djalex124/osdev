@@ -1,97 +1,108 @@
 #include <stdint.h>
 #include <serial.h>
+#include <screen.h>
 #include <debug.h>
 #include <desc.h>
 
+const char* kdesc_ints[] =
+{
+    "DE", "DB", "NM", "BP",
+    "OF", "BR", "UD", "NM",
+    "DF", "XX", "TS", "NP",
+    "SS", "GP", "PF", "XX",
+    "MF", "AC", "MC", "XF",
+    "VE", "CP", "XX", "XX",
+    "XX", "XX", "XX", "XX",
+    "HV", "VC", "SX", "XX"
+};
+
 void kwrapper_isr(kframe_int *k)
 {   
-    kserial_outf("\r\n --- exception ---");
-    kserial_outf("\r\nkisr: isr num %d err code %b", k->int_no, k->err_code);
+    kscreen_putf("\r\n%n%m --- exception --- ", 0xFF0000, 0x0);
+    kscreen_putf("\r\nkisr: isr 0x%d #%s code 0b%b", k->int_no, kdesc_ints[k->int_no], k->err_code);
 #ifdef AQUA_DEBUG
-    kserial_outf("\r\nkisr: rax 0x%x rbx 0x%x rcx 0x%x rdx 0x%x",
+    kscreen_putf("\r\nkisr: rax 0x%x rbx 0x%x rcx 0x%x rdx 0x%x",
         k->rax, k->rbx, k->rcx, k->rdx);
-    kserial_outf("\r\nkisr: rsp 0x%x rbp 0x%x rsi 0x%x rdi 0x%x",
+    kscreen_putf("\r\nkisr: rsp 0x%x rbp 0x%x rsi 0x%x rdi 0x%x",
         k->rsp, k->rbp, k->rsi, k->rdi);
-    kserial_outf("\r\nkisr: r8  0x%x r9  0x%x r10 0x%x r11 0x%x",
+    kscreen_putf("\r\nkisr: r8  0x%x r9  0x%x r10 0x%x r11 0x%x",
         k->r8, k->r9, k->r10, k->r11);
-    kserial_outf("\r\nkisr: r12 0x%x r13 0x%x r14 0x%x r15 0x%x",
+    kscreen_putf("\r\nkisr: r12 0x%x r13 0x%x r14 0x%x r15 0x%x",
         k->r12, k->r13, k->r14, k->r15);
-    kserial_outf("\r\nkisr: rip 0x%x cs  0x%x ss 0x%x",
+    kscreen_putf("\r\nkisr: rip 0x%x cs  0x%x ss 0x%x",
         k->rip, k->cs, k->ss);
-    kserial_outf("\r\nkisr: eflags %b user_rsp 0x%x",
+    kscreen_putf("\r\nkisr: eflags 0b%b user_rsp 0x%x",
         k->eflags, k->user_rsp);
     if (k->int_no == 0xD && k->err_code != 0)
     {
-        kserial_outf("\r\nkisr: gpf from ");
+        kscreen_putf("\r\nkisr: gpf from ");
         uint16_t which = (k->err_code >> 1) & 3;
         if (which == 0b00)
-            kserial_outf("gdt");
+            kscreen_putf("gdt");
         else if (which == 0b01 || which == 0b11)
-            kserial_outf("idt");
+            kscreen_putf("idt");
         else if (which == 0b10)
-            kserial_outf("ldt");
-        kserial_outf(" at index %d", k->err_code >> 3);
+            kscreen_putf("ldt");
+        kscreen_putf(" at index %d", k->err_code >> 3);
     }
     else if (k->int_no == 0xE)
     {
         uint64_t cr2;
         asm volatile ("mov %%cr2, %0" : "=r"(cr2));
-        kserial_outf("\r\nkisr: cr2 [0x%x]", cr2);
-        kserial_outf("\r\nkisr: page fault code: |");
+        kscreen_putf("\r\nkisr: cr2 [0x%x]", cr2);
+        kscreen_putf("\r\nkisr: pf code: |");
         if (k->err_code & 1)
         {    
-            kserial_outf("present|");
+            kscreen_putf("present|");
             if (k->err_code & (1 << 2))
-                kserial_outf("user|");
+                kscreen_putf("user|");
             else
-                kserial_outf("system|");
+                kscreen_putf("system|");
         }
         else
-            kserial_outf("non-present|");
+            kscreen_putf("non-present|");
         if (k->err_code & (1 << 1))
-            kserial_outf("write|");
+            kscreen_putf("write|");
         else
-            kserial_outf("read|");
+            kscreen_putf("read|");
         if (k->err_code & (1 << 3))
-            kserial_outf("reserved bits|");
+            kscreen_putf("reserved bits|");
         if (k->err_code & (1 << 4))
-            kserial_outf("nx bit|");
+            kscreen_putf("nx bit|");
         if (k->err_code & (1 << 5))
-            kserial_outf("pk violation|");
+            kscreen_putf("pk violation|");
         if (k->err_code & (1 << 6))
-            kserial_outf("ss access|");
+            kscreen_putf("ss access|");
         if (k->err_code & (1 << 14))
-            kserial_outf("sgx violation|");
+            kscreen_putf("sgx violation|");
     }
 #endif
 
     //should attempt fix or ret if non crashing isr before stack trace and hlt
 
     struct kstackframe* stack = (struct kstackframe*)k->rbp;
-    kserial_outf("\r\nkisr: stack trace");
+    kscreen_putf("\r\nkisr: stack trace");
 #ifdef AQUA_DEBUG
         kdbg_trace(k->rip);
 #else
-        kserial_outf("\r\nkisr: [0x%x]", k->rip);
+        kscreen_putf("\r\nkisr: [0x%x]", k->rip);
 #endif
     for(unsigned frame = 0; stack && frame < 5; ++frame)
     {
 #ifdef AQUA_DEBUG
         kdbg_trace(stack->rip);
 #else
-        kserial_outf("\r\nkisr: [0x%x]", stack->rip);
+        kscreen_putf("\r\nkisr: [0x%x]", stack->rip);
 #endif
         stack = stack->rbp;
     }
-
-    kserial_outf("\r\nkisr: end of trace");
 
     while (1) asm("hlt");
 }
 
 void kwrapper_irq(kframe_int *k)
 {
-    kserial_outf("\r\nkirq: irq num %x", k->int_no);
+    kdebug_outf("\r\nkirq: irq num %x", k->int_no);
     if (k->int_no >= 8)
         outb(0xA0, 0x20);
     outb(0x20, 0x20);
@@ -260,5 +271,5 @@ void kdesc_install()
     kdesc_setdescriptors();
     kdesc_reload();
 
-    kserial_outf("\r\nkdesc: interrupt descriptors set");
+    kdebug_outf("\r\nkdesc: interrupt descriptors set");
 }

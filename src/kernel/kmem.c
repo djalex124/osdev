@@ -155,14 +155,26 @@ void kmem_unpage(uint64_t address, uint64_t size)
 //physical memory management?
 //currently: UNFINISHED
 
+uint64_t kmem_heap;
+uint64_t kmem_heapend;
+
 void* kmem_alloc(uint64_t size)
 {
-    return 0;
+    if ((kmem_heap + size) > kmem_heapend)
+    {
+        kdebug_outf("\r\nkm_a: out of kernel heap - halting");
+        for(;;);
+    }
+    uint64_t addr = kmem_heap;
+    kmem_heap += size;
+    kdebug_outf("\r\nkm_a: heap now at [0x%x]", kmem_heap);
+    //memset((uintptr_t *)addr, 0, size);
+    return (uintptr_t *)addr;
 }
 
 void kmem_free(void* addr)
 {
-    return;
+    return; //no good implementation until real mm
 }
 
 extern uintptr_t boot_tab4;
@@ -213,6 +225,11 @@ void kmem_init(struct multiboot_mmap_tag *mmap)
     kmem_page(0, kernel_virtual, 0x200000, 0b11);
 
     asm volatile("mov %0, %%cr3" ::"r"(phys_from_virt((uintptr_t)ptab4)));
+
+    kmem_heap = (uint64_t)_end;
+    kmem_heapend = kernel_virtual + 0x200000;
+
+    kdebug_outf("\r\nkm_i: kernel heap [0x%x] - [0x%x]", kmem_heap, kmem_heapend);
     
     kdebug_outf("\r\nkm_i: done");
 }
