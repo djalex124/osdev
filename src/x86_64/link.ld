@@ -13,11 +13,6 @@ SECTIONS
         src/x86_64/multiboot.o (.text)
     }
 
-    .font :
-    {
-        bin/font.o
-    }
-
 #ifdef AQUA_DEBUG
 
     .debug :
@@ -56,6 +51,11 @@ SECTIONS
         _data = .;
         *(.data)
         . = ALIGN(4096);
+    }
+
+    .font :
+    {
+        bin/font.o
     }
 
     .eh_frame : AT(ADDR(.eh_frame) - kernel_va)

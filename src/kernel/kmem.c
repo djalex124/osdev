@@ -9,7 +9,7 @@ extern uint64_t _end[];
 static uint64_t kmem_earlyalloc_start;
 static uint64_t kmem_earlyalloc_end;
 
-//#define AQUA_DEBUG_PAGING
+#define AQUA_DEBUG_PAGING
 
 uint64_t* kmem_earlyalloc()
 {
@@ -168,7 +168,7 @@ void* kmem_alloc(uint64_t size)
     uint64_t addr = kmem_heap;
     kmem_heap += size;
     kdebug_outf("\r\nkm_a: heap now at [0x%x]", kmem_heap);
-    //memset((uintptr_t *)addr, 0, size);
+    memset((uintptr_t *)addr, 0, size);
     return (uintptr_t *)addr;
 }
 
@@ -176,8 +176,6 @@ void kmem_free(void* addr)
 {
     return; //no good implementation until real mm
 }
-
-extern uintptr_t boot_tab4;
 
 #ifdef AQUA_DEBUG
 static char* kmem_type[5] = {
@@ -221,13 +219,13 @@ void kmem_init(struct multiboot_mmap_tag *mmap)
     kmem_earlyalloc_end+=kernel_virtual;
     
     ptab4 = kmem_earlyalloc();
-    kmem_page(0, 0, 0x200000, 0b11);
-    kmem_page(0, kernel_virtual, 0x200000, 0b11);
+    kmem_page(0, 0, kernel_space, 0b11); //only identity mapped while reading GRUB data
+    kmem_page(0, kernel_virtual, kernel_space, 0b11);
 
     asm volatile("mov %0, %%cr3" ::"r"(phys_from_virt((uintptr_t)ptab4)));
 
     kmem_heap = (uint64_t)_end;
-    kmem_heapend = kernel_virtual + 0x200000;
+    kmem_heapend = kernel_virtual + kernel_space;
 
     kdebug_outf("\r\nkm_i: kernel heap [0x%x] - [0x%x]", kmem_heap, kmem_heapend);
     

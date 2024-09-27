@@ -21,15 +21,15 @@ void kwrapper_isr(kframe_int *k)
     kscreen_putf("\r\n%n%m --- exception --- ", 0xFF0000, 0x0);
     kscreen_putf("\r\nkisr: isr 0x%d #%s code 0b%b", k->int_no, kdesc_ints[k->int_no], k->err_code);
 #ifdef AQUA_DEBUG
-    kscreen_putf("\r\nkisr: rax 0x%x rbx 0x%x rcx 0x%x rdx 0x%x",
+    kscreen_putf("\r\nkisr: rax 0x%16x rbx 0x%16x rcx 0x%16x rdx 0x%16x",
         k->rax, k->rbx, k->rcx, k->rdx);
-    kscreen_putf("\r\nkisr: rsp 0x%x rbp 0x%x rsi 0x%x rdi 0x%x",
+    kscreen_putf("\r\nkisr: rsp 0x%16x rbp 0x%16x rsi 0x%16x rdi 0x%16x",
         k->rsp, k->rbp, k->rsi, k->rdi);
-    kscreen_putf("\r\nkisr: r8  0x%x r9  0x%x r10 0x%x r11 0x%x",
+    kscreen_putf("\r\nkisr: r8  0x%16x r9  0x%16x r10 0x%16x r11 0x%16x",
         k->r8, k->r9, k->r10, k->r11);
-    kscreen_putf("\r\nkisr: r12 0x%x r13 0x%x r14 0x%x r15 0x%x",
+    kscreen_putf("\r\nkisr: r12 0x%16x r13 0x%16x r14 0x%16x r15 0x%16x",
         k->r12, k->r13, k->r14, k->r15);
-    kscreen_putf("\r\nkisr: rip 0x%x cs  0x%x ss 0x%x",
+    kscreen_putf("\r\nkisr: rip 0x%16x cs  0x%x ss 0x%x",
         k->rip, k->cs, k->ss);
     kscreen_putf("\r\nkisr: eflags 0b%b user_rsp 0x%x",
         k->eflags, k->user_rsp);

@@ -31,7 +31,7 @@ void kscreen_set(struct multiboot_framebuffer_tag* fb_tag)
 
 extern char _binary____font_psf_start[];
 static uint32_t fg, bg;
-static unsigned int cx = 0, cy = 0;
+static unsigned int cx = 0, cy = 0, cw = 0, ch = 0;
 
 void kscreen_putc(uint16_t c)
 {
@@ -72,13 +72,14 @@ void kscreen_printc(uint16_t c)
         default:
             kscreen_putc(c);
             cx++;
-            if (cx != screen_info.width/((psf_font *)&_binary____font_psf_start)->width)
+            if (cx != cw)
                 break;
         case '\n':
             cx = 0;
-            if (cy++ == screen_info.height/((psf_font *)&_binary____font_psf_start)->height)
+            if (cy++ > ch)
             {
                 //terminal scroll?
+                cy--;
             }
             break;
     }
@@ -214,6 +215,9 @@ void kscreen_putf(const char *fmt, ...)
 void kscreen_init()
 {
     kdebug_outf("\r\nkscr: [%d]x[%d] @ %d bpp", screen_info.width, screen_info.height, screen_info.bpp);
-    kmem_page(screen_info.addr, screen_info.addr, screen_info.width * screen_info.height * screen_info.bpp, 0b11);
+    kmem_page(screen_info.addr, screen_info.addr + kernel_virtual, screen_info.width * screen_info.height * screen_info.bpp, 0b11);
     kdebug_outf("\r\nkscr: p [%d] framebuffer [0x%x]", screen_info.pitch, screen_info.addr);
+    screen_info.addr += kernel_virtual;
+    cw = screen_info.width/((psf_font *)&_binary____font_psf_start)->width;
+    ch = screen_info.height/((psf_font *)&_binary____font_psf_start)->height;
 }

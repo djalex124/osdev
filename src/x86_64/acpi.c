@@ -73,6 +73,8 @@ void kacpi_init(struct mutliboot_acpi_tag *acpi_tag)
         kdebug_outf("\r\nkacpi: dsdt [%x]", (uint64_t)dsdt);
         aml = dsdt->aml;
         kacpi_aml_decode((uint64_t)dsdt + dsdt->h.length);
+        kmem_unpage((uint64_t)dsdt & 0xFFFFF000, 0x1000);
+        kmem_unpage(sdt_addr & 0xFFFFF000, 0x1000);
     }
     else if (table->revision == 2)
     {

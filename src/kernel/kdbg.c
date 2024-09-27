@@ -5,6 +5,7 @@
 #include <serial.h>
 #include <screen.h>
 #include <kstring.h>
+#include <mem.h>
 
 typedef struct __attribute__((packed))
 {
@@ -156,9 +157,11 @@ static char kdbg_file[64];
 
 void kdbg_trace(uint64_t addr)
 {
-    debuginfo_header* debug = (debuginfo_header *)(uint64_t)&_debug_info;
+    //some virtual addr magic due to dwarf being 32-bit
+
+    debuginfo_header* debug = (debuginfo_header *)virt_from_phys((uint64_t)&_debug_info);
     uint64_t* ptr = ptr_right(debug, sizeof(debuginfo_header));
-    uint64_t* abbrev_ptr = (uint64_t *)(uint64_t)debug->abbrev_offset;
+    uint64_t* abbrev_ptr = (uint64_t *)virt_from_phys((uint64_t)debug->abbrev_offset);
 
     uint8_t level = 0, unit = 0;
     uint64_t size = 1;
@@ -253,7 +256,7 @@ void kdbg_trace(uint64_t addr)
                     case 0x1F:// DW_FORM_line_strp
                         if(check == entry->type)
                         {
-                            char* strp = (char*)(uintptr_t)((uint32_t)*ptr_right(ptr, size + 1));
+                            char* strp = (char*)(uintptr_t)virt_from_phys((uint32_t)*ptr_right(ptr, size + 1));
 #if kdbg_verbose
                             kserial_outf("  : \"%s\"", strp);
 #endif
@@ -445,18 +448,18 @@ void kdbg_trace(uint64_t addr)
         }
 
         if(check == 0)level--;
-        abbrev_ptr = (uint64_t *)(uint64_t)debug->abbrev_offset;
+        abbrev_ptr = (uint64_t *)virt_from_phys((uint64_t)debug->abbrev_offset);
         ptr = ptr_right(ptr, size + 1);
         if (level == 0)
         {
             debug = (debuginfo_header *)ptr;
             ptr = ptr_right(ptr, sizeof(debuginfo_header));
-            abbrev_ptr = (uint64_t *)(uint64_t)debug->abbrev_offset;
+            abbrev_ptr = (uint64_t *)virt_from_phys((uint64_t)debug->abbrev_offset);
             size = 1;
             unit++;
             kdbg_file[0] = 0;
         }
-        if ((uint64_t)ptr > (uint64_t)&_debug_abbrev)
+        if ((uint64_t)ptr > virt_from_phys((uint64_t)&_debug_abbrev))
             break;
     }
 }

@@ -1,4 +1,5 @@
 #include <multiboot.h>
+#include <mem.h>
 
 .code64
 .text
@@ -9,6 +10,7 @@ _start64:
     callq *%rax
 
 entry64: // jump to correct RIP
+    movabsq $stack_top, %rsp
 .extern kmain
     xor %rbp, %rbp
     call kmain

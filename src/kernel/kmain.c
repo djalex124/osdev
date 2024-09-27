@@ -17,6 +17,8 @@ void kmultiboot(void *mboot_ptr)
     struct multiboot_framebuffer_tag *framebuffer = 0;
     struct mutliboot_acpi_tag *acpi = 0;
 
+    kserial_outf("\r\nkmboot: ptr [0x%x]", (uint64_t)mboot_ptr);
+
     for (mboot_info = (struct multiboot_tag *) (mboot_ptr + 8);
          mboot_info->type != 0;
          mboot_info = (struct multiboot_tag *) ((uint8_t *) mboot_info + ((mboot_info->size + 7) & ~7)))
@@ -68,9 +70,10 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
     asm("sti");
 
     kmultiboot(mboot_ptr);
+    kmem_unpage(0, kernel_space); // finally higher half only mapping
     kscreen_clr(default_color);
 
-    kscreen_putf("%m%n[AQUA Kernel (%s) - Alpha Dev]\r\n[Built %s UTC-6]", default_color, 0, AQUA_VERSION, __TIMESTAMP__); 
+    kscreen_putf("%m%n[AQUA Kernel (%s) - In Development]\r\n[Built %s %s UTC-6]", default_color, 0, AQUA_VERSION, __TIME__, __DATE__);
 
     khalt();
 }
