@@ -2,7 +2,7 @@ build_speed = -O2
 
 gcc = x86_64-elf-gcc
 
-kernel_flags = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf-5 -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
+kernel_flags = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$$(cat build.txt) -gdwarf-5 -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
 kernel_link  = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf-5 -fno-pie -T bin/link.ld
 
 all: run
@@ -41,10 +41,12 @@ bin/dbg_kernel.bin: $(all_obj) bin/link.ld
 bin/boot.iso: bin/kernel.bin
 	@cp bin/kernel.bin grub/boot/kernel.bin
 	@grub-mkrescue -o bin/boot.iso grub
+	@echo $$(($$(cat build.txt) + 1)) > build.txt
 
 bin/dbg_boot.iso: bin/dbg_kernel.bin
 	@cp bin/dbg_kernel.bin grub/boot/kernel.bin
 	@grub-mkrescue -o bin/boot.iso grub
+	@echo $$(($$(cat build.txt) + 1)) > build.txt
 
 run: bin/boot.iso
 	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none

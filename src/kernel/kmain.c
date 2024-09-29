@@ -7,6 +7,7 @@
 #include <screen.h>
 #include <debug.h>
 #include <acpi.h>
+#include <kernel.h>
 
 void khalt(void);
 
@@ -48,12 +49,6 @@ void kmultiboot(void *mboot_ptr)
     kacpi_init(acpi);
 }
 
-#ifdef AQUA_DEBUG
-#define AQUA_VERSION "0.0/D"
-#else
-#define AQUA_VERSION "0.0"
-#endif
-
 void kmain(uint64_t mboot_magic, void *mboot_ptr)
 {
 #ifdef AQUA_DEBUG
@@ -73,7 +68,7 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
     kmem_unpage(0, kernel_space); // finally higher half only mapping
     kscreen_clr(default_color);
 
-    kscreen_putf("%m%n[AQUA Kernel (%s) - In Development]\r\n[Built %s %s UTC-6]", default_color, 0, AQUA_VERSION, __TIME__, __DATE__);
+    kscreen_putf("%m%n[AQUA Kernel (%s)]\r\n[Built %s %s UTC-6]", default_color, 0, AQUA_VER_STRING, __TIME__, __DATE__);
 
     khalt();
 }

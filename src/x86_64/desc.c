@@ -102,7 +102,7 @@ void kwrapper_isr(kframe_int *k)
 
 void kwrapper_irq(kframe_int *k)
 {
-    kdebug_outf("\r\nkirq: irq num %x", k->int_no);
+    kscreen_putf("\r\nkirq: irq num %x", k->int_no);
     if (k->int_no >= 8)
         outb(0xA0, 0x20);
     outb(0x20, 0x20);

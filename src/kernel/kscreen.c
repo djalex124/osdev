@@ -44,9 +44,9 @@ void kscreen_putc(uint16_t c)
         (c > 0 && c < font->num_glyph ? c : 0)*font->bp_glyph;
     int offset =
         (cy * font->height * scanline) + 
-        (cx * (font->width + 1) * sizeof(uint32_t));
+        (cx * font->width * sizeof(uint32_t));
     int x, y, line, mask;
-    for (y = 0; y < font->height; y++)
+    for (y = 0; y < font->height + 1; y++)
     {
         line = offset;
         mask = 1 << (font->width - 1);
@@ -62,26 +62,35 @@ void kscreen_putc(uint16_t c)
     }
 }
 
+void kscreen_scroll()
+{
+    memcpy((uint64_t *)screen_info.addr, (uint64_t *)(screen_info.addr + screen_info.pitch * 16), (screen_info.height - 16) * screen_info.pitch);
+    memset((uint64_t *)(screen_info.addr + (screen_info.height - 16) * screen_info.pitch), bg, screen_info.pitch * 16);
+    cy--;
+}
+
 void kscreen_printc(uint16_t c)
 {
-    switch (c)
+    if (c == '\r')
     {
-        case '\r':
-            cx = 0;
-            break;
-        default:
-            kscreen_putc(c);
-            cx++;
-            if (cx != cw)
-                break;
-        case '\n':
-            cx = 0;
-            if (cy++ > ch)
-            {
-                //terminal scroll?
-                cy--;
-            }
-            break;
+        cx = 0;
+        return;
+    }
+    else if (c == '\n')
+    {
+        cx = 0;
+        if (++cy == ch)
+            kscreen_scroll();
+        return;
+    }
+    else
+        kscreen_putc(c);
+    
+    if (++cx == cw)
+    {
+        cx = 0;
+        if (++cy == ch)
+            kscreen_scroll();
     }
 }
 
@@ -220,4 +229,5 @@ void kscreen_init()
     screen_info.addr += kernel_virtual;
     cw = screen_info.width/((psf_font *)&_binary____font_psf_start)->width;
     ch = screen_info.height/((psf_font *)&_binary____font_psf_start)->height;
+    kdebug_outf("\r\nkscr: terminal %dx%d", cw, ch);
 }

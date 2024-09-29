@@ -1,10 +1,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-void* memset(void* bufptr, uint64_t value, size_t size) {
-	uint64_t* buf = (uint64_t*) bufptr;
+void* memset(void* bufptr, uint32_t value, size_t size) {
+	uint32_t* buf = (uint32_t*) bufptr;
 	for (size_t i = 0; i < size; i++)
-		buf[i] = (uint64_t) value;
+		buf[i] = (uint32_t) value;
 	return bufptr;
 }
 
