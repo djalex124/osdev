@@ -114,3 +114,19 @@ struct acpi_dsdt
     struct acpi_sdt_header h;
     uint8_t aml[];
 };
+
+struct acpi_mcfg_baa_header
+{
+    uint64_t ecm_baseaddr;
+    uint16_t pci_grpsegnum;
+    uint8_t  pci_busnum;
+    uint8_t  pci_busnumend;
+    uint32_t reserved;
+};
+
+struct acpi_mcfg
+{
+    struct acpi_sdt_header h;
+    uint64_t reserved;
+    struct acpi_mcfg_baa_header pci_baa[];
+};

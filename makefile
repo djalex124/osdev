@@ -49,11 +49,11 @@ bin/dbg_boot.iso: bin/dbg_kernel.bin
 	@echo $$(($$(cat build.txt) + 1)) > build.txt
 
 run: bin/boot.iso
-	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none
+	@qemu-system-x86_64 -machine q35 -m 2048 -cdrom bin/boot.iso -net none
 
 debug: kernel_flags += -DAQUA_DEBUG
 debug: bin/dbg_boot.iso
-	@qemu-system-x86_64 -m 2048 -cdrom bin/boot.iso -net none -s -d int
+	@qemu-system-x86_64 -machine q35 -m 2048 -cdrom bin/boot.iso -net none -s -d int
 
 clean:
 	@rm -f bin/link.ld

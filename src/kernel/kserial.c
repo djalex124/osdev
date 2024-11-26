@@ -1,8 +1,10 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
-#include <serial.h>
 #include <kstring.h>
+#include <port.h>
+
+#define PORT1 0x3F8
 
 void kserial_init()
 {

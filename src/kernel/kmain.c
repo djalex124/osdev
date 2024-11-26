@@ -18,7 +18,7 @@ void kmultiboot(void *mboot_ptr)
     struct multiboot_framebuffer_tag *framebuffer = 0;
     struct mutliboot_acpi_tag *acpi = 0;
 
-    kserial_outf("\r\nkmboot: ptr [0x%x]", (uint64_t)mboot_ptr);
+    kdebug_outf("\r\nkmboot: ptr [0x%x]", (uint64_t)mboot_ptr);
 
     for (mboot_info = (struct multiboot_tag *) (mboot_ptr + 8);
          mboot_info->type != 0;

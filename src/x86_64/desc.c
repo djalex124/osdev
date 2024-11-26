@@ -1,8 +1,8 @@
 #include <stdint.h>
-#include <serial.h>
 #include <screen.h>
 #include <debug.h>
 #include <desc.h>
+#include <port.h>
 
 const char* kdesc_ints[] =
 {

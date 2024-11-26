@@ -31,6 +31,8 @@ static uint64_t *ptab4;
 
 void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags)
 {
+    size = (size + 0xFFF) & ~0xFFF;
+    
     /*
         Preferable paging algorithm
 
@@ -95,6 +97,8 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
 
 void kmem_unpage(uint64_t address, uint64_t size)
 {
+    size = (size + 0xFFF) & ~0xFFF;
+
 #ifdef AQUA_DEBUG_PAGING
     kdebug_outf("\r\nkm_up: attempt to unpage > virt=0x%x length=0x%x",
         address, size);
