@@ -2,35 +2,26 @@ build_speed = -O2
 
 gcc = x86_64-elf-gcc
 
-kernel_flags = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$$(cat build.txt) -gdwarf-5 -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
+kernel_build = $$(cat build.txt)
+
+kernel_flags = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$(kernel_build) -gdwarf-5 -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
 kernel_link  = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf-5 -fno-pie -T bin/link.ld
 
 all: run
 
-boot_c := $(wildcard src/x86_64/*.c)
-boot_s := $(wildcard src/x86_64/*.S)
-
-boot_obj_c = $(boot_c:.c=.o)
-boot_obj_s = $(boot_s:.S=.o)
-
-kernel_c := $(wildcard src/kernel/*.c)
-kernel_s := $(wildcard src/kernel/*.S)
-
-kernel_obj_c = $(kernel_c:.c=.o)
-kernel_obj_s = $(kernel_s:.S=.o)
-
-build_obj := $(boot_obj_c) $(boot_obj_s) $(kernel_obj_c) $(kernel_obj_s)
-all_obj := $(build_obj)
+src_c := $(shell find src/ -name '*.c')
+src_s := $(shell find src/ -name '*.S')
+obj := $(src_c:.c=.o) $(src_s:.S=.o)
 
 bin/link.ld:
-	@$(gcc) -E -P -x c $(kernel_flags) src/x86_64/link.ld >bin/link.ld
+	@$(gcc) -E -P -x c $(kernel_flags) src/kernel/link.ld >bin/link.ld
 
-bin/kernel.bin: $(all_obj) bin/link.ld
-	@$(gcc) $(kernel_link) $(all_obj) -o bin/kernel.bin -nostdlib -lgcc
+bin/kernel.bin: $(obj) bin/link.ld
+	@$(gcc) $(kernel_link) $(obj) -o bin/kernel.bin -nostdlib -lgcc
 	@objcopy --strip-debug bin/kernel.bin
 
-bin/dbg_kernel.bin: $(all_obj) bin/link.ld
-	@$(gcc) $(kernel_link) $(all_obj) -o bin/dbg_kernel.bin -nostdlib -lgcc
+bin/dbg_kernel.bin: $(obj) bin/link.ld
+	@$(gcc) $(kernel_link) $(obj) -o bin/dbg_kernel.bin -nostdlib -lgcc
 
 %.o: %.c 
 	@$(gcc) $(kernel_flags) -c -MMD -MP $< -o $@ -lgcc
@@ -53,10 +44,10 @@ run: bin/boot.iso
 
 debug: kernel_flags += -DAQUA_DEBUG
 debug: bin/dbg_boot.iso
-	@qemu-system-x86_64 -machine q35 -m 2048 -cdrom bin/boot.iso -net none -s -d cpu_reset
+	@qemu-system-x86_64 -machine q35 -m 2048 -cdrom bin/boot.iso -net none -s
 
 clean:
 	@rm -f bin/link.ld
-	@rm -f $(build_obj)
+	@rm -f $(obj)
 	@rm -f bin/kernel.bin bin/dbg_kernel.bin
 	@rm -f bin/boot.iso

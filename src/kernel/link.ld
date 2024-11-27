@@ -10,7 +10,7 @@ SECTIONS
 
     .multiboot :
     {
-        src/x86_64/multiboot.o (.text)
+        src/kernel/x86_64/multiboot.o (.text)
     }
 
 #ifdef AQUA_DEBUG
@@ -35,7 +35,7 @@ SECTIONS
 
     .text : AT(ADDR(.text) - kernel_va)
     {
-        *(EXCLUDE_FILE(*src/x86_64/multiboot.o) .text)
+        *(EXCLUDE_FILE(*src/kernel/x86_64/multiboot.o) .text)
         . = ALIGN(4096);
     }
 
