@@ -71,4 +71,7 @@ struct kstackframe
 extern void kdesc_setdescriptors();
 extern void kdesc_reload();
 
+void kdesc_setinterruptfunc(uint16_t irq, void* function);
+void kdesc_removeinterruptfunc(uint16_t irq);
+
 void kdesc_install();

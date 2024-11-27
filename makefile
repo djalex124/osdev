@@ -53,7 +53,7 @@ run: bin/boot.iso
 
 debug: kernel_flags += -DAQUA_DEBUG
 debug: bin/dbg_boot.iso
-	@qemu-system-x86_64 -machine q35 -m 2048 -cdrom bin/boot.iso -net none -s -d int
+	@qemu-system-x86_64 -machine q35 -m 2048 -cdrom bin/boot.iso -net none -s -d cpu_reset
 
 clean:
 	@rm -f bin/link.ld

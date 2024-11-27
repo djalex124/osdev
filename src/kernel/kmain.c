@@ -8,6 +8,8 @@
 #include <debug.h>
 #include <acpi.h>
 #include <kernel.h>
+#include <kbd.h>
+#include <mouse.h>
 
 void khalt(void);
 
@@ -70,6 +72,8 @@ void kmain(uint64_t mboot_magic, void *mboot_ptr)
 
     kscreen_putf("%m%n[AQUA Kernel (%s)]\r\n[Built %s %s UTC-6]", default_color, 0, AQUA_VER_STRING, __TIME__, __DATE__);
 
+    kkeyboard_init();
+    kmouse_init();
     khalt();
 }
 

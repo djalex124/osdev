@@ -100,15 +100,20 @@ void kwrapper_isr(kframe_int *k)
     while (1) asm("hlt");
 }
 
+typedef void (*kdesc_irqfunc)(void);
+static kdesc_irqfunc kdesc_irqs[16];
+
 void kwrapper_irq(kframe_int *k)
 {
-    kscreen_putf("\r\nkirq: irq num %x", k->int_no);
+    if (kdesc_irqs[k->int_no])
+    {
+        void (*function)() = kdesc_irqs[k->int_no];
+        function();
+    }
+
     if (k->int_no >= 8)
         outb(0xA0, 0x20);
     outb(0x20, 0x20);
-
-    if (k->int_no == 1)
-        inb(0x60);
 }
 
 static gdt_entry kgdt_table[6];
@@ -191,6 +196,18 @@ extern void kirq12();
 extern void kirq13();
 extern void kirq14();
 extern void kirq15();
+
+void kdesc_setinterruptfunc(uint16_t irq, void* function)
+{
+    if (irq >= 0 && irq <= 15)
+        kdesc_irqs[irq] = (kdesc_irqfunc)function;
+}
+
+void kdesc_removeinterruptfunc(uint16_t irq)
+{
+    if (irq >= 0 && irq <= 15)
+        kdesc_ints[irq] = 0;
+}
 
 void kdesc_install()
 {

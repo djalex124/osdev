@@ -221,6 +221,20 @@ void kscreen_putf(const char *fmt, ...)
     va_end(arg);
 }
 
+kscreen_pos kscreen_getpos()
+{
+    kscreen_pos out;
+    out.x = cx;
+    out.y = cy;
+    return out;
+}
+
+void kscreen_setpos(kscreen_pos pos)
+{
+    cx = pos.x;
+    cy = pos.y;
+}
+
 void kscreen_init()
 {
     kdebug_outf("\r\nkscr: [%d]x[%d] @ %d bpp", screen_info.width, screen_info.height, screen_info.bpp);
