@@ -1,6 +1,8 @@
 bin/*
 .vscode/
+firmware/
 *.o
+*.so
 *.d
 *.bin
 build.txt

@@ -6,11 +6,11 @@
 
 #ifndef ASSEMBLY
 
-#include <multiboot.h>
+#include <kernel.h>
 
 #define kernel_space 0x200000
 
-void kmem_init(struct multiboot_mmap_tag *mmap);
+void kmem_init(kernel_table *table);
 
 void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags);
 void kmem_unpage(uint64_t address, uint64_t size);

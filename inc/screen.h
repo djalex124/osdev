@@ -1,10 +1,9 @@
 #pragma once
 
 #include <stdint.h>
-#include <multiboot.h>
+#include <kernel.h>
 
 void kscreen_init();
-void kscreen_set(struct multiboot_framebuffer_tag* fb_tag);
 
 void kscreen_putf(const char *fmt, ...);
 void kscreen_clr(uint32_t color);

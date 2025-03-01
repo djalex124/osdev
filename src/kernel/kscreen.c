@@ -7,26 +7,18 @@
 #include <debug.h>
 #include <kstring.h>
 
-static struct multiboot_framebuffer_tag screen_info;
+extern kernel_table ktable;
+static graphics_info kgraphics;
 
 void kscreen_clr(uint32_t color)
 {
-    for (int y = 0; y < screen_info.height; y++)
+    for (int y = 0; y < kgraphics.vertical_res; y++)
     {
-        for (int x = 0; x < screen_info.width; x++)
+        for (int x = 0; x < kgraphics.horizontal_res; x++)
         {
-            *((uint32_t*)(screen_info.addr + y*screen_info.pitch + x*(screen_info.bpp/8)))=color;
+            *((uint32_t*)(kgraphics.framebuffer_base + y*kgraphics.ppsl*4 + x*4))=color;
         }
     }
-}
-
-void kscreen_set(struct multiboot_framebuffer_tag* fb_tag)
-{
-    screen_info.addr = fb_tag->addr;
-    screen_info.bpp = fb_tag->bpp;
-    screen_info.width = fb_tag->width;
-    screen_info.height = fb_tag->height;
-    screen_info.pitch = fb_tag->pitch;
 }
 
 extern char _binary____font_psf_start[];
@@ -36,7 +28,7 @@ static unsigned int cx = 0, cy = 0, cw = 0, ch = 0;
 void kscreen_putc(uint16_t c)
 {
     psf_font *font = (psf_font *)&_binary____font_psf_start;
-    int scanline = screen_info.pitch;
+    int scanline = kgraphics.ppsl;
     int bp_line = (font->width + 7) / 8;
     unsigned char* glyph =
         (unsigned char*)&_binary____font_psf_start +
@@ -52,11 +44,11 @@ void kscreen_putc(uint16_t c)
         mask = 1 << (font->width - 1);
         for (x = 0; x < font->width; x++)
         {
-            *((uint32_t *)(screen_info.addr + line)) = *((unsigned int *)glyph) & mask ? fg : bg;
+            *((uint32_t *)(kgraphics.framebuffer_base + line)) = *((unsigned int *)glyph) & mask ? fg : bg;
             mask >>= 1;
             line += sizeof(uint32_t);
         }
-        *((uint32_t *)(screen_info.addr + line)) = bg;
+        *((uint32_t *)(kgraphics.framebuffer_base + line)) = bg;
         glyph += bp_line;
         offset += scanline;
     }
@@ -64,13 +56,14 @@ void kscreen_putc(uint16_t c)
 
 void kscreen_scroll()
 {
-    memcpy((uint64_t *)screen_info.addr, (uint64_t *)(screen_info.addr + screen_info.pitch * 16), (screen_info.height - 16) * screen_info.pitch);
-    memset((uint64_t *)(screen_info.addr + (screen_info.height - 16) * screen_info.pitch), bg, screen_info.pitch * 16);
+    memcpy((uint64_t *)kgraphics.framebuffer_base, (uint64_t *)(kgraphics.framebuffer_base + kgraphics.ppsl * 16), (kgraphics.vertical_res - 16) * kgraphics.ppsl);
+    memset((uint64_t *)(kgraphics.framebuffer_base + (kgraphics.vertical_res - 16) * kgraphics.ppsl), bg, kgraphics.ppsl * 16);
     cy--;
 }
 
 void kscreen_printc(uint16_t c)
 {
+    kserial_outf("%c", c);
     if (c == '\r')
     {
         cx = 0;
@@ -237,11 +230,17 @@ void kscreen_setpos(kscreen_pos pos)
 
 void kscreen_init()
 {
-    kdebug_outf("\r\nkscr: [%d]x[%d] @ %d bpp", screen_info.width, screen_info.height, screen_info.bpp);
-    kmem_page(screen_info.addr, screen_info.addr + kernel_virtual, screen_info.width * screen_info.height * screen_info.bpp, 0b11);
-    kdebug_outf("\r\nkscr: p [%d] framebuffer [0x%x]", screen_info.pitch, screen_info.addr);
-    screen_info.addr += kernel_virtual;
-    cw = screen_info.width/((psf_font *)&_binary____font_psf_start)->width;
-    ch = screen_info.height/((psf_font *)&_binary____font_psf_start)->height;
+    kgraphics.framebuffer_base = ktable.graphics.framebuffer_base;
+    kgraphics.horizontal_res = ktable.graphics.horizontal_res;
+    kgraphics.vertical_res = ktable.graphics.vertical_res;
+    kgraphics.ppsl = ktable.graphics.ppsl;
+    kdebug_outf("\r\nkscr: %x %x", &ktable, &kgraphics);
+    kdebug_outf("\r\nkscr: [%d]x[%d] @ %d bpp", kgraphics.horizontal_res, kgraphics.vertical_res, kgraphics.ppsl);
+    kmem_page((uint64_t)kgraphics.framebuffer_base, (uint64_t)kgraphics.framebuffer_base + kernel_virtual, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b11);
+    kdebug_outf("\r\nkscr: framebuffer [0x%x]", kgraphics.framebuffer_base);
+    kgraphics.framebuffer_base = (uint64_t*)((uint64_t)kgraphics.framebuffer_base + kernel_virtual);
+    kdebug_outf("\r\nkscr: font [0x%x]", &_binary____font_psf_start);
+    cw = kgraphics.horizontal_res/((psf_font *)&_binary____font_psf_start)->width;
+    ch = kgraphics.vertical_res/((psf_font *)&_binary____font_psf_start)->height;
     kdebug_outf("\r\nkscr: terminal %dx%d", cw, ch);
 }

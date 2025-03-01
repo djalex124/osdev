@@ -3,23 +3,25 @@
 #include <mem.h>
 #include <kstring.h>
 #include <debug.h>
+#include <kernel.h>
+#include <screen.h>
 
 extern uint64_t _end[];
 
-static uint64_t kmem_earlyalloc_start;
-static uint64_t kmem_earlyalloc_end;
+static uint64_t kmem_newpt_start;
+static uint64_t kmem_newpt_end;
 
 #define AQUA_DEBUG_PAGING
 
-uint64_t* kmem_earlyalloc()
+uint64_t* kmem_newpt()
 {
-    if ((kmem_earlyalloc_start + 0x1000) > kmem_earlyalloc_end)
+    if ((kmem_newpt_start + 0x1000) > kmem_newpt_end)
     {
         kdebug_outf("\r\nkm_ea: out of early memory? halting");
         for(;;);
     }
-    uint64_t page = kmem_earlyalloc_start;
-    kmem_earlyalloc_start += 0x1000;
+    uint64_t page = kmem_newpt_start;
+    kmem_newpt_start += 0x1000;
 #ifdef AQUA_DEBUG_PAGING
     kdebug_outf("\r\nkm_ea: new page table at 0x%x", page);
 #endif
@@ -57,11 +59,11 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
         size_t p2_index = (address >> 21) & 0x1FF;
 
         if ((!ptab4[p4_index] & 0x1))
-            ptab4[p4_index] = phys_from_virt((uint64_t)kmem_earlyalloc()) | flags;
+            ptab4[p4_index] = phys_from_virt((uint64_t)kmem_newpt()) | flags;
 
         ptab3 = (uint64_t *)(ptab4[p4_index] & 0xFFFFFFFFFFFFF000);
         if ((!ptab3[p3_index] & 0x1))
-            ptab3[p3_index] = phys_from_virt((uint64_t)kmem_earlyalloc()) | flags;
+            ptab3[p3_index] = phys_from_virt((uint64_t)kmem_newpt()) | flags;
 
         ptab2 = (uint64_t *)(ptab3[p3_index] & 0xFFFFFFFFFFFFF000);
 
@@ -79,7 +81,7 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
             uint64_t *ptab1;
 
             if ((!ptab2[p2_index] & 0x1))
-                ptab2[p2_index] = phys_from_virt((uint64_t)kmem_earlyalloc()) | flags;
+                ptab2[p2_index] = phys_from_virt((uint64_t)kmem_newpt()) | flags;
 
             ptab1 = (uint64_t *)(ptab2[p2_index] & 0xFFFFFFFFFFFFF000);
             ptab1[p1_index] = physical | flags;
@@ -182,56 +184,79 @@ void kmem_free(void* addr)
 }
 
 #ifdef AQUA_DEBUG
-static char* kmem_type[5] = {
-    "available",
+static char* kmem_type[17] = {
     "reserved",
-    "acpi reclaimable",
-    "non-volatile storage",
-    "bad ram"
+    "loadercode",
+    "loaderdata",
+    "bootservicecode",
+    "bootservicedata",
+    "runtimeservicecode",
+    "runtimeservicedata",
+    "freememory",
+    "unusablememory",
+    "acpireclaim",
+    "acpimemorynvs",
+    "mmio",
+    "mmioportspace",
+    "palcode",
+    "persistentmemory",
+    "unaccepted",
+    "maxmemory",
 };
 #endif
 
-void kmem_init(struct multiboot_mmap_tag *mmap)
-{
-    struct multiboot_mmap_entry *mmap_entries;
+extern kernel_table ktable;
 
-    for (mmap_entries = mmap->entries;
-        (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap->size;
-        mmap_entries = (struct multiboot_mmap_entry *) ((uint64_t) mmap_entries + mmap->entry_size))
+void kmem_init(kernel_table *table)
+{
+    uint64_t cr3;
+    asm ( "mov %%cr3, %0" : "=a" (cr3) );
+    ptab4 = (uint64_t *)(cr3 + kernel_virtual);
+
+    memory_descriptor *mmap = table->mmap;
+    memory_descriptor *mmap_entries;
+    uint64_t mmap_length = table->mmap_enteries * table->mmap_size;
+
+    kdebug_outf("\r\nkm_i: testing %x", table->mmap_enteries);
+
+    for (mmap_entries = mmap;
+        (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap_length;
+        mmap_entries = (memory_descriptor *) ((uint64_t) mmap_entries + table->mmap_size))
     {
-        kdebug_outf("\r\nkm_i: mmap [0x%x] - [0x%x] %s", 
-            mmap_entries->address, mmap_entries->address + mmap_entries->length, kmem_type[mmap_entries->type - 1]);
+        kdebug_outf("\r\nkm_i: mmap [0x%x] - [0x%x]", 
+            mmap_entries->physical_start, mmap_entries->physical_start + mmap_entries->num_pages*0x1000);
+        if (mmap_entries->type < 18)
+            kdebug_outf(" %s", kmem_type[mmap_entries->type]);
+        else
+            kdebug_outf(" %d", mmap_entries->type);
         switch (mmap_entries->type)
         {
-            case 1:
-                if (mmap_entries->address + mmap_entries->length < 0x100000)
+            case 7:
+                if (mmap_entries->physical_start + mmap_entries->num_pages*0x1000 < 0x100000)
                 {    
-                    kmem_earlyalloc_start = mmap_entries->address;
-                    kmem_earlyalloc_end = (kmem_earlyalloc_start + mmap_entries->length);
+                    kmem_newpt_start = mmap_entries->physical_start;
+                    kmem_newpt_end = (kmem_newpt_start + mmap_entries->num_pages*0x1000);
                 } // find lowest chunk of mem for early kernel paging
                 break;
         }
     }
 
-	if (kmem_earlyalloc_start == 0) // dont overwrite bios data
-		kmem_earlyalloc_start += 0x1000;
+    kdebug_outf("\r\nkm_i: kernel pts [0x%x] - [0x%x]", kmem_newpt_start, kmem_newpt_end);
+    kdebug_outf("\r\nkm_i: kernel [0x100000] - [0x%x]", (uint64_t)_end - kernel_virtual); //when available, page kernel with global bit
 
-    kdebug_outf("\r\nkm_i: kernel pts [0x%x] - [0x%x]", kmem_earlyalloc_start, kmem_earlyalloc_end);
-    kdebug_outf("\r\nkm_i: kernel [0x100000] - [0x%x]", phys_from_virt((uint64_t)_end)); //when available, page kernel with global bit
+    kmem_newpt_start += kernel_virtual;
+    kmem_newpt_end += kernel_virtual;
 
-    kmem_earlyalloc_start+=kernel_virtual;
-    kmem_earlyalloc_end+=kernel_virtual;
-    
-    ptab4 = kmem_earlyalloc();
-    kmem_page(0, 0, kernel_space, 0b11); //only identity mapped while reading GRUB data
     kmem_page(0, kernel_virtual, kernel_space, 0b11);
 
-    asm volatile("mov %0, %%cr3" ::"r"(phys_from_virt((uintptr_t)ptab4)));
+    asm volatile("mov %0, %%cr3" ::"r"(((uintptr_t)ptab4 - kernel_virtual)));
 
-    kmem_heap = (uint64_t)_end;
+    kmem_heap = (uint64_t)_end + mmap_length + sizeof(kernel_table) + sizeof(graphics_info);
     kmem_heapend = kernel_virtual + kernel_space;
 
     kdebug_outf("\r\nkm_i: kernel heap [0x%x] - [0x%x]", kmem_heap, kmem_heapend);
+
+    memcpy(&ktable, (uint64_t*)virt_from_phys((uint64_t)table), sizeof(kernel_table));
     
     kdebug_outf("\r\nkm_i: done");
 }

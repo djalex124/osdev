@@ -1,9 +1,8 @@
 #pragma once
 
 #include <stdint.h>
-#include <multiboot.h>
 
-void kacpi_init(struct mutliboot_acpi_tag *acpi_tag);
+void kacpi_init();
 
 struct acpi_rsdp
 {

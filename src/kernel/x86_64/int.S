@@ -142,3 +142,9 @@ kdesc_reload:
     mov %ax, %ss
     pop %rbp
     ret
+
+.global kmem_flush
+kmem_flush:
+    mov %cr3, %rax
+    mov %rax, %cr3
+    ret

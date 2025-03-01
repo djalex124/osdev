@@ -1,71 +1,41 @@
 OUTPUT_FORMAT(elf64-x86-64)
-ENTRY(_start)
+ENTRY(_start64)
 
-kernel_pa = 0x100000;
 kernel_va = 0xFFFFFF8000000000;
 
 SECTIONS
 {
-    . = kernel_pa;
+    . = 0xFFFFFF8000100000;
 
-    .multiboot :
+    .text : AT(ADDR(.text))
     {
-        src/kernel/x86_64/multiboot.o (.text)
-    }
-
-#ifdef AQUA_DEBUG
-
-    .debug :
-    {
-        . = ALIGN(4096);
-        _debug_info = .;
-        *(.debug_info)
-        _debug_abbrev = .;
-        *(.debug_abbrev)
-        _debug_str = .;
-        *(.debug_str)
-        _debug_line_str = .;
-        *(.debug_line_str)
-        _debug_line_str_end = .;
-    }
-
-#endif
-
-    . += kernel_va;
-
-    .text : AT(ADDR(.text) - kernel_va)
-    {
-        *(EXCLUDE_FILE(*src/kernel/x86_64/multiboot.o) .text)
+        *(.text)
         . = ALIGN(4096);
     }
 
-    .rodata : AT(ADDR(.rodata) - kernel_va)
+    .rodata : AT(ADDR(.rodata))
     {
         _rodata = .;
         *(.rodata*)
         . = ALIGN(4096);
     }
 
-    .data : AT(ADDR(.data) - kernel_va)
+    .data : AT(ADDR(.data))
     {
         _data = .;
         *(.data)
+        bin/font.o
         . = ALIGN(4096);
     }
 
-    .font :
-    {
-        bin/font.o
-    }
-
-    .eh_frame : AT(ADDR(.eh_frame) - kernel_va)
+    .eh_frame : AT(ADDR(.eh_frame))
     {
         _ehframe = .;
         *(.eh_frame)
          . = ALIGN(4096);
     }
 
-    .bss : AT(ADDR(.bss) - kernel_va)
+    .bss : AT(ADDR(.bss))
     {
         _bss = .;
         *(.bss)

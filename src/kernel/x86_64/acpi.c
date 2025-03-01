@@ -54,8 +54,10 @@ void kacpi_parse_mcfg(struct acpi_mcfg *mcfg)
     }
 }
 
-void kacpi_init(struct mutliboot_acpi_tag *acpi_tag)
+void kacpi_init()
 {
+    kdebug_outf("\r\nkacpi: disabled until UEFI boot established well enough");
+    /*
     kdebug_outf("\r\nkacpi: reading from [0x%x]", (uint64_t)acpi_tag);
     struct acpi_rsdp *table = (struct acpi_rsdp *)acpi_tag->rsdp;
 
@@ -128,4 +130,5 @@ void kacpi_init(struct mutliboot_acpi_tag *acpi_tag)
 
     checksum:
     kdebug_outf("\r\nkacpi: invalid checksum!");
+    */
 }

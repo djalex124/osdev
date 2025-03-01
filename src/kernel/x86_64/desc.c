@@ -82,18 +82,10 @@ void kwrapper_isr(kframe_int *k)
 
     struct kstackframe* stack = (struct kstackframe*)k->rbp;
     kscreen_putf("\r\nkisr: stack trace");
-#ifdef AQUA_DEBUG
-        kdbg_trace(k->rip);
-#else
-        kscreen_putf("\r\nkisr: [0x%x]", k->rip);
-#endif
+    kscreen_putf("\r\nkisr: [0x%x]", k->rip);
     for(unsigned frame = 0; stack && frame < 5; ++frame)
     {
-#ifdef AQUA_DEBUG
-        kdbg_trace(stack->rip);
-#else
         kscreen_putf("\r\nkisr: [0x%x]", stack->rip);
-#endif
         stack = stack->rbp;
     }
 
