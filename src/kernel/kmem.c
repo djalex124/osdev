@@ -209,10 +209,6 @@ extern kernel_table ktable;
 
 void kmem_init(kernel_table *table)
 {
-    uint64_t cr3;
-    asm ( "mov %%cr3, %0" : "=a" (cr3) );
-    ptab4 = (uint64_t *)(cr3 + kernel_virtual);
-
     memory_descriptor *mmap = table->mmap;
     memory_descriptor *mmap_entries;
     uint64_t mmap_length = table->mmap_enteries * table->mmap_size;
@@ -245,6 +241,10 @@ void kmem_init(kernel_table *table)
     kmem_newpt_start += kernel_virtual;
     kmem_newpt_end += kernel_virtual;
 
+    ptab4 = kmem_newpt();
+    //page tables have to be identity mapped
+
+    kmem_page(0, 0, kernel_space, 0b11);
     kmem_page(0, kernel_virtual, kernel_space, 0b11);
 
     asm volatile("mov %0, %%cr3" ::"r"(((uintptr_t)ptab4 - kernel_virtual)));

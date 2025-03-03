@@ -27,7 +27,33 @@ static inline void kmouse_wait(uint8_t type)
 
 uint8_t mcycle = 0;
 uint8_t mbyte[3];
-uint16_t mx = 0, my = 0;
+int16_t mx = 0, my = 0;
+
+extern graphics_info kgraphics;
+
+void kmouse_calc()
+{
+    kscreen_pos pos;
+    pos.x = 0;
+    pos.y = 10;
+    kscreen_setpos(pos);
+
+    mx += (mbyte[1] - ((mbyte[0] << 4) & 0x100));
+    my += (mbyte[2] - ((mbyte[0] << 3) & 0x100));
+
+    if (mx < 0)
+        mx = 0;
+    else if (mx > kgraphics.horizontal_res)
+        mx = kgraphics.horizontal_res;
+    if (my < 0)
+        my = 0;
+    else if (my > kgraphics.vertical_res)
+        my = kgraphics.vertical_res;
+
+    kscreen_putf("kmouse_interrupt: mdx %8x mdy %8x", (mbyte[1] - ((mbyte[0] << 4) & 0x100)), (mbyte[2] - ((mbyte[0] << 3) & 0x100)));
+    kscreen_putf("\r\nkmouse_interrupt: left %b right %b middle %b", mbyte[0] & 1, (mbyte[0] >> 1) & 1, (mbyte[0] >> 2) & 1);
+    kscreen_putf("\r\nkmouse_interrupt: cursor x %4d cursor y %4d", mx, my);
+}
 
 void kmouse_interrupt()
 {
@@ -44,15 +70,9 @@ void kmouse_interrupt()
         case 2:
             mbyte[2] = inb(0x60);
             mcycle = 0;
+            kmouse_calc();
+            break;
     }
-    
-    kscreen_pos pos;
-    pos.x = 0;
-    pos.y = 10;
-    kscreen_setpos(pos);
-
-    kscreen_putf("kmouse_interrupt: mdx %8x mdy %8x", (mbyte[1] - ((mbyte[0] << 4) & 0x100)), (mbyte[2] - ((mbyte[0] << 3) & 0x100)));
-    kscreen_putf("\r\nkmouse_interrupt: left %b right %b middle %b", mbyte[0] & 1, (mbyte[0] >> 1) & 1, (mbyte[0] >> 2) & 1);
 }
 
 void kmouse_init()
@@ -86,6 +106,24 @@ void kmouse_init()
 
     kmouse_wait(1);
     outb(0x60, 0xF4);
+
+    kmouse_wait(0);
+    inb(0x60);
+
+    kmouse_wait(1);
+    outb(0x64, 0xD4);
+
+    kmouse_wait(1);
+    outb(0x60, 0xF3);
+
+    kmouse_wait(0);
+    inb(0x60);
+
+    kmouse_wait(1);
+    outb(0x64, 0xD4);
+
+    kmouse_wait(1);
+    outb(0x60, 1);
 
     kmouse_wait(0);
     inb(0x60);

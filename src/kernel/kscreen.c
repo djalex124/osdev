@@ -8,7 +8,7 @@
 #include <kstring.h>
 
 extern kernel_table ktable;
-static graphics_info kgraphics;
+graphics_info kgraphics;
 
 static inline void kscreen_putp(int x, int y, uint32_t color)
 {
@@ -74,7 +74,6 @@ void kscreen_scroll()
 
 void kscreen_printc(uint16_t c)
 {
-    //kserial_outf("%c", c);
     if (c == '\r')
     {
         cx = 0;

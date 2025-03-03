@@ -37,5 +37,19 @@ void kmain(kernel_table *table)
     kmouse_init();
     kkeyboard_init();
 
+    /*
+    
+    Things to still add
+
+    - ACPI decoding
+        - SMP support (multiple cores/threads)
+        - PCI device support
+            - USB support
+    - File system driver
+    - Real display driver
+    - Real memory manager (not just paging)
+    
+    */
+
     khalt();
 }
