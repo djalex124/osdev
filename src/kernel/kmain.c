@@ -10,10 +10,14 @@
 #include <kbd.h>
 #include <mouse.h>
 
-void khalt(void);
+void khalt(void)
+{
+    kdebug_outf("\r\nkhalt: halting indefinitely!");
+    while(1)
+        asm("hlt");
+}
 
 kernel_table ktable;
-extern void kmem_flush();
 
 void kmain(kernel_table *table)
 {
@@ -28,18 +32,10 @@ void kmain(kernel_table *table)
     kscreen_init();
     kscreen_clr(default_color);
 
-    //kscreen_putf("%m%n[AQUA Kernel (%s)]\r\n[Built %s %s UTC-6]", default_color, 0, AQUA_VER_STRING, __TIME__, __DATE__);
+    kscreen_putf("\r\n%m%n[AQUA Kernel (%s)]\r\n[Built %s %s UTC-6]", default_color, 0, AQUA_VER_STRING, __TIME__, __DATE__);
 
-    khalt();
-
-    kkeyboard_init();
     kmouse_init();
-    khalt();
-}
+    kkeyboard_init();
 
-void khalt(void)
-{
-    kdebug_outf("\r\nkhalt: halting indefinitely!");
-    while(1)
-        asm("hlt");
+    khalt();
 }

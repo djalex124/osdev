@@ -2,7 +2,7 @@
 
 #define AQUA_VER_MAJOR 0
 #define AQUA_VER_MINOR 0
-#define AQUA_VER_REV   0
+#define AQUA_VER_REV   1
 #define AQUA_VER_STR   alpha
 
 #define string2(s) #s
@@ -35,4 +35,5 @@ typedef struct {
     memory_descriptor *mmap;
     uint64_t mmap_enteries;
     uint64_t mmap_size;
+    uint64_t safe_mem;
 } kernel_table;

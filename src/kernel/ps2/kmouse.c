@@ -2,6 +2,29 @@
 #include <port.h>
 #include <desc.h>
 
+static inline void kmouse_wait(uint8_t type)
+{
+    unsigned wait = 100000;
+    if (type == 0)
+    {
+        while (wait--)
+        {
+            if ((inb(0x64) & 1) == 1)
+                return;
+        }
+        return;
+    }
+    else
+    {
+        while (wait--)
+        {
+            if ((inb(0x64) & 2) == 0)
+                return;
+        }
+        return;
+    }
+}
+
 uint8_t mcycle = 0;
 uint8_t mbyte[3];
 uint16_t mx = 0, my = 0;
@@ -34,18 +57,37 @@ void kmouse_interrupt()
 
 void kmouse_init()
 {
+    kmouse_wait(1);
     outb(0x64, 0xA8);
+
+    kmouse_wait(1);
     outb(0x64, 0x20);
+
+    kmouse_wait(0);
     uint8_t s = inb(0x60) | 2;
+
+    kmouse_wait(1);
     outb(0x64, 0x60);
+
+    kmouse_wait(1);
     outb(0x60, s);
 
+    kmouse_wait(1);
     outb(0x64, 0xD4);
+
+    kmouse_wait(1);
     outb(0x60, 0xF6);
+
+    kmouse_wait(0);
     inb(0x60);
 
+    kmouse_wait(1);
     outb(0x64, 0xD4);
+
+    kmouse_wait(1);
     outb(0x60, 0xF4);
+
+    kmouse_wait(0);
     inb(0x60);
 
     kdesc_setinterruptfunc(12, *kmouse_interrupt);

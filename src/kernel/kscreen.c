@@ -10,13 +10,26 @@
 extern kernel_table ktable;
 static graphics_info kgraphics;
 
+static inline void kscreen_putp(int x, int y, uint32_t color)
+{
+    if (x > kgraphics.horizontal_res || x < 0)
+        return;
+    else if (y > kgraphics.vertical_res || y < 0)
+        return;
+    
+    unsigned where = x*4 + y*kgraphics.ppsl*4;
+    ((unsigned char*)kgraphics.framebuffer_base)[where] = color & 0xFF;
+    ((unsigned char*)kgraphics.framebuffer_base)[where + 1] = (color >> 8) & 0xFF;
+    ((unsigned char*)kgraphics.framebuffer_base)[where + 2] = (color >> 16) & 0xFF;
+}
+
 void kscreen_clr(uint32_t color)
 {
     for (int y = 0; y < kgraphics.vertical_res; y++)
     {
         for (int x = 0; x < kgraphics.horizontal_res; x++)
         {
-            *((uint32_t*)(kgraphics.framebuffer_base + y*kgraphics.ppsl*4 + x*4))=color;
+            kscreen_putp(x, y, color);
         }
     }
 }
@@ -28,29 +41,27 @@ static unsigned int cx = 0, cy = 0, cw = 0, ch = 0;
 void kscreen_putc(uint16_t c)
 {
     psf_font *font = (psf_font *)&_binary____font_psf_start;
-    int scanline = kgraphics.ppsl;
+    int sx = cx * font->width;
+    int sy = cy * font->height;
     int bp_line = (font->width + 7) / 8;
     unsigned char* glyph =
         (unsigned char*)&_binary____font_psf_start +
         font->header_size +
         (c > 0 && c < font->num_glyph ? c : 0)*font->bp_glyph;
-    int offset =
-        (cy * font->height * scanline) + 
-        (cx * font->width * sizeof(uint32_t));
-    int x, y, line, mask;
+    int x, y, mask;
     for (y = 0; y < font->height + 1; y++)
     {
-        line = offset;
+        sx = cx * font->width;
         mask = 1 << (font->width - 1);
         for (x = 0; x < font->width; x++)
         {
-            *((uint32_t *)(kgraphics.framebuffer_base + line)) = *((unsigned int *)glyph) & mask ? fg : bg;
+            kscreen_putp(sx, sy, *((unsigned int *)glyph) & mask ? fg : bg);
             mask >>= 1;
-            line += sizeof(uint32_t);
+            sx++;
         }
-        *((uint32_t *)(kgraphics.framebuffer_base + line)) = bg;
+        kscreen_putp(sx, sy, bg);
         glyph += bp_line;
-        offset += scanline;
+        sy++;
     }
 }
 
@@ -63,7 +74,7 @@ void kscreen_scroll()
 
 void kscreen_printc(uint16_t c)
 {
-    kserial_outf("%c", c);
+    //kserial_outf("%c", c);
     if (c == '\r')
     {
         cx = 0;
@@ -234,8 +245,8 @@ void kscreen_init()
     kgraphics.horizontal_res = ktable.graphics.horizontal_res;
     kgraphics.vertical_res = ktable.graphics.vertical_res;
     kgraphics.ppsl = ktable.graphics.ppsl;
-    kdebug_outf("\r\nkscr: %x %x", &ktable, &kgraphics);
-    kdebug_outf("\r\nkscr: [%d]x[%d] @ %d bpp", kgraphics.horizontal_res, kgraphics.vertical_res, kgraphics.ppsl);
+    //assume 32 bpp as is standard from UEFI's GOP
+    kdebug_outf("\r\nkscr: [%d]x[%d] @ 32 bpp", kgraphics.horizontal_res, kgraphics.vertical_res);
     kmem_page((uint64_t)kgraphics.framebuffer_base, (uint64_t)kgraphics.framebuffer_base + kernel_virtual, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b11);
     kdebug_outf("\r\nkscr: framebuffer [0x%x]", kgraphics.framebuffer_base);
     kgraphics.framebuffer_base = (uint64_t*)((uint64_t)kgraphics.framebuffer_base + kernel_virtual);

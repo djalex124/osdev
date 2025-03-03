@@ -3,6 +3,6 @@ bin/*
 firmware/
 *.o
 *.so
+*.efi
 *.d
 *.bin
-build.txt

@@ -24,7 +24,6 @@ SECTIONS
     {
         _data = .;
         *(.data)
-        bin/font.o
         . = ALIGN(4096);
     }
 
@@ -39,8 +38,13 @@ SECTIONS
     {
         _bss = .;
         *(.bss)
-
         *(COMMON)
+        . = ALIGN(4096);
+    }
+
+    .font : AT(ADDR(.font))
+    {
+        bin/font.o
         . = ALIGN(4096);
     }
     

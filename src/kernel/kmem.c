@@ -217,8 +217,6 @@ void kmem_init(kernel_table *table)
     memory_descriptor *mmap_entries;
     uint64_t mmap_length = table->mmap_enteries * table->mmap_size;
 
-    kdebug_outf("\r\nkm_i: testing %x", table->mmap_enteries);
-
     for (mmap_entries = mmap;
         (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap_length;
         mmap_entries = (memory_descriptor *) ((uint64_t) mmap_entries + table->mmap_size))
@@ -251,7 +249,7 @@ void kmem_init(kernel_table *table)
 
     asm volatile("mov %0, %%cr3" ::"r"(((uintptr_t)ptab4 - kernel_virtual)));
 
-    kmem_heap = (uint64_t)_end + mmap_length + sizeof(kernel_table) + sizeof(graphics_info);
+    kmem_heap = table->safe_mem;
     kmem_heapend = kernel_virtual + kernel_space;
 
     kdebug_outf("\r\nkm_i: kernel heap [0x%x] - [0x%x]", kmem_heap, kmem_heapend);

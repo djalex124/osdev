@@ -280,5 +280,8 @@ void kdesc_install()
     kdesc_setdescriptors();
     kdesc_reload();
 
+    for (int i = 0; i < 16; i++)
+        kdesc_setinterruptfunc(i, (void *)0);
+
     kdebug_outf("\r\nkdesc: interrupt descriptors set");
 }

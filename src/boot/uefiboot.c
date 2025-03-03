@@ -7,6 +7,10 @@
 
 #include <kernel.h>
 
+#define kernel_virtual   0xFFFFFF8000000000 
+#define phys_from_virt(x) ((x) - kernel_virtual)
+#define virt_from_phys(x) ((x) + kernel_virtual)
+
 #define assert(n) if (EFI_ERROR(n)) { Print(L"\r\n[ERR]: \"%r\" at line %d - aborting...\r\n", n, __LINE__); return n; }
 
 void* boot_memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size) {
@@ -15,6 +19,13 @@ void* boot_memcpy(void* restrict dstptr, const void* restrict srcptr, size_t siz
 	for (size_t i = 0; i < size; i++)
 		dst[i] = src[i];
 	return dstptr;
+}
+
+void* boot_memset(void* bufptr, uint32_t value, size_t size) {
+	uint32_t* buf = (uint32_t*) bufptr;
+	for (size_t i = 0; i < size; i++)
+		buf[i] = (uint32_t) value;
+	return bufptr;
 }
 
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
@@ -93,7 +104,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     assert(s);
 
     UINTN segment = 0x100000;
-    UINTN filesz = 0;
+    UINTN kernel_size = 0;
     for (Elf64_Phdr* prog_header = prog_headers;
          (char*)prog_header < (char*)prog_headers + header_size;
          prog_header = (Elf64_Phdr*)((char*)prog_header + elf_header->e_phentsize))
@@ -101,15 +112,22 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
         if (prog_header->p_type == PT_LOAD)
         {
             UINTN pages = (prog_header->p_memsz + 0x1000 - 1) / 0x1000;
-            s = uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, EfiLoaderCode, pages, (EFI_PHYSICAL_ADDRESS)segment);
+            s = uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, 
+                EfiLoaderCode, pages, (EFI_PHYSICAL_ADDRESS)phys_from_virt(prog_header->p_vaddr));
             assert(s);
             s = uefi_call_wrapper(file->SetPosition, 2, file, prog_header->p_offset);
             assert(s);
-            filesz += prog_header->p_filesz;
-            s = uefi_call_wrapper(file->Read, 3, file, &filesz, (EFI_PHYSICAL_ADDRESS)segment);
+            kernel_size += pages * 0x1000;
+            if (prog_header->p_filesz < prog_header->p_memsz)
+            {
+                boot_memset((void *)(phys_from_virt(prog_header->p_vaddr) + prog_header->p_filesz), 0, prog_header->p_memsz - prog_header->p_filesz);
+                Print(L"[OK]: Clearing memory 0x%x length %x\r\n", 
+                    phys_from_virt(prog_header->p_vaddr) + prog_header->p_filesz, prog_header->p_memsz - prog_header->p_filesz);
+            }
+            s = uefi_call_wrapper(file->Read, 3, file, 
+                &(prog_header->p_filesz), (EFI_PHYSICAL_ADDRESS)phys_from_virt(prog_header->p_vaddr));
             assert(s);
-            Print(L"[OK]: Kernel loaded (total 0x%x) at 0x%x\r\n", prog_header->p_memsz, (EFI_PHYSICAL_ADDRESS)segment);
-            segment += filesz;
+            Print(L"[OK]: Kernel loaded (total 0x%x) at 0x%x\r\n", prog_header->p_memsz, (EFI_PHYSICAL_ADDRESS)phys_from_virt(prog_header->p_vaddr));
         }
     }
 
@@ -121,8 +139,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     FreePool(elf_header);
     FreePool(prog_headers);
 
-    filesz = (filesz + 0xFFF) &~ 0xFFF;
-    UINTN start_addr = segment + filesz;
+    UINTN start_addr = segment + kernel_size;
     Print(L"[OK]: Making page tables at 0x%x\r\n", start_addr);
 
     uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, EfiLoaderCode, 4, (EFI_PHYSICAL_ADDRESS)start_addr);
@@ -130,8 +147,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     UINTN *pt4 = (UINTN *)start_addr;
     UINTN *pt3 = (UINTN *)(start_addr + 0x1000);
     UINTN *pt2 = (UINTN *)(start_addr + 0x2000);
-    UINTN *pt_ktab3 = NULL;
-    UINTN *pt_ktab2 = NULL;
 
     start_addr += 0x3000;
 
@@ -157,11 +172,14 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     table->mmap_enteries = enteries;
     table->mmap_size = descsize;
 
-    UINTN* k_mmap = (UINTN *)((start_addr + 0xFFF) &~ 0xFFF);
-    uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, EfiLoaderCode, ((enteries * descsize) + 0x1000 - 1) / 0x1000, (EFI_PHYSICAL_ADDRESS)k_mmap);
+    UINTN* k_mmap = (UINTN *)start_addr;
+    UINTN mmap_pages = ((enteries * descsize) + 0x1000 - 1) / 0x1000;
+    uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, EfiLoaderCode, mmap_pages, (EFI_PHYSICAL_ADDRESS)k_mmap);
+    boot_memset(k_mmap, 0, mmap_pages * 0x1000);
     boot_memcpy(k_mmap, map, descsize * enteries);
 
-    Print(L"[OK]: Kernel mem at 0x%x", (EFI_PHYSICAL_ADDRESS)k_mmap);
+    Print(L"[OK]: Kernel mem at 0x%x %x size", (EFI_PHYSICAL_ADDRESS)k_mmap, descsize * enteries);
+    table->safe_mem = virt_from_phys(start_addr + mmap_pages * 0x1000);
 
     table->mmap = (memory_descriptor*)k_mmap;
 

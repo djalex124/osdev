@@ -19,10 +19,13 @@ bin/link.ld:
 	@$(gcc) -E -P -x c $(kernel_flags) src/kernel/link.ld >bin/link.ld
 
 drive/kernel.bin: $(obj) bin/link.ld
+	@echo $$(($$(cat build.txt) + 1)) > build.txt
 	@$(gcc) $(kernel_link) $(obj) -o drive/kernel.bin -nostdlib -lgcc
+	@objcopy --only-keep-debug drive/kernel.bin bin/kernel.map
 	@objcopy --strip-debug drive/kernel.bin
 
 drive/dbg_kernel.bin: $(obj) bin/link.ld
+	@echo $$(($$(cat build.txt) + 1)) > build.txt
 	@$(gcc) $(kernel_link) $(obj) -o drive/kernel.bin -nostdlib -lgcc
 	@objcopy --only-keep-debug drive/kernel.bin bin/kernel.map
 
@@ -42,7 +45,6 @@ drive/boot.efi:
 	ld -shared -Bsymbolic -L$(gnu_efi_lib) -T$(gnu_efi_lib)/elf_x86_64_efi.lds $(gnu_efi_lib)/crt0-efi-x86_64.o src/boot/uefiboot.o -o src/boot/boot.so -lgnuefi -lefi
 	objcopy -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym  -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc --target efi-app-x86_64 --subsystem=10 src/boot/boot.so drive/boot.efi
 
-
 run: drive/boot.efi drive/kernel.bin
 	@qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
@@ -52,7 +54,7 @@ debug: kernel_flags += -DAQUA_DEBUG
 debug: drive/boot.efi drive/dbg_kernel.bin
 	@qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
-					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -s -S
+					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -s -S -serial stdio
 
 clean:
 	@rm -f bin/link.ld
