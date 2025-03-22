@@ -15,6 +15,15 @@
 #endif
 
 typedef struct {
+    uint32_t type;
+    uint32_t pad;
+    uint64_t physical_start;
+    uint64_t virtual_start;
+    uint64_t num_pages;
+    uint64_t attribute;
+} efi_memory_descriptor;
+
+typedef struct {
     uint32_t horizontal_res;
     uint32_t vertical_res;
     uint32_t ppsl;
@@ -22,18 +31,11 @@ typedef struct {
 } graphics_info;
 
 typedef struct {
-    uint32_t type;
-    uint32_t pad;
-    uint64_t physical_start;
-    uint64_t virtual_start;
-    uint64_t num_pages;
-    uint64_t attribute;
-} memory_descriptor;
-
-typedef struct {
     graphics_info graphics;
-    memory_descriptor *mmap;
+    efi_memory_descriptor *mmap;
     uint64_t mmap_enteries;
     uint64_t mmap_size;
     uint64_t safe_mem;
-} kernel_table;
+    uint8_t acpi_ver;
+    uint64_t rsdp;
+} boot_table;

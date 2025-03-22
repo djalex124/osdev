@@ -10,12 +10,12 @@
 
 #define kernel_space 0x200000
 
-void kmem_init(kernel_table *table);
+void kmem_init(boot_table *table);
 
 void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags);
 void kmem_unpage(uint64_t address, uint64_t size);
 
-void* kmem_alloc(uint64_t size);
+void* kmem_kalloc(uint64_t size);
 void kmem_free(void* addr);
 
 #endif

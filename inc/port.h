@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-static inline uint8_t inb(uint16_t p)
+inline uint8_t inb(uint16_t p)
 {
     uint8_t ret;
     asm volatile (
@@ -13,7 +13,7 @@ static inline uint8_t inb(uint16_t p)
     return ret;
 }
 
-static inline void outb(uint16_t p, uint8_t v)
+inline void outb(uint16_t p, uint8_t v)
 {
     asm volatile ( "outb %0, %1" : : "a"(v), "Nd"(p) :"memory" );
 }

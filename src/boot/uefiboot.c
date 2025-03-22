@@ -6,6 +6,7 @@
 #define EFI_BOOT
 
 #include <kernel.h>
+#include <acpi.h>
 
 #define kernel_virtual   0xFFFFFF8000000000 
 #define phys_from_virt(x) ((x) - kernel_virtual)
@@ -21,25 +22,18 @@ void* boot_memcpy(void* restrict dstptr, const void* restrict srcptr, size_t siz
 	return dstptr;
 }
 
-void* boot_memset(void* bufptr, uint32_t value, size_t size) {
-	uint32_t* buf = (uint32_t*) bufptr;
-	for (size_t i = 0; i < size; i++)
-		buf[i] = (uint32_t) value;
-	return bufptr;
-}
+EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
+boot_table* table;
+UINTN kernel_size = 0;
+void (*kentry)(boot_table* table, UINTN* page_table);
 
-EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
+EFI_STATUS load_graphics()
 {
-    ST = system_table;
-    BS = ST->BootServices;
-
     EFI_STATUS s;
-    
-    InitializeLib(image_handle, system_table);
+
     uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
     uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut, EFI_LIGHTCYAN);
 
-    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
     EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
     s = LibLocateProtocol(&gop_guid, (void**)&gop);
     assert(s);
@@ -61,6 +55,13 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     Print(L"[OK]: GOP - address 0x%x size 0x%x width %dx%d ppsl %d format %x\r\n",
         gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize, gop->Mode->Info->HorizontalResolution,
         gop->Mode->Info->VerticalResolution, gop->Mode->Info->PixelsPerScanLine, gop->Mode->Info->PixelFormat);
+
+    return 0;
+}
+
+EFI_STATUS load_kernel(EFI_HANDLE image_handle)
+{
+    EFI_STATUS s;
 
     EFI_LOADED_IMAGE *loaded_image = NULL;
     EFI_GUID loaded_image_guid = LOADED_IMAGE_PROTOCOL;
@@ -104,7 +105,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     assert(s);
 
     UINTN segment = 0x100000;
-    UINTN kernel_size = 0;
     for (Elf64_Phdr* prog_header = prog_headers;
          (char*)prog_header < (char*)prog_headers + header_size;
          prog_header = (Elf64_Phdr*)((char*)prog_header + elf_header->e_phentsize))
@@ -119,29 +119,66 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
             assert(s);
             kernel_size += pages * 0x1000;
             if (prog_header->p_filesz < prog_header->p_memsz)
-            {
-                boot_memset((void *)(phys_from_virt(prog_header->p_vaddr) + prog_header->p_filesz), 0, prog_header->p_memsz - prog_header->p_filesz);
-                Print(L"[OK]: Clearing memory 0x%x length %x\r\n", 
-                    phys_from_virt(prog_header->p_vaddr) + prog_header->p_filesz, prog_header->p_memsz - prog_header->p_filesz);
-            }
+                ZeroMem((void *)(phys_from_virt(prog_header->p_vaddr) + prog_header->p_filesz), prog_header->p_memsz - prog_header->p_filesz);
             s = uefi_call_wrapper(file->Read, 3, file, 
                 &(prog_header->p_filesz), (EFI_PHYSICAL_ADDRESS)phys_from_virt(prog_header->p_vaddr));
             assert(s);
-            Print(L"[OK]: Kernel loaded (total 0x%x) at 0x%x\r\n", prog_header->p_memsz, (EFI_PHYSICAL_ADDRESS)phys_from_virt(prog_header->p_vaddr));
+            Print(L"[OK]: Kernel loaded [0x%x - 0x%x]\r\n", 
+                (EFI_PHYSICAL_ADDRESS)phys_from_virt(prog_header->p_vaddr), 
+                (EFI_PHYSICAL_ADDRESS)phys_from_virt(prog_header->p_vaddr) + prog_header->p_filesz);
         }
     }
 
     uefi_call_wrapper(file->Close, 1, file);
 
-    void (*kentry)(kernel_table* table, UINTN* page_table) = (void*)(elf_header->e_entry - 0xFFFFFF8000000000);
-    Print(L"[OK]: Kernel entry at 0x%x\r\n", elf_header->e_entry);
+    kentry = (void*)(elf_header->e_entry - 0xFFFFFF8000000000);
 
     FreePool(elf_header);
     FreePool(prog_headers);
 
-    UINTN start_addr = segment + kernel_size;
-    Print(L"[OK]: Making page tables at 0x%x\r\n", start_addr);
+    return 0;
+}
 
+EFI_STATUS load_acpi()
+{
+    EFI_STATUS s;
+
+    Print(L"[OK]: Config table enteries: %d\r\n", ST->NumberOfTableEntries);
+
+    EFI_GUID acpi2 = ACPI_20_TABLE_GUID;
+    EFI_GUID acpi1 = ACPI_TABLE_GUID;
+
+    EFI_CONFIGURATION_TABLE *configtable;
+    for (UINTN i = 0; i < ST->NumberOfTableEntries; i++)
+    {
+        configtable = (EFI_CONFIGURATION_TABLE *)(ST->ConfigurationTable + sizeof(EFI_CONFIGURATION_TABLE) * i);
+        if (CompareGuid(&configtable->VendorGuid, &acpi2))
+        {
+            table->acpi_ver = 2;
+            table->rsdp = (EFI_PHYSICAL_ADDRESS)configtable->VendorTable;
+            break;
+        }
+        else if (CompareGuid(&configtable->VendorGuid, &acpi1))
+        {
+            table->acpi_ver = 1;
+            table->rsdp = (EFI_PHYSICAL_ADDRESS)configtable->VendorTable;
+            break;
+        }
+    }
+    
+    Print(L"[OK]: ACPI version %d RSDP 0x%x\r\n", table->acpi_ver, table->rsdp);
+
+    if (!strncmpa((char*)table->rsdp, "RSD PTR ", 8))
+        assert(EFI_UNSUPPORTED);
+
+    return 0;
+}
+
+EFI_STATUS create_tables_and_exit(EFI_HANDLE image_handle)
+{
+    EFI_STATUS s;
+    
+    UINTN start_addr = 0x100000 + kernel_size;
     uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, EfiLoaderCode, 4, (EFI_PHYSICAL_ADDRESS)start_addr);
 
     UINTN *pt4 = (UINTN *)start_addr;
@@ -155,16 +192,17 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     pt3[0] = (UINTN)pt2 + 0x3;
     pt2[0] = 0x83; // page of first 2mb?
 
-    Print(L"[OK]: Kernel structures at 0x%x\r\n", start_addr);
-
-    kernel_table* table = (kernel_table *)(start_addr);
-    start_addr += sizeof(kernel_table);
+    table = (boot_table *)(start_addr);
+    start_addr += sizeof(boot_table);
 
     table->graphics.framebuffer_base = (uint64_t*)gop->Mode->FrameBufferBase;
     table->graphics.horizontal_res = gop->Mode->Info->HorizontalResolution;
     table->graphics.vertical_res = gop->Mode->Info->VerticalResolution;
     table->graphics.ppsl = gop->Mode->Info->PixelsPerScanLine;
-    
+
+    s = load_acpi();
+    assert(s);
+
     UINTN enteries, mapkey, descsize;
     UINT32 descver;
     EFI_MEMORY_DESCRIPTOR *map = LibMemoryMap(&enteries, &mapkey, &descsize, &descver);
@@ -175,13 +213,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     UINTN* k_mmap = (UINTN *)start_addr;
     UINTN mmap_pages = ((enteries * descsize) + 0x1000 - 1) / 0x1000;
     uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, EfiLoaderCode, mmap_pages, (EFI_PHYSICAL_ADDRESS)k_mmap);
-    boot_memset(k_mmap, 0, mmap_pages * 0x1000);
+    ZeroMem(k_mmap, enteries * descsize);
     boot_memcpy(k_mmap, map, descsize * enteries);
 
-    Print(L"[OK]: Kernel mem at 0x%x %x size", (EFI_PHYSICAL_ADDRESS)k_mmap, descsize * enteries);
     table->safe_mem = virt_from_phys(start_addr + mmap_pages * 0x1000);
-
-    table->mmap = (memory_descriptor*)k_mmap;
+    table->mmap = (efi_memory_descriptor*)k_mmap;
 
     if (uefi_call_wrapper(BS->ExitBootServices, 2, image_handle, mapkey) == 2)
     {
@@ -190,10 +226,31 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
         table->mmap_enteries = enteries;
         table->mmap_size = descsize;
         boot_memcpy(k_mmap, map, descsize * enteries);
-        table->mmap = (memory_descriptor*)k_mmap;
+        table->mmap = (efi_memory_descriptor*)k_mmap;
     }
 
     kentry(table, pt4);
 
     return EFI_UNSUPPORTED;
+}
+
+EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
+{
+    ST = system_table;
+    BS = ST->BootServices;
+    
+    EFI_STATUS s;
+    
+    InitializeLib(image_handle, system_table);
+
+    s = load_graphics();
+    assert(s);
+
+    s = load_kernel(image_handle);
+    assert(s);
+
+    s = create_tables_and_exit(image_handle);
+    assert(s);
+
+    assert(EFI_END_OF_FILE);
 }

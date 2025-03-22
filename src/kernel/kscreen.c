@@ -7,7 +7,7 @@
 #include <debug.h>
 #include <kstring.h>
 
-extern kernel_table ktable;
+extern boot_table ktable;
 graphics_info kgraphics;
 
 static inline void kscreen_putp(int x, int y, uint32_t color)

@@ -68,7 +68,7 @@ void kwrapper_isr(kframe_int *k)
         if (k->err_code & (1 << 3))
             kscreen_putf("reserved bits|");
         if (k->err_code & (1 << 4))
-            kscreen_putf("nx bit|");
+            kscreen_putf("instruction fetch|");
         if (k->err_code & (1 << 5))
             kscreen_putf("pk violation|");
         if (k->err_code & (1 << 6))

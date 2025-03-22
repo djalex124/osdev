@@ -17,9 +17,9 @@ void khalt(void)
         asm("hlt");
 }
 
-kernel_table ktable;
+boot_table ktable;
 
-void kmain(kernel_table *table)
+void kmain(boot_table *table)
 {
 #ifdef AQUA_DEBUG
     kserial_init();
@@ -32,7 +32,10 @@ void kmain(kernel_table *table)
     kscreen_init();
     kscreen_clr(default_color);
 
-    kscreen_putf("\r\n%m%n[AQUA Kernel (%s)]\r\n[Built %s %s UTC-6]", default_color, 0, AQUA_VER_STRING, __TIME__, __DATE__);
+    kscreen_putf("\r\n%m%n[AQUA Kernel (%s)]", default_color, 0, AQUA_VER_STRING);
+    kscreen_putf("\r\n[Built %s %s UTC-6]", __TIME__, __DATE__);
+
+    kacpi_init();
 
     kmouse_init();
     kkeyboard_init();
