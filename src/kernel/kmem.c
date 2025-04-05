@@ -209,6 +209,25 @@ static char* kmem_type[17] = {
 
 extern boot_table ktable;
 
+void kmem_physinit()
+{
+    
+}
+
+void kmem_virtinit()
+{
+    kmem_newpt_start += kernel_virtual;
+    kmem_newpt_end += kernel_virtual;
+
+    ptab4 = kmem_newpt();
+    //page tables have to be identity mapped
+
+    kmem_page(0, 0, kernel_space, 0b11);
+    kmem_page(0, kernel_virtual, kernel_space, 0b11);
+
+    asm volatile("mov %0, %%cr3" ::"r"(((uintptr_t)ptab4 - kernel_virtual)));
+}
+
 void kmem_init(boot_table *table)
 {
     efi_memory_descriptor *mmap = table->mmap;
@@ -249,16 +268,7 @@ void kmem_init(boot_table *table)
     kdebug_outf("\r\nkm_i: kernel [0x100000] - [0x%x]", (uint64_t)_end - kernel_virtual); //when available, page kernel with global bit
     kdebug_outf("\r\nkm_i: os free mem [0x%x] - [0x%x]", free_mem, free_mem + free_memlen);
 
-    kmem_newpt_start += kernel_virtual;
-    kmem_newpt_end += kernel_virtual;
-
-    ptab4 = kmem_newpt();
-    //page tables have to be identity mapped
-
-    kmem_page(0, 0, kernel_space, 0b11);
-    kmem_page(0, kernel_virtual, kernel_space, 0b11);
-
-    asm volatile("mov %0, %%cr3" ::"r"(((uintptr_t)ptab4 - kernel_virtual)));
+    kmem_virtinit();
 
     kmem_heap = table->safe_mem;
     kmem_heapend = kernel_virtual + kernel_space;
@@ -266,6 +276,8 @@ void kmem_init(boot_table *table)
     kdebug_outf("\r\nkm_i: kernel heap [0x%x] - [0x%x]", kmem_heap, kmem_heapend);
 
     memcpy(&ktable, (uint64_t*)virt_from_phys((uint64_t)table), sizeof(boot_table));
+
+    kmem_physinit();
     
     kdebug_outf("\r\nkm_i: done");
 }

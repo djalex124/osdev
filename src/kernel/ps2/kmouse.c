@@ -33,11 +33,6 @@ extern graphics_info kgraphics;
 
 void kmouse_calc()
 {
-    kscreen_pos pos;
-    pos.x = 0;
-    pos.y = 10;
-    kscreen_setpos(pos);
-
     mx += (mbyte[1] - ((mbyte[0] << 4) & 0x100));
     my += (mbyte[2] - ((mbyte[0] << 3) & 0x100));
 
@@ -49,10 +44,6 @@ void kmouse_calc()
         my = 0;
     else if (my > kgraphics.vertical_res)
         my = kgraphics.vertical_res;
-
-    kscreen_putf("kmouse_interrupt: mdx %8x mdy %8x", (mbyte[1] - ((mbyte[0] << 4) & 0x100)), (mbyte[2] - ((mbyte[0] << 3) & 0x100)));
-    kscreen_putf("\r\nkmouse_interrupt: left %b right %b middle %b", mbyte[0] & 1, (mbyte[0] >> 1) & 1, (mbyte[0] >> 2) & 1);
-    kscreen_putf("\r\nkmouse_interrupt: cursor x %4d cursor y %4d", mx, my);
 }
 
 void kmouse_interrupt()

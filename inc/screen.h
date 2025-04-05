@@ -5,6 +5,8 @@
 
 void kscreen_init();
 
+void kscreen_drawrect(int x, int y, int w, int h, uint32_t color);
+
 void kscreen_putf(const char *fmt, ...);
 void kscreen_clr(uint32_t color);
 

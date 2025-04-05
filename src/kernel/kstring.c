@@ -24,18 +24,66 @@ size_t str_len(const char* s)
     return len;
 }
 
-int str_cmp(const char* a, const char* b, size_t n)
+int str_cmp(const char* a, const char* b)
 {
-	while ((*a == *b) && *a && n)
-		++a, ++b, --n;
-	if (n == 0)
-		return 0;
-	return ((int) (uint8_t) *a) - ((int) (uint8_t) *b);
+	for (; *a == *b; a++, b++)
+    {
+        if (*a == '\0')
+            return 0;
+    }
+    return *a - *b;
+}
+
+unsigned int is_split(char c, char *split)
+{
+    while (*split != '\0')
+    {
+        if (c == *split)
+            return 1;
+        split++;
+    }
+    return 0;
+}
+
+char* str_tok(char *s, char *split)
+{
+    static char* backup;
+    if (!s)
+        s = backup;
+    if (!s)
+        return NULL;
+    while (1)
+    {
+        if (is_split(*s, split))
+        {
+            s++;
+            continue;
+        }
+        else if (*s == '\0')
+            return NULL;
+        break;
+    }
+    char *ret = s;
+    while (1)
+    {
+        if (*s == '\0')
+        {
+            backup = s;
+            return ret;
+        }
+        else if (is_split(*s, split))
+        {
+            *s = '\0';
+            backup = s + 1;
+            return ret;
+        }
+        s++;
+    }
 }
 
 static char str_itoa_buffer[32];
 
-char* str_itoa(uint64_t i, int b)
+char* str_itoa(long i, int b)
 {
     if (b < 1)
 		return 0;
@@ -63,6 +111,31 @@ char* str_itoa(uint64_t i, int b)
     }
 
 	return str_itoa_buffer;
+}
+
+int64_t str_atoi(const char *s)
+{
+    int sign = 1;
+    int64_t res = 0, index = 0;
+
+    while (s[index] == ' ')
+        index++;
+    
+    if (s[index] == '-' || s[index] == '+')
+        sign = 1 - 2 * (s[index++] == '-');
+
+    while (s[index] >= '0' && s[index] <= '9')
+    {
+        if (res > INT64_MAX / 10 || (res == INT64_MAX / 10 && s[index] - '0' > 7))
+        {
+            if (sign == 1)
+                return INT64_MAX;
+            else
+                return INT64_MIN;
+        }
+        res = 10 * res + (s[index++] - '0');
+    }
+    return res * sign;
 }
 
 //the plan is to use cpuid to check for quickest possible mem functions

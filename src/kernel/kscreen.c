@@ -23,6 +23,21 @@ static inline void kscreen_putp(int x, int y, uint32_t color)
     ((unsigned char*)kgraphics.framebuffer_base)[where + 2] = (color >> 16) & 0xFF;
 }
 
+void kscreen_drawrect(int x, int y, int w, int h, uint32_t color)
+{
+    unsigned char* where = (unsigned char*)kgraphics.framebuffer_base + y*kgraphics.ppsl*4;
+    for (int i = 0; i < h; i++)
+    {
+        for (int j = 0; j < w; j++)
+        {
+            where[j*4] = color & 0xFF;
+            where[j*4 + 1] = (color >> 8) & 0xFF;
+            where[j*4 + 2] = (color >> 16) & 0xFF;
+        }
+        where += kgraphics.ppsl*4;
+    }
+}
+
 void kscreen_clr(uint32_t color)
 {
     for (int y = 0; y < kgraphics.vertical_res; y++)
@@ -35,12 +50,13 @@ void kscreen_clr(uint32_t color)
 }
 
 extern char _binary____font_psf_start[];
-static uint32_t fg, bg;
-static unsigned int cx = 0, cy = 0, cw = 0, ch = 0;
+uint32_t fg, bg;
+unsigned int cx = 0, cy = 0, cw = 0, ch = 0;
+psf_font *font;
 
 void kscreen_putc(uint16_t c)
 {
-    psf_font *font = (psf_font *)&_binary____font_psf_start;
+    font = (psf_font *)&_binary____font_psf_start;
     int sx = cx * font->width;
     int sy = cy * font->height;
     int bp_line = (font->width + 7) / 8;
@@ -49,7 +65,7 @@ void kscreen_putc(uint16_t c)
         font->header_size +
         (c > 0 && c < font->num_glyph ? c : 0)*font->bp_glyph;
     int x, y, mask;
-    for (y = 0; y < font->height + 1; y++)
+    for (y = 0; y < font->height; y++)
     {
         sx = cx * font->width;
         mask = 1 << (font->width - 1);
@@ -67,8 +83,11 @@ void kscreen_putc(uint16_t c)
 
 void kscreen_scroll()
 {
-    memcpy((uint64_t *)kgraphics.framebuffer_base, (uint64_t *)(kgraphics.framebuffer_base + kgraphics.ppsl * 16), (kgraphics.vertical_res - 16) * kgraphics.ppsl);
-    memset((uint64_t *)(kgraphics.framebuffer_base + (kgraphics.vertical_res - 16) * kgraphics.ppsl), bg, kgraphics.ppsl * 16);
+    memcpy((uint32_t*)(kgraphics.framebuffer_base + (font->height * kgraphics.ppsl/2)),
+        (uint32_t*)(kgraphics.framebuffer_base + 2 * (font->height * kgraphics.ppsl/2)),
+        (ch - 2) * kgraphics.ppsl * font->height * 4);
+    memset((uint32_t*)(kgraphics.framebuffer_base + (cy - 1) * (font->height * kgraphics.ppsl/2)), bg, kgraphics.ppsl * font->height);
+    
     cy--;
 }
 

@@ -9,6 +9,7 @@
 #include <kernel.h>
 #include <kbd.h>
 #include <mouse.h>
+#include <kterm.h>
 
 void khalt(void)
 {
@@ -32,10 +33,9 @@ void kmain(boot_table *table)
     kscreen_init();
     kscreen_clr(default_color);
 
-    kscreen_putf("\r\n%m%n[AQUA Kernel (%s)]", default_color, 0, AQUA_VER_STRING);
-    kscreen_putf("\r\n[Built %s %s UTC-6]", __TIME__, __DATE__);
-
     kacpi_init();
+
+    kterm_init();
 
     kmouse_init();
     kkeyboard_init();
