@@ -11,7 +11,7 @@ extern uint64_t _end[];
 static uint64_t kmem_newpt_start;
 static uint64_t kmem_newpt_end;
 
-#define AQUA_DEBUG_PAGING 1
+//#define AQUA_DEBUG_PAGING 1
 
 uint64_t* kmem_newpt()
 {
@@ -165,7 +165,7 @@ void* kmem_kalloc(uint64_t size)
 {
     if ((kmem_heap + size) > kmem_heapend)
     {
-        kdebug_outf("\r\nkm_a: out of kernel heap - halting");
+        kdebug_outf("\r\nkm_ka: out of kernel heap - halting");
         for(;;);
     }
     uint64_t addr = kmem_heap;
@@ -204,7 +204,7 @@ void* kmem_alloc(size_t pages)
         
         if (connected == pages - 1)
         {
-            kdebug_outf("\r\nkm_f: setting entry[%x] pages[%x]", index - pages, pages);
+            kdebug_outf("\r\nkm_a: setting entry[%x] pages[%x]", index - pages, pages);
             for (size_t i = 0; i < pages; i++)
                 kmem_table[index - pages + i].used = 1;
             

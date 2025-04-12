@@ -2,6 +2,7 @@
 #include <screen.h>
 #include <kbd.h>
 #include <mem.h>
+#include <pci.h>
 #include <limits.h>
 
 #define kterm_buffersize 100
@@ -61,11 +62,16 @@ void kterm_run()
         kscreen_putf("\ncompare [num1] [num2] - compares two numbers and prints out the largest");
         kscreen_putf("\nhelp - lists available commands");
         kscreen_putf("\nmeminfo - prints current memory usage");
+        kscreen_putf("\npciinfo - prints pci busses and devices");
         kscreen_putf("\ntest - test random features");
     }
     else if (str_cmp(kterm_argv[0], "meminfo") == 0)
     {
         kmem_printinfo();
+    }
+    else if (str_cmp(kterm_argv[0], "pciinfo") == 0)
+    {
+        kpci_printinfo();
     }
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {

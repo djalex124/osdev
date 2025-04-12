@@ -10,6 +10,7 @@
 #include <kbd.h>
 #include <mouse.h>
 #include <kterm.h>
+#include <pci.h>
 
 void khalt(void)
 {
@@ -30,10 +31,12 @@ void kmain(boot_table *table)
     asm("sti");
 
     kmem_init(table);
-    kscreen_init();
-    kscreen_clr(default_color);
 
     kacpi_init();
+    kpci_init();
+
+    kscreen_init();
+    kscreen_clr(default_color);
 
     kterm_init();
 
@@ -49,8 +52,6 @@ void kmain(boot_table *table)
         - PCI device support
             - USB support
     - File system driver
-    - Real display driver
-    - Real memory manager (not just paging)
     
     */
 

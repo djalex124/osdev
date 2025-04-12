@@ -4,7 +4,7 @@
 
 void kacpi_init();
 
-struct acpi_rsdp
+typedef struct
 {
     char signature[8];
     uint8_t checksum;
@@ -16,9 +16,9 @@ struct acpi_rsdp
     uint64_t xsdt_addr;
     uint8_t extended_checksum;
     uint8_t reserved[3];
-}__attribute__((packed));
+}__attribute__((packed)) acpi_rsdp;
 
-struct acpi_sdt_header
+typedef struct
 {
     char signature[4];
     uint32_t length;
@@ -29,26 +29,32 @@ struct acpi_sdt_header
     uint32_t oem_revision;
     uint32_t creator_id;
     uint32_t creator_revision;
-};
+}acpi_sdt_header;
 
-struct acpi_rsdt
+typedef struct
 {
-    struct acpi_sdt_header h;
-    uint32_t other_sdt[];
-};
+    acpi_sdt_header h;
+    uint64_t other_sdt[];
+}__attribute__((packed)) acpi_xsdt;
 
-struct acpi_gas
+typedef struct
+{
+    acpi_sdt_header h;
+    uint32_t other_sdt[];
+}__attribute__((packed)) acpi_rsdt;
+
+typedef struct
 {
     uint8_t address_space;
     uint8_t bit_width;
     uint8_t bit_offset;
     uint8_t access_size;
     uint64_t address;
-};
+}acpi_gas;
 
-struct acpi_fadt
+typedef struct
 {
-    struct acpi_sdt_header h;
+    acpi_sdt_header h;
     uint32_t firmware_control;
     uint32_t dsdt;
     uint8_t reserved;
@@ -90,7 +96,7 @@ struct acpi_fadt
     uint8_t reserved_2;
     uint32_t Flags;
 
-    struct acpi_gas reset_reg;
+    acpi_gas reset_reg;
 
     uint8_t reset_value;
     uint8_t reserved_3[3];
@@ -98,34 +104,34 @@ struct acpi_fadt
     uint64_t x_firmware_control; // acpi 2.0+ from this point
     uint64_t x_dsdt;
 
-    struct acpi_gas x_pm1a_event_block;
-    struct acpi_gas x_pm1b_event_block;
-    struct acpi_gas x_pm1a_control_block;
-    struct acpi_gas x_pm1b_control_block;
-    struct acpi_gas x_pm2_control_block;
-    struct acpi_gas x_pm_timer_block;
-    struct acpi_gas x_gpe0_block;
-    struct acpi_gas x_gpe1_block;
-};
+    acpi_gas x_pm1a_event_block;
+    acpi_gas x_pm1b_event_block;
+    acpi_gas x_pm1a_control_block;
+    acpi_gas x_pm1b_control_block;
+    acpi_gas x_pm2_control_block;
+    acpi_gas x_pm_timer_block;
+    acpi_gas x_gpe0_block;
+    acpi_gas x_gpe1_block;
+}acpi_fadt;
 
-struct acpi_dsdt
+typedef struct
 {
-    struct acpi_sdt_header h;
+    acpi_sdt_header h;
     uint8_t aml[];
-};
+}acpi_dsdt;
 
-struct acpi_mcfg_baa_header
+typedef struct
 {
     uint64_t ecm_baseaddr;
     uint16_t pci_grpsegnum;
     uint8_t  pci_busnum;
     uint8_t  pci_busnumend;
     uint32_t reserved;
-};
+}acpi_mcfg_baa_header;
 
-struct acpi_mcfg
+typedef struct
 {
-    struct acpi_sdt_header h;
+    acpi_sdt_header h;
     uint64_t reserved;
-    struct acpi_mcfg_baa_header pci_baa[];
-};
+    acpi_mcfg_baa_header pci_baa[];
+}acpi_mcfg;

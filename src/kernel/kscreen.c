@@ -48,13 +48,7 @@ void kscreen_drawrect(int x, int y, int w, int h, uint32_t color)
 
 void kscreen_clr(uint32_t color)
 {
-    for (int y = 0; y < kgraphics.vertical_res; y++)
-    {
-        for (int x = 0; x < kgraphics.horizontal_res; x++)
-        {
-            kscreen_putp(x, y, color);
-        }
-    }
+    kscreen_drawrect(0, 0, kgraphics.horizontal_res, kgraphics.vertical_res, color);
 }
 
 extern char _binary____font_psf_start[];

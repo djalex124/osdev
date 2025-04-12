@@ -22,6 +22,16 @@ void* boot_memcpy(void* restrict dstptr, const void* restrict srcptr, size_t siz
 	return dstptr;
 }
 
+INTN boot_guidcmp(EFI_GUID *a, EFI_GUID *b)
+{
+    INTN value = a->Data1 - b->Data1;
+    value += a->Data2 - b->Data2;
+    value += a->Data3 - b->Data3;
+    for (int i = 0; i < 4; i++)
+        value += a->Data4[i] - b->Data4[i];
+    return value;
+}
+
 EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 boot_table* table;
 UINTN kernel_size = 0;
@@ -148,27 +158,28 @@ EFI_STATUS load_acpi()
     EFI_GUID acpi2 = ACPI_20_TABLE_GUID;
     EFI_GUID acpi1 = ACPI_TABLE_GUID;
 
-    EFI_CONFIGURATION_TABLE *configtable;
+    EFI_CONFIGURATION_TABLE configtable;
+    
     for (UINTN i = 0; i < ST->NumberOfTableEntries; i++)
     {
-        configtable = (EFI_CONFIGURATION_TABLE *)(ST->ConfigurationTable + sizeof(EFI_CONFIGURATION_TABLE) * i);
-        if (CompareGuid(&configtable->VendorGuid, &acpi2))
+        configtable = ST->ConfigurationTable[i];
+        if (boot_guidcmp(&acpi2, &configtable.VendorGuid) == 0)
         {
             table->acpi_ver = 2;
-            table->rsdp = (EFI_PHYSICAL_ADDRESS)configtable->VendorTable;
-            break;
+            table->rsdp = (EFI_PHYSICAL_ADDRESS)configtable.VendorTable;
         }
-        else if (CompareGuid(&configtable->VendorGuid, &acpi1))
+        else if (boot_guidcmp(&acpi1, &configtable.VendorGuid) == 0)
         {
+            if (table->acpi_ver == 2)
+                continue;
             table->acpi_ver = 1;
-            table->rsdp = (EFI_PHYSICAL_ADDRESS)configtable->VendorTable;
-            break;
+            table->rsdp = (EFI_PHYSICAL_ADDRESS)configtable.VendorTable;
         }
     }
     
     Print(L"[OK]: ACPI version %d RSDP 0x%x\r\n", table->acpi_ver, table->rsdp);
 
-    if (!strncmpa((char*)table->rsdp, "RSD PTR ", 8))
+    if (strncmpa((unsigned char*)table->rsdp, "RSD PTR ", 8) != 0)
         assert(EFI_UNSUPPORTED);
 
     return 0;
