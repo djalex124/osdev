@@ -145,6 +145,7 @@ void kterm_input(kkeyboard_state k)
     }
 
     kterm_pos = kscreen_getpos();
+    kscreen_copy();
 }
 
 void kterm_init()
@@ -153,4 +154,5 @@ void kterm_init()
     kkeyboard_setinput(*kterm_input);
     kscreen_putf("%m\n%s", default_color, kterm_prompt);
     kterm_pos = kscreen_getpos();
+    kscreen_copy();
 }

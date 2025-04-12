@@ -4,6 +4,7 @@
 #include <kernel.h>
 
 void kscreen_init();
+void kscreen_copy();
 
 void kscreen_drawrect(int x, int y, int w, int h, uint32_t color);
 

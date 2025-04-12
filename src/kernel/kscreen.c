@@ -10,6 +10,14 @@
 extern boot_table ktable;
 graphics_info kgraphics;
 
+uint32_t *kscreen_buffer;
+
+void kscreen_copy()
+{
+    memcpy(kgraphics.framebuffer_base, kscreen_buffer,
+        kgraphics.horizontal_res * kgraphics.vertical_res * 4);
+}
+
 static inline void kscreen_putp(int x, int y, uint32_t color)
 {
     if (x > kgraphics.horizontal_res || x < 0)
@@ -18,14 +26,14 @@ static inline void kscreen_putp(int x, int y, uint32_t color)
         return;
     
     unsigned where = x*4 + y*kgraphics.ppsl*4;
-    ((unsigned char*)kgraphics.framebuffer_base)[where] = color & 0xFF;
-    ((unsigned char*)kgraphics.framebuffer_base)[where + 1] = (color >> 8) & 0xFF;
-    ((unsigned char*)kgraphics.framebuffer_base)[where + 2] = (color >> 16) & 0xFF;
+    ((unsigned char*)kscreen_buffer)[where] = color & 0xFF;
+    ((unsigned char*)kscreen_buffer)[where + 1] = (color >> 8) & 0xFF;
+    ((unsigned char*)kscreen_buffer)[where + 2] = (color >> 16) & 0xFF;
 }
 
 void kscreen_drawrect(int x, int y, int w, int h, uint32_t color)
 {
-    unsigned char* where = (unsigned char*)kgraphics.framebuffer_base + y*kgraphics.ppsl*4;
+    unsigned char* where = (unsigned char*)kscreen_buffer + y*kgraphics.ppsl*4;
     for (int i = 0; i < h; i++)
     {
         for (int j = 0; j < w; j++)
@@ -83,8 +91,8 @@ void kscreen_putc(uint16_t c)
 
 void kscreen_scroll()
 {
-    memcpy((uint32_t*)(kgraphics.framebuffer_base + (font->height * kgraphics.ppsl/2)),
-        (uint32_t*)(kgraphics.framebuffer_base + 2 * (font->height * kgraphics.ppsl/2)),
+    memcpy((uint32_t*)(kscreen_buffer + (font->height * kgraphics.ppsl)),
+        (uint32_t*)(kscreen_buffer + 2 * (font->height * kgraphics.ppsl)),
         (ch - 2) * kgraphics.ppsl * font->height * 4);
     kscreen_drawrect(0, (cy - 1) * font->height, kgraphics.horizontal_res, font->height, bg);
     
@@ -272,4 +280,6 @@ void kscreen_init()
     cw = kgraphics.horizontal_res/((psf_font *)&_binary____font_psf_start)->width;
     ch = kgraphics.vertical_res/((psf_font *)&_binary____font_psf_start)->height;
     kdebug_outf("\r\nkscr: terminal %dx%d", cw, ch);
+    kscreen_buffer = kmem_alloc((kgraphics.horizontal_res * kgraphics.vertical_res * 4)/0x1000 + 1);
+    kdebug_outf("\r\nkscr: buffer [0x%x]", (uintptr_t)kscreen_buffer);
 }

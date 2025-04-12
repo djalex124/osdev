@@ -67,7 +67,7 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
         
         ptab2 = (uint64_t *)(ptab3[p3_index] & 0xFFFFFFFFFFFFF000);
 
-        if (size >= 0x200000) //2mb page?
+        if (size >= 0x200000 && (address % 0x200000 == 0)) //2mb page?
         {
             ptab2[p2_index] = physical | flags | (1 << 7); // huge bit?
             
@@ -117,15 +117,15 @@ void kmem_unpage(uint64_t address, uint64_t size)
         size_t p2_index = (address >> 21) & 0x1FF;
 
         if (!(ptab4[p4_index] & 0x1))
-            break;;
+            break;
 
         ptab3 = (uint64_t *)(ptab4[p4_index] & 0xFFFFFFFFFFFFF000);
         if (!(ptab3[p3_index] & 0x1))
-            break;;
+            break;
 
         ptab2 = (uint64_t *)(ptab3[p3_index] & 0xFFFFFFFFFFFFF000);
 
-        if (size >= 0x200000) //2mb page?
+        if (size >= 0x200000 && (address % 0x200000 == 0)) //2mb page?
         {
 #ifdef AQUA_DEBUG_PAGING
             kdebug_outf("\r\nkm_up: unpage large page of 0x%x", address);
@@ -181,6 +181,7 @@ typedef struct
     uint8_t  used : 1;
     uint8_t  eos : 1;
     uint8_t  eom : 1;
+    uint8_t  pad : 5;
 }__attribute__((packed)) kmem_stack;
 
 size_t kmem_lowestfree = 0;
@@ -189,32 +190,37 @@ kmem_stack* kmem_table;
 void* kmem_alloc(size_t pages)
 {
     size_t index;
-    size_t connected = 1;
+    size_t connected = 0;
     for (index = kmem_lowestfree; kmem_table[index].eom != 1; index++)
     {
         if (kmem_table[index].used == 1)
         {
-            connected = 1;
+            connected = 0;
             continue;
         }
 
         if (kmem_table[index].eos)
-            connected = 1;
+            connected = 0;
         
-        if (connected == pages)
+        if (connected == pages - 1)
         {
+            kdebug_outf("\r\nkm_f: setting entry[%x] pages[%x]", index - pages, pages);
             for (size_t i = 0; i < pages; i++)
-                kmem_table[index - pages + 1].used = 1;
-            kdebug_outf("\r\nkm_f: setting entry[%x]eom[%x]", index - pages + 1, pages);
-            void* addr = (void*)(uint64_t)(kmem_table[index - connected + 1].page * 0x1000);
+                kmem_table[index - pages + i].used = 1;
+            
+            void* addr = (void*)(uint64_t)(kmem_table[index - pages].page * 0x1000);
             kmem_page((uint64_t)addr, (uint64_t)addr, pages * 0x1000, 0b11);
+
+            if (kmem_lowestfree < index - pages)
+                kmem_lowestfree = index - pages;
+
             return addr;
         }
 
         connected++;
     }
-    kdebug_outf("\r\nkm_a: could not allocate chunk before EOM! entry[%x]eom[%x]", index, kmem_table[index].eom);
-    return (void*)1;
+    kdebug_outf("\r\nkm_a: could not allocate chunk before EOM! entry[%x]pages[%x]eom[%x]", index, pages, kmem_table[index].eom);
+    return NULL;
 }
 
 void kmem_free(void* addr, size_t pages)
@@ -325,7 +331,7 @@ void kmem_physinit()
             for (size_t i = index; i < index + size; i++)
             {
                 kmem_table[i].page = (uint32_t)(mmap_entries->physical_start/0x1000) + i;
-                if (mmap_entries->physical_start >= 0x100000 && mmap_entries->physical_start + i*0x1000 <= kmem_heap - kernel_virtual)
+                if (mmap_entries->physical_start >= 0x100000 && (mmap_entries->physical_start <= kmem_heap - kernel_virtual))
                     kmem_table[i].used = 1;
                 else
                     kmem_table[i].used = 0;
@@ -341,6 +347,7 @@ void kmem_physinit()
             index += size;
         }
     }
+    kdebug_outf("\r\nkm_i: total indexed [%x]", index);
 }
 
 void kmem_virtinit()
