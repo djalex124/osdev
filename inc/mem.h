@@ -7,8 +7,7 @@
 #ifndef ASSEMBLY
 
 #include <kernel.h>
-
-#define kernel_space 0x200000
+#include <stddef.h>
 
 void kmem_init(boot_table *table);
 
@@ -16,6 +15,10 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
 void kmem_unpage(uint64_t address, uint64_t size);
 
 void* kmem_kalloc(uint64_t size);
-void kmem_free(void* addr);
+
+void* kmem_alloc(size_t pages);
+void kmem_free(void* addr, size_t pages);
+
+void kmem_printinfo();
 
 #endif

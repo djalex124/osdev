@@ -60,11 +60,22 @@ void kterm_run()
         kscreen_putf("\nclear - clears the screen");
         kscreen_putf("\ncompare [num1] [num2] - compares two numbers and prints out the largest");
         kscreen_putf("\nhelp - lists available commands");
+        kscreen_putf("\nmeminfo - prints current memory usage");
         kscreen_putf("\ntest - test random features");
+    }
+    else if (str_cmp(kterm_argv[0], "meminfo") == 0)
+    {
+        kmem_printinfo();
     }
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {
         kscreen_putf("\ntest output of the commands!!");
+        uint16_t* test = kmem_alloc(1);
+        kscreen_putf("\ntest %x", (uint64_t)test);
+        test[32] = 0xCA;
+        kscreen_putf("\ntest[32] %x", test[32]);
+        kmem_free(test, 1);
+        kscreen_putf("%m", default_color);
     }
     else if (kterm_argv[0] == NULL)
         return;

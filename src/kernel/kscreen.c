@@ -86,7 +86,7 @@ void kscreen_scroll()
     memcpy((uint32_t*)(kgraphics.framebuffer_base + (font->height * kgraphics.ppsl/2)),
         (uint32_t*)(kgraphics.framebuffer_base + 2 * (font->height * kgraphics.ppsl/2)),
         (ch - 2) * kgraphics.ppsl * font->height * 4);
-    memset((uint32_t*)(kgraphics.framebuffer_base + (cy - 1) * (font->height * kgraphics.ppsl/2)), bg, kgraphics.ppsl * font->height);
+    kscreen_drawrect(0, (cy - 1) * font->height, kgraphics.horizontal_res, font->height, bg);
     
     cy--;
 }
@@ -128,8 +128,8 @@ void kscreen_putf(const char *fmt, ...)
     va_list arg;
     va_start(arg, fmt);
 
-    uint64_t i;
-    int64_t d;
+    uint64_t unsign;
+    int64_t sign;
     char *s;
     char c;
     int length;
@@ -167,12 +167,12 @@ void kscreen_putf(const char *fmt, ...)
         switch (fmt[count])
         {
             case 'n':
-                i = va_arg(arg, uint64_t);
-                fg = i;
+                unsign = va_arg(arg, uint64_t);
+                fg = unsign;
                 break;
             case 'm':
-                i = va_arg(arg, uint64_t);
-                bg = i;
+                unsign = va_arg(arg, uint64_t);
+                bg = unsign;
                 break;
             case 's':
                 s = va_arg(arg, char *);
@@ -199,8 +199,8 @@ void kscreen_putf(const char *fmt, ...)
                 kscreen_printc(c);
                 break;
             case 'b':
-                i = va_arg(arg, uint64_t);
-                s = str_itoa(i, 2);
+                unsign = va_arg(arg, uint64_t);
+                s = str_utoa(unsign, 2);
                 if (length == 0)
                 {
                     kscreen_prints(s);
@@ -211,8 +211,8 @@ void kscreen_putf(const char *fmt, ...)
                 kscreen_prints(s);
                 break;
             case 'd':
-                d = va_arg(arg, int64_t);
-                s = str_itoa(d, 10);
+                sign = va_arg(arg, int64_t);
+                s = str_itoa(sign, 10);
                 if (length == 0)
                 {
                     kscreen_prints(s);
@@ -223,8 +223,8 @@ void kscreen_putf(const char *fmt, ...)
                 kscreen_prints(s);
                 break;
             case 'x':
-                i = va_arg(arg, uint64_t);
-                s = str_itoa(i, 16);
+                unsign = va_arg(arg, uint64_t);
+                s = str_utoa(unsign, 16);
                 if (length == 0)
                 {
                     kscreen_prints(s);

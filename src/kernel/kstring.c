@@ -1,10 +1,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-void* memset(void* bufptr, uint32_t value, size_t size) {
-	uint32_t* buf = (uint32_t*) bufptr;
+void* memset(void* bufptr, unsigned char value, size_t size) {
+	unsigned char* buf = (unsigned char*) bufptr;
 	for (size_t i = 0; i < size; i++)
-		buf[i] = (uint32_t) value;
+		buf[i] = value;
 	return bufptr;
 }
 
@@ -81,20 +81,44 @@ char* str_tok(char *s, char *split)
     }
 }
 
-static char str_itoa_buffer[32];
+static char str_toa_buffer[64];
 
 char* str_itoa(long i, int b)
 {
     if (b < 1)
 		return 0;
 	
-	char* p = str_itoa_buffer;
+	char* p = str_toa_buffer;
     if (i < 0 && b == 10)
     {
         *p++ = '-';
         i *= -1;
     }
 
+    char* low = p;
+    do
+    {
+        *p++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"[35 + i % b];
+        i /= b;
+    }while (i && *p);
+
+    *p-- = '\0';
+    while (low < p)
+    {
+        char tmp = *low;
+        *low++ = *p;
+        *p-- = tmp;
+    }
+
+	return str_toa_buffer;
+}
+
+char* str_utoa(uint64_t i, int b)
+{
+    if (b < 1)
+		return 0;
+	
+	char* p = str_toa_buffer;
     char* low = p;
     do
     {
@@ -110,7 +134,7 @@ char* str_itoa(long i, int b)
         *p-- = tmp;
     }
 
-	return str_itoa_buffer;
+	return str_toa_buffer;
 }
 
 int64_t str_atoi(const char *s)

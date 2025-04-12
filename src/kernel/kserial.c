@@ -39,15 +39,17 @@ void kserial_outf(const char *fmt, ...)
     va_list arg;
     va_start(arg, fmt);
 
-    uint64_t i;
-    int64_t d;
+    uint64_t unsign;
+    int64_t sign;
     char *s;
     char c;
     int length;
     int len;
     int j;
+
+    size_t strlen = str_len(fmt);
     
-    for (int count = 0; count < str_len(fmt); count++)
+    for (int count = 0; count < strlen; count++)
     {
         if (fmt[count] != '%')
         {
@@ -102,8 +104,8 @@ void kserial_outf(const char *fmt, ...)
                 kserial_outc(c);
                 break;
             case 'b':
-                i = va_arg(arg, uint64_t);
-                s = str_itoa(i, 2);
+                unsign = va_arg(arg, uint64_t);
+                s = str_utoa(unsign, 2);
                 if (length == 0)
                 {
                     kserial_outs(s);
@@ -114,8 +116,8 @@ void kserial_outf(const char *fmt, ...)
                 kserial_outs(s);
                 break;
             case 'd':
-                d = va_arg(arg, int64_t);
-                s = str_itoa(d, 10);
+                sign = va_arg(arg, int64_t);
+                s = str_itoa(sign, 10);
                 if (length == 0)
                 {
                     kserial_outs(s);
@@ -126,8 +128,8 @@ void kserial_outf(const char *fmt, ...)
                 kserial_outs(s);
                 break;
             case 'x':
-                i = va_arg(arg, uint64_t);
-                s = str_itoa(i, 16);
+                unsign = va_arg(arg, uint64_t);
+                s = str_utoa(unsign, 16);
                 if (length == 0)
                 {
                     kserial_outs(s);

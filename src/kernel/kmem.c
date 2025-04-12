@@ -11,7 +11,7 @@ extern uint64_t _end[];
 static uint64_t kmem_newpt_start;
 static uint64_t kmem_newpt_end;
 
-#define AQUA_DEBUG_PAGING
+#define AQUA_DEBUG_PAGING 1
 
 uint64_t* kmem_newpt()
 {
@@ -170,19 +170,62 @@ void* kmem_kalloc(uint64_t size)
     }
     uint64_t addr = kmem_heap;
     kmem_heap += size;
-    kdebug_outf("\r\nkm_a: heap now at [0x%x]", kmem_heap);
+    kdebug_outf("\r\nkm_ka: heap now at [0x%x]", kmem_heap);
     memset((uintptr_t *)addr, 0, size);
     return (uintptr_t *)addr;
 }
 
-void* kmem_alloc(size_t size, int aligned)
+typedef struct
 {
-    return NULL;
+    uint32_t page;
+    uint8_t  used : 1;
+    uint8_t  eos : 1;
+    uint8_t  eom : 1;
+}__attribute__((packed)) kmem_stack;
+
+size_t kmem_lowestfree = 0;
+kmem_stack* kmem_table;
+
+void* kmem_alloc(size_t pages)
+{
+    size_t index;
+    size_t connected = 1;
+    for (index = kmem_lowestfree; kmem_table[index].eom != 1; index++)
+    {
+        if (kmem_table[index].used == 1)
+        {
+            connected = 1;
+            continue;
+        }
+
+        if (kmem_table[index].eos)
+            connected = 1;
+        
+        if (connected == pages)
+        {
+            for (size_t i = 0; i < pages; i++)
+                kmem_table[index - pages + 1].used = 1;
+            kdebug_outf("\r\nkm_f: setting entry[%x]eom[%x]", index - pages + 1, pages);
+            void* addr = (void*)(uint64_t)(kmem_table[index - connected + 1].page * 0x1000);
+            kmem_page((uint64_t)addr, (uint64_t)addr, pages * 0x1000, 0b11);
+            return addr;
+        }
+
+        connected++;
+    }
+    kdebug_outf("\r\nkm_a: could not allocate chunk before EOM! entry[%x]eom[%x]", index, kmem_table[index].eom);
+    return (void*)1;
 }
 
-void kmem_free(void* addr)
+void kmem_free(void* addr, size_t pages)
 {
-    return; //no good implementation until real mm
+    size_t index = 0;
+    for (index = 0; kmem_table[index].page != (uint64_t)(addr)/0x1000; index++);
+    kdebug_outf("\r\nkm_f: freeing entry[%x]pages[%x]", index, pages);
+    for (size_t i = index; i < index + pages; i++)
+        kmem_table[i].used = 0;
+    memset(addr, 0, pages * 0x1000);
+    kmem_unpage((uint64_t)addr, pages * 0x1000);
 }
 
 #ifdef AQUA_DEBUG
@@ -209,9 +252,95 @@ static char* kmem_type[17] = {
 
 extern boot_table ktable;
 
+void kmem_printinfo()
+{
+    kscreen_putf("\nkheap range [0x%x - 0x%x]\n - current value: 0x%x", ktable.safe_mem, kmem_heapend, kmem_heap);
+    kscreen_putf("\nkpagetables [0x%x - 0x%x]", kmem_newpt_start, kmem_newpt_end);
+    kscreen_putf("\nkmem_table ");
+    size_t entries;
+    int sections = 0;
+    int section_size = 0;
+    int sections_available = 0;
+    for (entries = 0; kmem_table[entries].eom != 1; entries++, section_size++)
+    {
+        if (kmem_table[entries].eos == 1)
+        {
+            kscreen_putf("\n - section[%x] size[0x%x]", sections, section_size*0x1000);
+            sections++;
+            section_size = 0;
+        }
+        if (!kmem_table[entries].used)
+            sections_available++;
+    }
+    kscreen_putf("\nkmem_table mapped memory %d MiB", entries/256);
+    kscreen_putf("\nkmem_table available memory %d MiB", sections_available/256);
+}
+
 void kmem_physinit()
 {
+    //algorithm outline:
+    //finalized memory map will be dynamically created using kernel heap
+    //go over section of memory
+    // - if not clear, go back to beginning and move checker forward
+    // - if clear, continue
+    //break down each free section into page aligned areas
+    //
+    efi_memory_descriptor *mmap = ktable.mmap;
+    efi_memory_descriptor *mmap_entries;
+    uint64_t mmap_length = ktable.mmap_enteries * ktable.mmap_size;
+
+    uint64_t pages = 0;
     
+    for (mmap_entries = mmap;
+        (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap_length;
+        mmap_entries = (efi_memory_descriptor *) ((uint64_t) mmap_entries + ktable.mmap_size))
+    {
+        if (mmap_entries->type == 7)
+        {
+            if (mmap_entries->physical_start < 0x100000)
+                continue; //ignored, pagetables
+            kdebug_outf("\r\nkm_i: open physical mem [0x%x] pages %x", mmap_entries->physical_start, 
+                mmap_entries->num_pages);
+            pages += mmap_entries->num_pages;
+            if (mmap_entries->physical_start == 0x100000)
+                kdebug_outf(" (kernel)");
+        }
+    }
+
+    kdebug_outf("\r\nkm_i: total mem needed %x (pages %x)", pages * sizeof(kmem_stack), pages);
+    kmem_table = (kmem_stack *)kmem_kalloc(pages * sizeof(kmem_stack));
+    
+    uint64_t index = 0;
+    for (mmap_entries = mmap;
+        (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap_length;
+        mmap_entries = (efi_memory_descriptor *) ((uint64_t) mmap_entries + ktable.mmap_size))
+    {
+        if (mmap_entries->type == 7)
+        {
+            if (mmap_entries->physical_start < 0x100000)
+                continue; //ignored, pagetables
+            kdebug_outf("\r\nkm_i: indexing mem [0x%x] pages %x", mmap_entries->physical_start, 
+                mmap_entries->num_pages);
+            uint64_t size = mmap_entries->num_pages;
+            for (size_t i = index; i < index + size; i++)
+            {
+                kmem_table[i].page = (uint32_t)(mmap_entries->physical_start/0x1000) + i;
+                if (mmap_entries->physical_start >= 0x100000 && mmap_entries->physical_start + i*0x1000 <= kmem_heap - kernel_virtual)
+                    kmem_table[i].used = 1;
+                else
+                    kmem_table[i].used = 0;
+                if (i == index + size - 1)
+                    kmem_table[i].eos = 1;
+                else
+                    kmem_table[i].eos = 0;
+                if (i == pages - 1)
+                    kmem_table[i].eom = 1;
+                else
+                    kmem_table[i].eom = 0;
+            }
+            index += size;
+        }
+    }
 }
 
 void kmem_virtinit()
@@ -222,8 +351,8 @@ void kmem_virtinit()
     ptab4 = kmem_newpt();
     //page tables have to be identity mapped
 
-    kmem_page(0, 0, kernel_space, 0b11);
-    kmem_page(0, kernel_virtual, kernel_space, 0b11);
+    kmem_page(0, 0, kmem_heapend - kernel_virtual, 0b11);
+    kmem_page(0, kernel_virtual, kmem_heapend - kernel_virtual, 0b11);
 
     asm volatile("mov %0, %%cr3" ::"r"(((uintptr_t)ptab4 - kernel_virtual)));
 }
@@ -233,9 +362,6 @@ void kmem_init(boot_table *table)
     efi_memory_descriptor *mmap = table->mmap;
     efi_memory_descriptor *mmap_entries;
     uint64_t mmap_length = table->mmap_enteries * table->mmap_size;
-
-    uint64_t free_mem = 0;
-    uint64_t free_memlen = 0;
 
     for (mmap_entries = mmap;
         (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap_length;
@@ -254,26 +380,21 @@ void kmem_init(boot_table *table)
                 {    
                     kmem_newpt_start = mmap_entries->physical_start;
                     kmem_newpt_end = (kmem_newpt_start + mmap_entries->num_pages*0x1000);
+                    break;
                 } // find lowest chunk of mem for kernel paging
-                else if (mmap_entries->num_pages*0x1000 > free_memlen)
-                {
-                    free_mem = mmap_entries->physical_start;
-                    free_memlen = mmap_entries->num_pages*0x1000;
-                }
+                if (mmap_entries->physical_start == 0x100000)
+                    kmem_heapend = mmap_entries->physical_start + mmap_entries->num_pages*0x1000 + kernel_virtual;
                 break;
         }
     }
 
     kdebug_outf("\r\nkm_i: kernel pts [0x%x] - [0x%x]", kmem_newpt_start, kmem_newpt_end);
     kdebug_outf("\r\nkm_i: kernel [0x100000] - [0x%x]", (uint64_t)_end - kernel_virtual); //when available, page kernel with global bit
-    kdebug_outf("\r\nkm_i: os free mem [0x%x] - [0x%x]", free_mem, free_mem + free_memlen);
-
-    kmem_virtinit();
 
     kmem_heap = table->safe_mem;
-    kmem_heapend = kernel_virtual + kernel_space;
-
     kdebug_outf("\r\nkm_i: kernel heap [0x%x] - [0x%x]", kmem_heap, kmem_heapend);
+
+    kmem_virtinit();
 
     memcpy(&ktable, (uint64_t*)virt_from_phys((uint64_t)table), sizeof(boot_table));
 
