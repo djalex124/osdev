@@ -1,3 +1,5 @@
+#define kernel_file
+
 #include <stdint.h>
 #include <stddef.h>
 #include <mem.h>
@@ -19,7 +21,8 @@ void khalt(void)
         asm("hlt");
 }
 
-boot_table ktable;
+boot_table k_boottable;
+info_table k_infotable;
 
 void kmain(boot_table *table)
 {

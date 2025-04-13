@@ -6,9 +6,23 @@
 
 #ifndef ASSEMBLY
 
-#include <kernel.h>
 #include <stddef.h>
 
+typedef struct
+{
+    uint32_t page;
+    uint8_t  used : 1;
+    uint8_t  eos : 1;
+    uint8_t  eom : 1;
+    uint8_t  pad : 5;
+}__attribute__((packed)) kmem_stack;
+
+void kmem_physinit();
+void kmem_virtinit();
+
+#define AQUA_DEBUG_MEM
+
+#include <kernel.h>
 void kmem_init(boot_table *table);
 
 void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags);

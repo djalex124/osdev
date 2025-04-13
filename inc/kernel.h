@@ -39,3 +39,19 @@ typedef struct {
     uint8_t acpi_ver;
     uint64_t rsdp;
 } boot_table;
+
+#include <stddef.h>
+#include <mem.h>
+#include <pci.h>
+
+typedef struct {
+    size_t kpci_tablesize;
+    kpci_headercommon *kpci_table;
+
+    kmem_stack *kmem_table;
+} info_table;
+
+#ifndef kernel_file
+extern boot_table k_boottable;
+extern info_table k_infotable;
+#endif

@@ -7,9 +7,7 @@
 #include <debug.h>
 #include <kstring.h>
 
-extern boot_table ktable;
 graphics_info kgraphics;
-
 uint32_t *kscreen_buffer;
 
 void kscreen_copy()
@@ -261,10 +259,10 @@ void kscreen_setpos(kscreen_pos pos)
 
 void kscreen_init()
 {
-    kgraphics.framebuffer_base = ktable.graphics.framebuffer_base;
-    kgraphics.horizontal_res = ktable.graphics.horizontal_res;
-    kgraphics.vertical_res = ktable.graphics.vertical_res;
-    kgraphics.ppsl = ktable.graphics.ppsl;
+    kgraphics.framebuffer_base = k_boottable.graphics.framebuffer_base;
+    kgraphics.horizontal_res = k_boottable.graphics.horizontal_res;
+    kgraphics.vertical_res = k_boottable.graphics.vertical_res;
+    kgraphics.ppsl = k_boottable.graphics.ppsl;
     //assume 32 bpp as is standard from UEFI's GOP
     kdebug_outf("\r\nkscr: [%d]x[%d] @ 32 bpp", kgraphics.horizontal_res, kgraphics.vertical_res);
     kmem_page((uint64_t)kgraphics.framebuffer_base, (uint64_t)kgraphics.framebuffer_base + kernel_virtual, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b11);

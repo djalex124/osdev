@@ -4,6 +4,8 @@
 #include <mem.h>
 #include <pci.h>
 #include <limits.h>
+#include <cpuid.h>
+#include <kernel.h>
 
 #define kterm_buffersize 100
 #define kterm_maxargs 16
@@ -55,11 +57,18 @@ void kterm_run()
         else
             kscreen_putf("number 2 (%d)", b);
     }
+    else if (str_cmp(kterm_argv[0], "cpuinfo") == 0)
+    {
+        unsigned int unused, bx, cx, dx;
+        __cpuid(0, unused, bx, cx, dx);
+        kscreen_putf("\n - Brand [%4s%4s%4s]", &bx, &dx, &cx);
+    }
     else if (str_cmp(kterm_argv[0], "help") == 0)
     {
         kscreen_putf("\nList of currently available commands:");
         kscreen_putf("\nclear - clears the screen");
         kscreen_putf("\ncompare [num1] [num2] - compares two numbers and prints out the largest");
+        kscreen_putf("\ncpuinfo - lists CPU model and capabilities");
         kscreen_putf("\nhelp - lists available commands");
         kscreen_putf("\nmeminfo - prints current memory usage");
         kscreen_putf("\npciinfo - prints pci busses and devices");
@@ -71,7 +80,14 @@ void kterm_run()
     }
     else if (str_cmp(kterm_argv[0], "pciinfo") == 0)
     {
-        kpci_printinfo();
+        kscreen_putf("\nkpci_info: current pci device table");
+        kpci_headercommon* kpci_table = k_infotable.kpci_table;
+        for (int i = 0; i < k_infotable.kpci_tablesize; i++)
+        {
+            kscreen_putf("\n - Bus %2x Device %2x Function %2x", kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
+            kscreen_putf(": Class %2x/%2x VendorID %x DeviceID %x Prog IF %x", 
+                kpci_table[i].class, kpci_table[i].subclass, kpci_table[i].vendorid, kpci_table[i].deviceid, kpci_table[i].progif);
+        }
     }
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {

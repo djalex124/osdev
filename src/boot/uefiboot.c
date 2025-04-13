@@ -61,7 +61,7 @@ EFI_STATUS load_graphics()
     s = uefi_call_wrapper(gop->SetMode, 2, gop, mode_native);
     assert(s);
 
-    Print(L"Welcome to concatenOS loader!\r\n");
+    Print(L"\r\nWelcome to concatenOS loader!\r\n");
     Print(L"[OK]: GOP - address 0x%x size 0x%x width %dx%d ppsl %d format %x\r\n",
         gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize, gop->Mode->Info->HorizontalResolution,
         gop->Mode->Info->VerticalResolution, gop->Mode->Info->PixelsPerScanLine, gop->Mode->Info->PixelFormat);

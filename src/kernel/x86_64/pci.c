@@ -3,6 +3,7 @@
 #include <port.h>
 #include <pci.h>
 #include <mem.h>
+#include <kernel.h>
 
 //#define AQUA_IDE_DEBUG
 
@@ -173,15 +174,7 @@ void kpci_init()
                 kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
         }
     }
-}
 
-void kpci_printinfo()
-{
-    kscreen_putf("\nkpci_info: current pci device table");
-    for (int i = 0; i < kpci_tablesize; i++)
-    {
-        kscreen_putf("\n - Bus %2x Device %2x Function %2x", kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
-        kscreen_putf(": Class %2x/%2x VendorID %x DeviceID %x Prog IF %x", 
-            kpci_table[i].class, kpci_table[i].subclass, kpci_table[i].vendorid, kpci_table[i].deviceid, kpci_table[i].progif);
-    }
+    k_infotable.kpci_tablesize = kpci_tablesize;
+    k_infotable.kpci_table = kpci_table;
 }

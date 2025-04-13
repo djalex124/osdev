@@ -3,7 +3,6 @@
 #include <stdint.h>
 
 void kpci_init();
-void kpci_printinfo();
 
 typedef struct
 {
