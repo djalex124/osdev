@@ -20,7 +20,7 @@ typedef struct
 void kmem_physinit();
 void kmem_virtinit();
 
-#define AQUA_DEBUG_MEM
+//#define AQUA_DEBUG_MEM
 
 #include <kernel.h>
 void kmem_init(boot_table *table);

@@ -54,8 +54,8 @@ void kmem_free(void* addr, size_t pages)
         kmem_table[i].used = 0;
     memset(addr, 0, pages * 0x1000);
     kmem_unpage((uint64_t)addr, pages * 0x1000);
-    if (index < kmem_lowestfree)
-        kmem_lowestfree = index;
+    if (index + pages < kmem_lowestfree)
+        kmem_lowestfree = index + pages;
 }
 
 extern uint64_t kmem_heap;

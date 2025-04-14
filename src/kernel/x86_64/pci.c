@@ -5,92 +5,211 @@
 #include <mem.h>
 #include <kernel.h>
 
-//#define AQUA_IDE_DEBUG
+#define AQUA_IDE_DEBUG
+
+char* kpci_classname[] =
+{
+    "Unclassified",
+    "Mass Storage Controller",
+    "Network Controller",
+    "Display Controller",
+    "Multimedia Controller",
+    "Memory Controller",
+    "Bridge",
+    "Simple Communication Controller",
+    "Base System Peripheral",
+    "Input Device Controller",
+    "Docking Station",
+    "Processor",
+    "Serial Bus Controller",
+    "Wireless Controller",
+    "Intelligent Controller",
+    "Satelite Communication Controller",
+    "Encryption Controller",
+    "Signal Processing Controller",
+    "Processing Accelerator",
+    "Non-Essential Instrumentation",
+    "Co-Processor",
+    "Unassigned Class",
+    "Reserved"
+};
+
+char* kpci_subclass0x80 = "Other";
+
+char* kpci_subclassname_0[] = 
+{
+    "VGA-Compatible",
+    "Non-VGA-Compatible"
+};
+
+char* kpci_subclassname_1[] =
+{
+    "SCSI Bus Controller",
+    "IDE Controller",
+    "Floppy Disk Controller",
+    "IPI Bus Controller",
+    "RAID Controller",
+    "ATA Controller",
+    "SATA Controller",
+    "Serial Attached SCSI Controller",
+    "Non-Volatile Memory Controller"
+};
+
+char* kpci_subclassname_2[] =
+{
+    "Ethernet Controller"
+};
+
+char* kpci_subclassname_3[] =
+{
+    "VGA Compatible Controller",
+    "XGA Controller",
+    "3D Controller"
+};
+
+char* kpci_subclassname_6[] =
+{
+    "Host Bridge",
+    "ISA Bridge",
+    "EISA Bridge",
+    "MCA Bridge",
+    "PCI-PCI Bridge",
+    "PCMIA Bridge",
+    "NuBus Bridge",
+    "CardBus Bridge",
+    "RACEway Bridge",
+    "PCI-PCI Bridge",
+    "InfiniBand-PCI Bridge"
+};
+
+char* kpci_subclassname_12[] =
+{
+    "FireWire Controller",
+    "ACCESS Bus Controller",
+    "SSA",
+    "USB Controller",
+    "Fibre Channel",
+    "SMBus Controller",
+    "InfiniBand Controller",
+    "IPMI Interface",
+    "SERCOS Interface",
+    "CANbus Controller"
+};
+
+char* kpci_getsubclassname(uint8_t class, uint8_t subclass)
+{
+    if (subclass == 0x80)
+        return kpci_subclass0x80;
+    switch (class)
+    {
+        case 0:
+            if (subclass >= 2)
+                return kpci_classname[22];
+            return kpci_subclassname_0[subclass];
+        case 1:
+            if (subclass >= 9)
+                return kpci_classname[22];
+            return kpci_subclassname_1[subclass];
+        case 2:
+            if (subclass >= 1)
+                return kpci_subclass0x80;
+            return kpci_subclassname_2[subclass];
+        case 3:
+            if (subclass >= 3)
+                return kpci_classname[22];
+            return kpci_subclassname_3[subclass];
+        case 6:
+            if (subclass >= 11)
+                return kpci_classname[22];
+            return kpci_subclassname_6[subclass];
+        case 12:
+            if (subclass >= 10)
+                return kpci_classname[22];
+            return kpci_subclassname_12[subclass];
+        default:
+            return kpci_classname[22];
+    }
+}
+
+char* kpci_getclassname(uint8_t class)
+{
+    if (class >= 0x14 && class <= 0x3F)
+        return kpci_classname[22];
+    else if (class >= 0x41 && class <= 0xFE)
+        return kpci_classname[22];
+    else if (class == 0x40)
+        return kpci_classname[21];
+    else
+        return kpci_classname[class];
+}
 
 size_t kpci_tablesize = 0;
-kpci_headercommon *kpci_table = NULL;
+kpci_device *kpci_table = NULL;
 
 void kpci_checkbus(uint8_t bus);
 
-uint16_t kpci_configreadword(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off)
+uint32_t kpci_configread(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off)
 {
     uint32_t addr;
     uint32_t lbus = (uint32_t)bus;
     uint32_t lslot = (uint32_t)slot;
     uint32_t lfunc = (uint32_t)func;
-    uint16_t tmp = 0;
+    uint32_t tmp = 0;
 
     addr = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) | (off & 0xFC) | ((uint32_t)0x80000000));
     outl(0xCF8, addr);
 
-    tmp = (uint16_t)((inl(0xCFC) >> ((off & 2) * 8)) & 0xFFFF);
+    tmp = inl(0xCFC) >> ((off & 3) * 0x8);
     return tmp;
-}
-
-uint16_t kpci_getdeviceid(uint8_t bus, uint8_t device, uint8_t func)
-{
-    return kpci_configreadword(bus, device, func, 0x2);
 }
 
 uint16_t kpci_getvendorid(uint8_t bus, uint8_t device, uint8_t func)
 {
-    return kpci_configreadword(bus, device, func, 0x0);
+    return kpci_configread(bus, device, func, PCI_OFFSET_VENDORID) & 0xFFFF;
 }
 
 uint8_t kpci_getbaseclass(uint8_t bus, uint8_t device, uint8_t func)
 {
-    return kpci_configreadword(bus, device, func, 0xB) & 0xFF;
+    return kpci_configread(bus, device, func, PCI_OFFSET_CLASS) & 0xFF;
 }
 
 uint8_t kpci_getsubclass(uint8_t bus, uint8_t device, uint8_t func)
 {
-    return kpci_configreadword(bus, device, func, 0xA) & 0xFF;
-}
-
-uint8_t kpci_getprogif(uint8_t bus, uint8_t device, uint8_t func)
-{
-    return kpci_configreadword(bus, device, func, 0x9) & 0xFF;
+    return kpci_configread(bus, device, func, PCI_OFFSET_SUBCLASS) & 0xFF;
 }
 
 uint8_t kpci_getheadertype(uint8_t bus, uint8_t device, uint8_t func)
 {
-    return kpci_configreadword(bus, device, func, 0xE) & 0xFF;
+    return kpci_configread(bus, device, func, PCI_OFFSET_HDRTYPE) & 0xFF;
 }
 
 uint8_t kpci_getsecondarybus(uint8_t bus, uint8_t device, uint8_t func)
 {
-    return kpci_configreadword(bus, device, func, 0x19) & 0xFF;
+    return kpci_configread(bus, device, func, 0x19) & 0xFF;
 }
 
 void kpci_confirmedfunction(uint8_t bus, uint8_t device, uint8_t func)
 {
     uint8_t base = kpci_getbaseclass(bus, device, func);
     uint8_t sub  = kpci_getsubclass(bus, device, func);
-    uint16_t dev = kpci_getdeviceid(bus, device, func);
-
-    uint16_t vendorid = kpci_getvendorid(bus, device, func);
-    uint8_t progif = kpci_getprogif(bus, device, func);
+    uint16_t ven = kpci_getvendorid(bus, device, func);
 
 #ifdef AQUA_IDE_DEBUG
-    kdebug_outf("\r\nkpci_i: PCI(B%xD%x) F%x ID%x", bus, device, func, dev);
-    kdebug_outf(" V%x CLASS %2x:%2x PROGIF %x", vendorid, base, sub, progif);
+    kdebug_outf("\r\nkpci_i: PCI(B%xD%x) F%x V%x CLASS %2x:%2x", bus, device, func, ven, base, sub);
 #endif
 
     if (kpci_table != NULL)
-        kpci_table = kmem_kalloc(sizeof(kpci_headercommon));
+        kpci_table = kmem_kalloc(sizeof(kpci_device));
 
     kpci_table[kpci_tablesize].bus = bus;
     kpci_table[kpci_tablesize].device = device;
     kpci_table[kpci_tablesize].function = func;
-    
     kpci_table[kpci_tablesize].class = base;
     kpci_table[kpci_tablesize].subclass = sub;
-    kpci_table[kpci_tablesize].deviceid = dev;
-    kpci_table[kpci_tablesize].progif = progif;
-    kpci_table[kpci_tablesize].vendorid = vendorid;
+    kpci_table[kpci_tablesize].vendorid = ven;
     
     if (kpci_tablesize != 0)
-        kmem_kalloc(sizeof(kpci_headercommon));
+        kmem_kalloc(sizeof(kpci_device));
 
     kpci_tablesize++;
 }
@@ -165,15 +284,6 @@ void kpci_init()
 {
     kdebug_outf("\r\nkpci_i: start iterate pci devices");
     kpci_checkall();
-
-    for (int i = 0; i < kpci_tablesize; i++)
-    {
-        if (kpci_table[i].class == 0x1 && kpci_table[i].subclass == 0x1)
-        {
-            kdebug_outf("\r\nkpci_i: IDE controller found B%xD%xF%x",
-                kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
-        }
-    }
 
     k_infotable.kpci_tablesize = kpci_tablesize;
     k_infotable.kpci_table = kpci_table;

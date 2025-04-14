@@ -13,6 +13,7 @@
 #include <mouse.h>
 #include <kterm.h>
 #include <pci.h>
+#include <fs.h>
 
 void khalt(void)
 {
@@ -37,6 +38,8 @@ void kmain(boot_table *table)
 
     kacpi_init();
     kpci_init();
+
+    kfs_init();
 
     kscreen_init();
     kscreen_clr(default_color);

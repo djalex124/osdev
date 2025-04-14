@@ -59,9 +59,25 @@ void kterm_run()
     }
     else if (str_cmp(kterm_argv[0], "cpuinfo") == 0)
     {
-        unsigned int unused, bx, cx, dx;
-        __cpuid(0, unused, bx, cx, dx);
-        kscreen_putf("\n - Brand [%4s%4s%4s]", &bx, &dx, &cx);
+        unsigned int ax, bx, cx, dx;
+        __cpuid(0, ax, bx, cx, dx);
+        kscreen_putf("\n - Highest Param %d Brand [%4s%4s%4s]", ax, &bx, &dx, &cx);
+        __cpuid(1, ax, bx, cx, dx);
+        kscreen_putf("\n - Features Tracked:");
+        if (dx & (1 << 25))
+            kscreen_putf(" SSE");
+        if (dx & (1 << 26))
+            kscreen_putf(" SSE2");
+        if (cx & (1 << 0))
+            kscreen_putf(" SSE3");
+        if (cx & (1 << 9))
+            kscreen_putf(" SSSE3");
+        if (cx & (1 << 19))
+            kscreen_putf(" SSE4.1");
+        if (cx & (1 << 20))
+            kscreen_putf(" SSE4.2");
+        if (cx & (1 << 28))
+            kscreen_putf(" AVX");
     }
     else if (str_cmp(kterm_argv[0], "help") == 0)
     {
@@ -81,12 +97,16 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "pciinfo") == 0)
     {
         kscreen_putf("\nkpci_info: current pci device table");
-        kpci_headercommon* kpci_table = k_infotable.kpci_table;
+        kpci_device* kpci_table = k_infotable.kpci_table;
+        uint8_t progif;
         for (int i = 0; i < k_infotable.kpci_tablesize; i++)
         {
+            progif = kpci_configread(kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function, PCI_OFFSET_PROGIF) & 0xFF;
             kscreen_putf("\n - Bus %2x Device %2x Function %2x", kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
-            kscreen_putf(": Class %2x/%2x VendorID %x DeviceID %x Prog IF %x", 
-                kpci_table[i].class, kpci_table[i].subclass, kpci_table[i].vendorid, kpci_table[i].deviceid, kpci_table[i].progif);
+            kscreen_putf(": VendorID %4x ProgIF %2x [%s]/[%s]",
+                kpci_table[i].vendorid, progif,
+                kpci_getclassname(kpci_table[i].class),
+                kpci_getsubclassname(kpci_table[i].class, kpci_table[i].subclass));
         }
     }
     else if (str_cmp(kterm_argv[0], "test") == 0)

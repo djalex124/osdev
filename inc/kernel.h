@@ -46,7 +46,7 @@ typedef struct {
 
 typedef struct {
     size_t kpci_tablesize;
-    kpci_headercommon *kpci_table;
+    kpci_device *kpci_table;
 
     kmem_stack *kmem_table;
 } info_table;

@@ -105,6 +105,8 @@ void kscreen_printc(uint16_t c)
             kscreen_scroll();
         return;
     }
+    else if (c == '\0')
+        kscreen_putc(' ');
     else
         kscreen_putc(c);
     
