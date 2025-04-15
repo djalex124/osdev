@@ -21,7 +21,7 @@ typedef struct
     uint8_t lastE0 : 1;
 }kkeyboard_state;
 
-typedef void (*kkeyboard_handler)(kkeyboard_state k);
+typedef void (*kkeyboard_handler)(kkeyboard_state *k);
 
 void kkeyboard_setinput(kkeyboard_handler input);
 void kkeyboard_init();

@@ -107,7 +107,7 @@ void kkeyboard_interrupt()
     keyboard_state.scancode = scan;
 
     if (keyboard_state.pressed)
-        kkeyboard_input(keyboard_state);
+        kkeyboard_input(&keyboard_state);
 }
 
 void kkeyboard_init()

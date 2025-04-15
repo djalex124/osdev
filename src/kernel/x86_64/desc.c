@@ -274,8 +274,8 @@ void kdesc_install()
     outb(0xA1, 0x2);
     outb(0x21, 0x1);
     outb(0xA1, 0x1);
-    outb(0x21, 0x1); // Disable PIT
-    outb(0xA1, 0x1); // for now ...
+    outb(0x21, 0x0);
+    outb(0xA1, 0x0);
     
     kdesc_setdescriptors();
     kdesc_reload();

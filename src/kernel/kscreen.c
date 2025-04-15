@@ -243,6 +243,8 @@ void kscreen_putf(const char *fmt, ...)
     }
 
     va_end(arg);
+
+    kscreen_copy();
 }
 
 kscreen_pos kscreen_getpos()

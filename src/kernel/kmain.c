@@ -14,6 +14,7 @@
 #include <kterm.h>
 #include <pci.h>
 #include <fs.h>
+#include <pit.h>
 
 void khalt(void)
 {
@@ -32,6 +33,7 @@ void kmain(boot_table *table)
 #endif
 
     kdesc_install();
+    kpit_init(1000);
     asm("sti");
 
     kmem_init(table);
@@ -48,6 +50,8 @@ void kmain(boot_table *table)
 
     kmouse_init();
     kkeyboard_init();
+
+    kterm_loop();
 
     /*
     

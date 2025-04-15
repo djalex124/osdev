@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <cpuid.h>
 #include <kernel.h>
+#include <pit.h>
 
 #define kterm_buffersize 100
 #define kterm_maxargs 16
@@ -117,7 +118,9 @@ void kterm_run()
         test[32] = 0xCA;
         kscreen_putf("\ntest[32] %x", test[32]);
         kmem_free(test, 1);
-        kscreen_putf("%m", default_color);
+        ksleep(1000);
+        kscreen_putf("\nwait a second :)");
+        ksleep(1000);
     }
     else if (kterm_argv[0] == NULL)
         return;
@@ -130,9 +133,12 @@ void kterm_run()
 char *kterm_prompt = "aqua >";
 extern unsigned int cw;
 
-void kterm_input(kkeyboard_state k)
+kkeyboard_state *kterm_next;
+uint8_t kterm_changed = 0;
+
+void kterm_processinput()
 {
-    char key = kkeyboard_keymapUSqwerty[k.scancode];
+    char key = kkeyboard_keymapUSqwerty[kterm_next->scancode];
     if (key == 0)
         return;
 
@@ -173,13 +179,13 @@ void kterm_input(kkeyboard_state k)
             uint8_t upper = 0;
             if (key >= 'a' && key <= 'z')
             {
-                if (k.capslk ^ (k.lshift | k.rshift))
+                if (kterm_next->capslk ^ (kterm_next->lshift | kterm_next->rshift))
                     upper = 1;
             }
-            else if (k.lshift | k.rshift)
+            else if (kterm_next->lshift | kterm_next->rshift)
                 upper = 1;
             if (upper)
-                key = kkeyboard_keymapUSqwerty_upper[k.scancode];
+                key = kkeyboard_keymapUSqwerty_upper[kterm_next->scancode];
             kscreen_putf("%c", key);
             kterm_buffer[kterm_bufferindex] = key;
             kterm_bufferindex++;
@@ -187,7 +193,26 @@ void kterm_input(kkeyboard_state k)
     }
 
     kterm_pos = kscreen_getpos();
-    kscreen_copy();
+}
+
+void kterm_input(kkeyboard_state *k)
+{
+    kterm_next = k;
+    kterm_changed = 1;
+}
+
+void kterm_loop()
+{
+    for (;;)
+    {
+        while (kterm_changed == 0)
+        {
+            asm("hlt");
+            continue;
+        }
+        kterm_processinput();
+        kterm_changed = 0;
+    }
 }
 
 void kterm_init()

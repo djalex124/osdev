@@ -4,12 +4,9 @@
 #include <pci.h>
 #include <fs.h>
 
-void kfs_initide(kpci_device* pci_entry)
+void kfs_idecheck(kpci_device *ide_device)
 {
-    kdebug_outf("\r\nkfs_i: starting on pci device bus %x device %x function %x",
-        pci_entry->bus, pci_entry->device, pci_entry->function);
-
-    uint8_t progif = kpci_configread(pci_entry->bus, pci_entry->device, pci_entry->function, PCI_OFFSET_PROGIF) & 0xFF;
+    uint8_t progif = kpci_configread(ide_device->bus, ide_device->device, ide_device->function, PCI_OFFSET_PROGIF) & 0xFF;
 
     kdebug_outf("\r\nkfs_i: ");
 
@@ -41,6 +38,6 @@ void kfs_init()
     for (size_t i = 0; i < k_infotable.kpci_tablesize; i++)
     {
         if (k_infotable.kpci_table[i].class == 0x1 && k_infotable.kpci_table[i].subclass == 0x1)
-            kfs_initide(&k_infotable.kpci_table[i]);
+            kfs_idecheck(&k_infotable.kpci_table[i]);
     }
 }
