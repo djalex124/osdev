@@ -12,7 +12,7 @@ uint32_t *kscreen_buffer;
 
 void kscreen_copy()
 {
-    memcpy(kgraphics.framebuffer_base, kscreen_buffer,
+    memcpy_ssealign(kgraphics.framebuffer_base, kscreen_buffer,
         kgraphics.horizontal_res * kgraphics.vertical_res * 4);
 }
 
@@ -83,8 +83,8 @@ void kscreen_putc(uint16_t c)
 
 void kscreen_scroll()
 {
-    memcpy((uint32_t*)(kscreen_buffer + (font->height * kgraphics.ppsl)),
-        (uint32_t*)(kscreen_buffer + 2 * (font->height * kgraphics.ppsl)),
+    memcpy_ssealign(kscreen_buffer + (font->height * kgraphics.ppsl),
+        kscreen_buffer + 2 * (font->height * kgraphics.ppsl),
         (ch - 2) * kgraphics.ppsl * font->height * 4);
     kscreen_drawrect(0, (cy - 1) * font->height, kgraphics.horizontal_res, font->height, bg);
     

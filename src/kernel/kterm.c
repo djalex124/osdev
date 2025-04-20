@@ -7,6 +7,7 @@
 #include <cpuid.h>
 #include <kernel.h>
 #include <pit.h>
+#include <fs.h>
 
 #define kterm_buffersize 100
 #define kterm_maxargs 16
@@ -58,11 +59,25 @@ void kterm_run()
         else
             kscreen_putf("number 2 (%d)", b);
     }
-    else if (str_cmp(kterm_argv[0], "cpuinfo") == 0)
+    else if (str_cmp(kterm_argv[0], "cpu_info") == 0)
     {
         unsigned int ax, bx, cx, dx;
         __cpuid(0, ax, bx, cx, dx);
-        kscreen_putf("\n - Highest Param %d Brand [%4s%4s%4s]", ax, &bx, &dx, &cx);
+
+        kscreen_putf("\n - Vendor [%4s%4s%4s]", &bx, &dx, &cx);
+
+        __cpuid(0x80000000, ax, bx, cx, dx);
+        if (ax >= 0x80000004)
+        {
+            uint32_t* name = kmem_alloc(1);
+            __cpuid(0x80000002, name[0], name[1], name[2], name[3]);
+            __cpuid(0x80000003, name[4], name[5], name[6], name[7]);
+            __cpuid(0x80000004, name[8], name[9], name[10], name[11]);
+            name[12] = 0;
+            kscreen_putf(" Brand [%s]", name);
+            kmem_free(name, 1);
+        }
+
         __cpuid(1, ax, bx, cx, dx);
         kscreen_putf("\n - Features Tracked:");
         if (dx & (1 << 25))
@@ -80,22 +95,27 @@ void kterm_run()
         if (cx & (1 << 28))
             kscreen_putf(" AVX");
     }
+    else if (str_cmp(kterm_argv[0], "fs_info") == 0)
+    {
+        kfs_printinfo();
+    }
     else if (str_cmp(kterm_argv[0], "help") == 0)
     {
         kscreen_putf("\nList of currently available commands:");
         kscreen_putf("\nclear - clears the screen");
         kscreen_putf("\ncompare [num1] [num2] - compares two numbers and prints out the largest");
-        kscreen_putf("\ncpuinfo - lists CPU model and capabilities");
+        kscreen_putf("\ncpu_info - lists CPU model and capabilities");
+        kscreen_putf("\nfs_info - lists detected disks and drives");
         kscreen_putf("\nhelp - lists available commands");
-        kscreen_putf("\nmeminfo - prints current memory usage");
-        kscreen_putf("\npciinfo - prints pci busses and devices");
+        kscreen_putf("\nmem_info - prints current memory usage");
+        kscreen_putf("\npci_info - prints pci busses and devices");
         kscreen_putf("\ntest - test random features");
     }
-    else if (str_cmp(kterm_argv[0], "meminfo") == 0)
+    else if (str_cmp(kterm_argv[0], "mem_info") == 0)
     {
         kmem_printinfo();
     }
-    else if (str_cmp(kterm_argv[0], "pciinfo") == 0)
+    else if (str_cmp(kterm_argv[0], "pci_info") == 0)
     {
         kscreen_putf("\nkpci_info: current pci device table");
         kpci_device* kpci_table = k_infotable.kpci_table;
@@ -116,11 +136,14 @@ void kterm_run()
         uint16_t* test = kmem_alloc(1);
         kscreen_putf("\ntest %x", (uint64_t)test);
         test[32] = 0xCA;
-        kscreen_putf("\ntest[32] %x", test[32]);
+        kscreen_putf("\ntest[32] %x %d", test[32], 10);
         kmem_free(test, 1);
-        ksleep(1000);
-        kscreen_putf("\nwait a second :)");
-        ksleep(1000);
+        kscreen_putf("\nwait a few second :) -");
+        for (uint16_t i = 1; i <= 5; i++)
+        {
+            ksleep(1000);
+            kscreen_putf(" %d", i);
+        }
     }
     else if (kterm_argv[0] == NULL)
         return;
@@ -219,7 +242,9 @@ void kterm_init()
 {
     kscreen_putf("%m%n%s", 0x8A8B8E, 0, kterm_titletext);
     kkeyboard_setinput(*kterm_input);
-    kscreen_putf("%m\n%s", default_color, kterm_prompt);
+    kscreen_putf("%m\nWelcome to ConcatenOS!", default_color);
+    kscreen_putf("\nTo get started, run 'help' for a list of commands.");
+    kscreen_putf("\n%s", kterm_prompt);
     kterm_pos = kscreen_getpos();
     kscreen_copy();
 }

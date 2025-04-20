@@ -16,6 +16,33 @@ void* memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size) {
 	return dstptr;
 }
 
+void* memcpy_ssealign(void* restrict dstptr, const void* restrict srcptr, size_t size)
+{
+    void* to = (void*)dstptr;
+    void* from = (void*)srcptr;
+    size_t count = (size/64);
+    for (size_t i = 0; i < count; i++)
+    {
+        __asm__ __volatile__ (
+            "movups (%0), %%xmm0\n"
+            "movups 16(%0), %%xmm1\n"
+            "movups 32(%0), %%xmm2\n"
+            "movups 48(%0), %%xmm3\n"
+            "movntdq %%xmm0, (%1)\n"
+            "movntdq %%xmm1, 16(%1)\n"
+            "movntdq %%xmm2, 32(%1)\n"
+            "movntdq %%xmm3, 48(%1)\n"
+            :: "r"(from), "r"(to) : "memory");
+
+        from += 64;
+        to += 64;
+    }
+    count = size % 64;
+    if (count)
+        return memcpy(from, to, count);
+    return dstptr;
+}
+
 size_t str_len(const char* s)
 {
     size_t len = 0;
@@ -100,7 +127,7 @@ char* str_itoa(long i, int b)
     {
         *p++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"[35 + i % b];
         i /= b;
-    }while (i && *p);
+    }while (i);
 
     *p-- = '\0';
     while (low < p)
@@ -161,5 +188,3 @@ int64_t str_atoi(const char *s)
     }
     return res * sign;
 }
-
-//the plan is to use cpuid to check for quickest possible mem functions
