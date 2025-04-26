@@ -16,6 +16,7 @@ typedef struct {
     char model[41];
 } kfs_patadrive;
 
-void kfs_atainit(kpci_device *ide_device);
+void kfs_patainit(kpci_device *ide_device);
+void kfs_satainit(kpci_device *ide_device);
 
 void kfs_init();

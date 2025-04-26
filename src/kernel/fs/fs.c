@@ -38,6 +38,8 @@ void kfs_init()
     for (size_t i = 0; i < k_infotable.kpci_tablesize; i++)
     {
         if (k_infotable.kpci_table[i].class == 0x1 && k_infotable.kpci_table[i].subclass == 0x1)
-            kfs_atainit(&k_infotable.kpci_table[i]);
+            kfs_patainit(&k_infotable.kpci_table[i]);
+        else if (k_infotable.kpci_table[i].class == 0x1 && k_infotable.kpci_table[i].subclass == 0x6)
+            kfs_satainit(&k_infotable.kpci_table[i]);
     }
 }

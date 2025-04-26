@@ -76,7 +76,7 @@ uint8_t kfs_ataread(uint8_t c, uint8_t reg)
     return v;
 }
 
-void kfs_atainit(kpci_device *ide_device)
+void kfs_patainit(kpci_device *ide_device)
 {
     uint8_t progif = kpci_configread(ide_device->bus, ide_device->device, ide_device->function, PCI_OFFSET_PROGIF) & 0xFF;
 
@@ -235,4 +235,9 @@ void kfs_atainit(kpci_device *ide_device)
     }
 #endif
 
+}
+
+void kfs_satainit(kpci_device *ide_device)
+{
+    
 }

@@ -110,6 +110,7 @@ void kterm_run()
         kscreen_putf("\nmem_info - prints current memory usage");
         kscreen_putf("\npci_info - prints pci busses and devices");
         kscreen_putf("\ntest - test random features");
+        kscreen_putf("\nwait [num1] - wait given number of seconds");
     }
     else if (str_cmp(kterm_argv[0], "mem_info") == 0)
     {
@@ -144,6 +145,24 @@ void kterm_run()
             ksleep(1000);
             kscreen_putf(" %d", i);
         }
+    }
+    else if (str_cmp(kterm_argv[0], "wait") == 0)
+    {
+        if (kterm_argc < 2)
+        {
+            kscreen_putf("\nNot enough arguments.");
+            return;
+        }
+        int64_t input = 0;
+        if (kterm_argv[1])
+            input = str_atoi(kterm_argv[1]);
+        if (input >= 0)
+        {    
+            kscreen_putf("\nWaiting %d seconds...", input);
+            ksleep(input * 1000);
+        }
+        else
+            kscreen_putf("\nInvalid number.");
     }
     else if (kterm_argv[0] == NULL)
         return;

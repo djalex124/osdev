@@ -48,13 +48,13 @@ drive/boot.efi:
 run: drive/boot.efi drive/kernel.bin
 	@qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
-					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048
+					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -smp 2
 
 debug: kernel_flags += -DAQUA_DEBUG
 debug: drive/boot.efi drive/dbg_kernel.bin
 	@qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
-					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -s -S -serial stdio
+					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -s -S -serial stdio -smp 2
 
 clean:
 	@rm -f bin/link.ld
