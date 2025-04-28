@@ -263,10 +263,7 @@ void kscreen_setpos(kscreen_pos pos)
 
 void kscreen_init()
 {
-    kgraphics.framebuffer_base = k_boottable.graphics.framebuffer_base;
-    kgraphics.horizontal_res = k_boottable.graphics.horizontal_res;
-    kgraphics.vertical_res = k_boottable.graphics.vertical_res;
-    kgraphics.ppsl = k_boottable.graphics.ppsl;
+    memcpy(&kgraphics, &k_boottable.graphics, sizeof(kgraphics));
     //assume 32 bpp as is standard from UEFI's GOP
     kdebug_outf("\r\nkscr: [%d]x[%d] @ 32 bpp", kgraphics.horizontal_res, kgraphics.vertical_res);
     kmem_page((uint64_t)kgraphics.framebuffer_base, (uint64_t)kgraphics.framebuffer_base + kernel_virtual, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b11);

@@ -38,13 +38,13 @@ void kmain(boot_table *table)
 
     kmem_init(table);
 
+    kscreen_init();
+    kscreen_clr(default_color);
+
     kacpi_init();
     kpci_init();
 
     kfs_init();
-
-    kscreen_init();
-    kscreen_clr(default_color);
 
     kterm_init();
 
@@ -65,5 +65,6 @@ void kmain(boot_table *table)
     
     */
 
+    //Should be unreachable...
     khalt();
 }

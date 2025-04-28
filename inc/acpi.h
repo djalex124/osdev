@@ -208,3 +208,6 @@ typedef struct
     uint32_t flags;
     uint8_t enteries[];
 }acpi_madt;
+
+void kacpi_processapic(acpi_madt *madt);
+void kacpi_processdsdt(acpi_dsdt *dsdt);

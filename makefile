@@ -11,9 +11,9 @@ all: run
 
 src_c := $(shell find src/kernel/ -name '*.c')
 src_s := $(shell find src/kernel/ -name '*.S')
-obj := $(src_c:.c=.o) $(src_s:.S=.o)
+obj := $(subst src, obj, $(src_c:.c=.o) $(src_s:.S=.o))
 
-deps := $(shell find src/kernel/ -name '*.d')
+deps := $(subst .o, .d, $(obj))
 
 bin/link.ld:
 	@$(gcc) -E -P -x c $(kernel_flags) src/kernel/link.ld >bin/link.ld
@@ -29,10 +29,12 @@ drive/dbg_kernel.bin: $(obj) bin/link.ld
 	@$(gcc) $(kernel_link) $(obj) -o drive/kernel.bin -nostdlib -lgcc
 	@objcopy --only-keep-debug drive/kernel.bin bin/kernel.map
 
-%.o: %.c 
+obj/%.o: src/%.c 
+	@mkdir -p $(@D)
 	@$(gcc) $(kernel_flags) -c -MMD -MP $< -o $@ -lgcc
 
-%.o: %.S 
+obj/%.o: src/%.S 
+	@mkdir -p $(@D)
 	@$(gcc) $(kernel_flags) -c -DASSEMBLY -MMD -MP $< -o $@ -lgcc
 
 efi_cc := /usr/bin/gcc
@@ -58,6 +60,6 @@ debug: drive/boot.efi drive/dbg_kernel.bin
 
 clean:
 	@rm -f bin/link.ld
-	@rm -f $(obj) $(deps)
+	@rm -r obj/
 	@rm -f drive/boot.efi
 	@rm -f drive/kernel.bin drive/dbg_kernel.bin

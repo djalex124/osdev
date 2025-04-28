@@ -11,6 +11,8 @@ void kscreen_drawrect(int x, int y, int w, int h, uint32_t color);
 void kscreen_putf(const char *fmt, ...);
 void kscreen_clr(uint32_t color);
 
+extern graphics_info kgraphics;
+
 typedef struct
 {
     uint8_t x;
