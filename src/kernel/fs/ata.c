@@ -1,3 +1,5 @@
+#define ata_file
+
 #include <kstring.h>
 #include <debug.h>
 #include <port.h>
@@ -42,13 +44,14 @@
 #define PATA_REG_CONTROL  12
 #define PATA_REG_ASTATUS  12
 
-kfs_patadrive kfs_patadrives[4];
-
 struct kfs_patachannel {
     uint16_t base;
     uint16_t ctrl;
     uint16_t bmide;
+    uint8_t  no_int;
 } kfs_channel[2];
+
+kfs_patadrive kfs_patadrives[4];
 
 void kfs_atawrite(uint8_t c, uint8_t reg, uint8_t v)
 {
@@ -222,19 +225,15 @@ void kfs_patainit(kpci_device *ide_device)
             count++;
         }
     }
+}
 
+void kfs_patatest(kfs_patadrive *drive)
+{
 #ifdef AQUA_DEBUG
-    for (int i = 0; i < 4; i++)
-    {
-        if (kfs_patadrives[i].exists)
-        {
-            uint64_t size = kfs_patadrives[i].sectors * kfs_patadrives[i].sector_size;
-            kdebug_outf("\r\nkfs_i: pata device %d named '%s' size %d mb", i, 
-                kfs_patadrives[i].model, size / 1024 / 1024);
-        }
-    }
+    uint64_t size = drive->sectors * drive->sector_size;
+    kdebug_outf("\r\nkfs_i: pata device %d named '%s' size %d mb", drive->drive, 
+        drive->model, size / 1024 / 1024);
 #endif
-
 }
 
 void kfs_satainit(kpci_device *ide_device)

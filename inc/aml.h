@@ -78,6 +78,25 @@ typedef struct
     kacpi_field* fieldlist;
 } kacpi_deffield;
 
+typedef struct
+{
+    
+} kacpi_supername;
+
+typedef struct
+{
+    uint8_t type;
+    uint8_t* string;
+} kacpi_target;
+
+typedef struct
+{
+    uint8_t encodingvalue[2];
+    uint64_t* next;
+    kacpi_termarg* operand;
+    kacpi_target* target;
+} kacpi_deftohexstring;
+
 kacpi_termlist* kacpi_gettermlist();
 uint8_t kacpi_getbytedata();
 kacpi_namepath* kacpi_getnamepath();

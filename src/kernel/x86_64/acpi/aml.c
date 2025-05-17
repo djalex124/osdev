@@ -17,13 +17,15 @@ kacpi_field* kacpi_getfield(uint32_t length)
     uint32_t *ptr2 = 0;
     uint32_t len;
 
-    size_t size = length + (uint64_t)aml_ptr;
+    size_t size = length - 1 + (uint64_t)aml_ptr;
 
-    aml_ptr++;
+    //aml_ptr++;
 
     while ((uint64_t)aml_ptr < size)
     {
+        aml_ptr++;
         kdebug_outf(" field %x", *aml_ptr);
+        
         switch (*aml_ptr)
         {
             case 0x00:
@@ -79,10 +81,63 @@ kacpi_field* kacpi_getfield(uint32_t length)
             lastelement->next = (uint64_t *)element;
             lastelement = element;
         }
-        aml_ptr++;
     }
 
     return field;
+}
+
+uint8_t* kacpi_getsupername()
+{
+    uint8_t* ptr;
+    aml_ptr++;
+
+    switch (*aml_ptr)
+    {
+        case 0x5B:
+            aml_ptr++;
+            ptr = kmem_kalloc(1);
+            ptr[0] = *aml_ptr;
+            break;
+        default:
+            if (*aml_ptr >= 0x60 && *aml_ptr <= 0x6E)
+            {
+                ptr = kmem_kalloc(1);
+                ptr[0] = *aml_ptr;
+            }
+            else
+            {
+                ptr = kmem_kalloc(4);
+                ptr[0] = *aml_ptr;
+                ptr[1] = kacpi_getbytedata();
+                ptr[2] = kacpi_getbytedata();
+                ptr[3] = kacpi_getbytedata();
+            }
+            break;
+    }
+
+    return ptr;
+}
+
+kacpi_target* kacpi_gettarget()
+{
+    kacpi_target* target;
+
+    aml_ptr++;
+
+    if (*aml_ptr == 0)
+    {
+        target = kmem_kalloc(1);
+        target->type = *aml_ptr;
+    }
+    else
+    {
+        target = kmem_kalloc(9);
+        target->type = 1;
+        aml_ptr--;
+        target->string = kacpi_getsupername();
+    }
+
+    return target;
 }
 
 kacpi_termarg* kacpi_gettermarg()
@@ -217,6 +272,14 @@ kacpi_termlist* kacpi_gettermlist()
                         cont = 0;
                         break;
                 }
+                break;
+            case 0x98:
+                kdebug_outf(" ToHexStringOp");
+                object = kmem_kalloc(sizeof(kacpi_deftohexstring));
+                kacpi_deftohexstring *tohexstring = (kacpi_deftohexstring *)object;
+                tohexstring->encodingvalue[0] = *aml_ptr;
+                tohexstring->operand = kacpi_gettermarg();
+                tohexstring->target = kacpi_gettarget();
                 break;
             default:
                 kdebug_outf(" %x", *aml_ptr);
@@ -380,7 +443,7 @@ void kacpi_parseaml(uint8_t *aml, size_t length)
     aml_ptr = aml;
     kdebug_outf("\r\nkacpi: parsing aml, %x %x", (uintptr_t)aml_ptr, (uintptr_t)aml_ptr + 5);
     kdebug_outf("\r\n - hex output:");
-    for (int i = 0; i < 32; i++)
+    for (int i = 0; i < 64; i++)
     {
         kdebug_outf(" %2x", aml[i]);
     }
@@ -450,9 +513,13 @@ void kacpi_parseaml(uint8_t *aml, size_t length)
 
 void kacpi_processdsdt(acpi_dsdt *dsdt)
 {
+    kdebug_outf("\r\nkacpi: ** UNFINISHED - USE DSDT DATA LATER **");
+    
     kdebug_outf("\r\nkacpi: processing DSDT table");
     uint8_t *aml = dsdt->aml;
 
     kdebug_outf("\r\nkacpi: aml data size %x", dsdt->h.length - sizeof(dsdt->h));
     kacpi_parseaml(aml, dsdt->h.length - sizeof(dsdt->h));
+
+    kdebug_outf("\r\nkacpi: ** UNFINISHED - USE DSDT DATA LATER **");
 }

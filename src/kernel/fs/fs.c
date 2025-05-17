@@ -42,4 +42,10 @@ void kfs_init()
         else if (k_infotable.kpci_table[i].class == 0x1 && k_infotable.kpci_table[i].subclass == 0x6)
             kfs_satainit(&k_infotable.kpci_table[i]);
     }
+
+    for (size_t i = 0; i < 4; i++)
+    {
+        if (kfs_patadrives[i].exists)
+            kfs_patatest(&kfs_patadrives[i]);
+    }
 }
