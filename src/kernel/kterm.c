@@ -8,6 +8,7 @@
 #include <kernel.h>
 #include <pit.h>
 #include <fs.h>
+#include <mouse.h>
 
 #define kterm_buffersize 100
 #define kterm_maxargs 16
@@ -23,6 +24,15 @@ static unsigned int kterm_argc;
 
 uint32_t kterm_fg = 0xC5C5C5;
 uint32_t kterm_bg = default_color;
+
+kkeyboard_state *kterm_next;
+uint8_t kterm_changed = 0;
+
+void kterm_input(kkeyboard_state *k)
+{
+    kterm_next = k;
+    kterm_changed = 1;
+}
 
 void kterm_header()
 {
@@ -118,6 +128,7 @@ void kterm_run()
         kscreen_putf("\n mem_info - prints current memory usage");
         kscreen_putf("\n pci_info - prints pci busses and devices");
         kscreen_putf("\n test - test random features");
+        kscreen_putf("\n test_mouse - tests ps2 mouse input");
         kscreen_putf("\n wait [num1] - wait given number of seconds");
     }
     else if (str_cmp(kterm_argv[0], "mem_info") == 0)
@@ -154,6 +165,11 @@ void kterm_run()
             kscreen_putf(" %d", i);
         }
     }
+    else if (str_cmp(kterm_argv[0], "test_mouse") == 0)
+    {
+        kmouse_test();
+        kkeyboard_setinput(*kterm_input);
+    }
     else if (str_cmp(kterm_argv[0], "wait") == 0)
     {
         if (kterm_argc < 2)
@@ -182,9 +198,6 @@ void kterm_run()
 
 char *kterm_prompt = "aqua >";
 extern unsigned int cw;
-
-kkeyboard_state *kterm_next;
-uint8_t kterm_changed = 0;
 
 void kterm_processinput()
 {
@@ -243,12 +256,6 @@ void kterm_processinput()
     }
 
     kterm_pos = kscreen_getpos();
-}
-
-void kterm_input(kkeyboard_state *k)
-{
-    kterm_next = k;
-    kterm_changed = 1;
 }
 
 void kterm_loop()

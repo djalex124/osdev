@@ -34,7 +34,6 @@ void kmain(boot_table *table)
 
     kdesc_install();
     kpit_init(1000);
-    asm("sti");
 
     kmem_init(table);
 
@@ -43,6 +42,8 @@ void kmain(boot_table *table)
 
     kacpi_init();
     kpci_init();
+
+    asm("sti");
 
     kfs_init();
 
