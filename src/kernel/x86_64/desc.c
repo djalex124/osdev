@@ -103,11 +103,7 @@ void kwrapper_irq(kframe_int *k)
         function();
     }
     else
-    {
         kdebug_outf("\r\nkdesc: irq %d fired but no handler", k->int_no);
-        if (k->int_no == 12 || k->int_no == 1)
-            inb(0x60);//avoid buffer overflow
-    }
 
     if (k->int_no >= 8)
         outb(0xA0, 0x20);

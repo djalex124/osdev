@@ -1,6 +1,6 @@
 build_speed = -O2
 
-gcc = /usr/opt/cross/compiler/bin/x86_64-elf-gcc
+gcc = x86_64-elf-gcc
 
 kernel_build = $$(cat build.txt)
 
@@ -40,21 +40,25 @@ obj/%.o: src/%.S
 efi_cc := /usr/bin/gcc
 
 gnu_efi_inc := /usr/include/efi
-gnu_efi_lib := /usr/lib64
+gnu_efi_lib := /usr/lib
 
 drive/boot.efi:
 	gcc -Iinc -I$(gnu_efi_inc) -O2 -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o src/boot/uefiboot.o
 	ld -shared -Bsymbolic -L$(gnu_efi_lib) -T$(gnu_efi_lib)/elf_x86_64_efi.lds $(gnu_efi_lib)/crt0-efi-x86_64.o src/boot/uefiboot.o -o src/boot/boot.so -lgnuefi -lefi
 	objcopy -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym  -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc --target efi-app-x86_64 --subsystem=10 src/boot/boot.so drive/boot.efi
 
+# sudo is required for mouse movement due to current QEMU quirkiness
+# - first movement packet is sent, but none after
+# - currently works natively on QEMU for windows and with sudo for WSL2
+
 run: drive/boot.efi drive/kernel.bin
-	@qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
+	@sudo qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
 					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -smp 2
 
 debug: kernel_flags += -DAQUA_DEBUG
 debug: drive/boot.efi drive/dbg_kernel.bin
-	@qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
+	@sudo qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
 					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -s -serial stdio -smp 2
 
