@@ -69,8 +69,9 @@ void kacpi_init()
     kmem_page(k_boottable.rsdp & 0xFFFFF000, k_boottable.rsdp & 0xFFFFF000, 0x1000, 0b11);
     acpi_rsdp *table = (acpi_rsdp *)k_boottable.rsdp;
 
+    kdebug_outf("\r\nkacpi_i: signature [%8s]", table->signature);
     if (!str_cmp(table->signature, "RSD PTR "))
-        kacpi_fail();
+        kacpi_fail(); //virtualbox fails here...
 
     if (k_boottable.acpi_ver == 2)
     {

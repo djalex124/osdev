@@ -163,6 +163,19 @@ uint32_t kpci_configread(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off)
     return tmp;
 }
 
+void kpci_configwrite16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off, uint8_t val)
+{
+    uint32_t addr;
+    uint32_t lbus = (uint32_t)bus;
+    uint32_t lslot = (uint32_t)slot;
+    uint32_t lfunc = (uint32_t)func;
+
+    addr = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) | (off & 0xFC) | ((uint32_t)0x80000000));
+    outl(0xCF8, addr);
+
+    outw(0xCFC, val);
+}
+
 uint16_t kpci_getvendorid(uint8_t bus, uint8_t device, uint8_t func)
 {
     return kpci_configread(bus, device, func, PCI_OFFSET_VENDORID) & 0xFFFF;

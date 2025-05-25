@@ -21,8 +21,10 @@
 #define PCI_OFFSET_HDR0_BAR3  0x1C
 #define PCI_OFFSET_HDR0_BAR4  0x20
 #define PCI_OFFSET_HDR0_BAR5  0x24
+#define PCI_OFFSET_HDR0_REGF  0x3C
 
 uint32_t kpci_configread(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off);
+void kpci_configwrite16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off, uint8_t val);
 void kpci_init();
 
 char* kpci_getsubclassname(uint8_t class, uint8_t subclass);

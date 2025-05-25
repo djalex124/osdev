@@ -33,7 +33,7 @@ void kmain(boot_table *table)
 #endif
 
     kdesc_install();
-    kpit_init(1000);
+    kpit_init(1000); //sets pit to ~1ms per interrupt
 
     kmem_init(table);
 
@@ -62,7 +62,7 @@ void kmain(boot_table *table)
         - SMP support (multiple cores/threads)
         - PCI device support
             - USB support
-    - File system driver
+    - File system driver (close)
     
     */
 

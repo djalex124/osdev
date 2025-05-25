@@ -29,6 +29,11 @@ inline void outb(uint16_t p, uint8_t v)
     asm volatile ( "outb %0, %1" : : "a"(v), "Nd"(p) :"memory" );
 }
 
+inline void outw(uint16_t p, uint16_t v)
+{
+    asm volatile ( "outw %0, %1" : : "a"(v), "Nd"(p) :"memory" );
+}
+
 inline void outl(uint16_t p, uint32_t v)
 {
     asm volatile ( "outl %0, %1" : : "a"(v), "Nd"(p) :"memory" );

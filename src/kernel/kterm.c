@@ -117,6 +117,13 @@ void kterm_run()
     {
         kfs_printinfo();
     }
+    else if (str_cmp(kterm_argv[0], "font") == 0)
+    {
+        kscreen_putf("\n");
+        uint8_t c = 0;
+        for (; c < 255; c++)
+            kscreen_putf("%c", c);
+    }
     else if (str_cmp(kterm_argv[0], "help") == 0)
     {
         kscreen_putf("\nList of currently available commands:");
@@ -124,6 +131,7 @@ void kterm_run()
         kscreen_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
         kscreen_putf("\n cpu_info - lists CPU model and capabilities");
         kscreen_putf("\n fs_info - lists detected disks and drives");
+        kscreen_putf("\n font - prints all characters in boot font");
         kscreen_putf("\n help - lists available commands");
         kscreen_putf("\n mem_info - prints current memory usage");
         kscreen_putf("\n pci_info - prints pci busses and devices");

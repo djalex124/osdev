@@ -9,7 +9,7 @@ void* kmem_alloc(size_t pages)
 {
     size_t index;
     size_t connected = 0;
-    for (index = kmem_lowestfree; kmem_table[index].eom != 1; index++)
+    for (index = kmem_lowestfree + 1; kmem_table[index].eom != 1; index++)
     {
         if (kmem_table[index].used == 1)
         {
@@ -55,7 +55,7 @@ void kmem_free(void* addr, size_t pages)
     memset(addr, 0, pages * 0x1000);
     kmem_unpage((uint64_t)addr, pages * 0x1000);
     if (index + pages < kmem_lowestfree)
-        kmem_lowestfree = index + pages;
+        kmem_lowestfree = index + pages - 1;
 }
 
 extern uint64_t kmem_heap;

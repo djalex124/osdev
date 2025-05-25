@@ -2,6 +2,7 @@
 
 #include <kstring.h>
 #include <debug.h>
+#include <desc.h>
 #include <port.h>
 #include <mem.h>
 #include <pci.h>
@@ -47,8 +48,9 @@
 struct kfs_patachannel {
     uint16_t base;
     uint16_t ctrl;
-    uint16_t bmide;
+    uint32_t bmide;
     uint8_t  no_int;
+    kpci_device *pci;
 } kfs_channel[2];
 
 kfs_patadrive kfs_patadrives[4];
@@ -79,6 +81,20 @@ uint8_t kfs_ataread(uint8_t c, uint8_t reg)
     return v;
 }
 
+uint8_t kfs_ataint[2] = {0, 0};
+
+void kfs_atainterrupt1()
+{
+    outb(kfs_channel[0].bmide, inb(kfs_channel[0].bmide) & ~1);
+    kfs_ataint[0] = 1;
+}
+
+void kfs_atainterrupt2()
+{
+    outb(kfs_channel[1].bmide, inb(kfs_channel[1].bmide) & ~1);
+    kfs_ataint[1] = 1;
+}
+
 void kfs_patainit(kpci_device *ide_device)
 {
     uint8_t progif = kpci_configread(ide_device->bus, ide_device->device, ide_device->function, PCI_OFFSET_PROGIF) & 0xFF;
@@ -105,6 +121,7 @@ void kfs_patainit(kpci_device *ide_device)
         kdebug_outf(" (can switch)");
     else
         kdebug_outf(" (can't switch)");
+    kdebug_outf("\r\nkfs_i: ");
     if (progif & 0x80)
         kdebug_outf(" bus master");
     else
@@ -124,8 +141,11 @@ void kfs_patainit(kpci_device *ide_device)
     kfs_channel[PATA_SECONDARY].base = PATA_BASE_SECONDARY;
     kfs_channel[PATA_PRIMARY].ctrl = PATA_CTRL_PRIMARY;
     kfs_channel[PATA_SECONDARY].ctrl = PATA_CTRL_SECONDARY;
-    kfs_channel[PATA_PRIMARY].bmide = bar4;
-    kfs_channel[PATA_SECONDARY].bmide = bar4 + 8;
+    kfs_channel[PATA_PRIMARY].bmide = bar4 & 0xFFFFFFFC;
+    kfs_channel[PATA_SECONDARY].bmide = (bar4 & 0xFFFFFFFC) + 8;
+
+    outb(kfs_channel[PATA_PRIMARY].ctrl, 4);
+    outb(kfs_channel[PATA_SECONDARY].ctrl, 4);
 
     kfs_atawrite(PATA_PRIMARY, PATA_REG_CONTROL, 2);
     kfs_atawrite(PATA_SECONDARY, PATA_REG_CONTROL, 2);
@@ -189,6 +209,8 @@ void kfs_patainit(kpci_device *ide_device)
             kfs_patadrives[count].drive = j;
             kfs_patadrives[count].signature = *(uint16_t *)(read_buffer + PATA_IDENT_SIGNATURE);
             kfs_patadrives[count].capabilities = *(uint16_t *)(read_buffer + PATA_IDENT_CAPABILITIES);
+            kfs_patadrives[count].mdma = *(uint16_t *)(read_buffer + 126);
+            kfs_patadrives[count].udma = *(uint16_t *)(read_buffer + 176);
             kfs_patadrives[count].commandsets = *(uint32_t *)(read_buffer + PATA_IDENT_COMMANDSETS);
 
             if (kfs_patadrives[count].commandsets & (1 << 26))
@@ -222,18 +244,131 @@ void kfs_patainit(kpci_device *ide_device)
 
             kmem_free(buffer, 2);
 
+            /*kdebug_outf("\r\nkfs_i: capabilities %16b", kfs_patadrives[count].capabilities);
+            if (!(kfs_patadrives[count].capabilities & (1 << 8)))
+                kdebug_outf("\r\nkfs_i: drive not dma capable?");
+
+            kdebug_outf("\r\nkfs_i: mdma %16b", kfs_patadrives[count].mdma);
+            kdebug_outf("\r\nkfs_i: udma %16b", kfs_patadrives[count].udma);*/
+
             count++;
         }
+
+        kfs_channel[i].pci = ide_device;
     }
+
+    //uint32_t ints = kpci_configread(ide_device->bus, ide_device->subclass, ide_device->function, PCI_OFFSET_HDR0_REGF);
+    //kdebug_outf("\r\nkfs_i: int pin: %x int line: %x", (ints & 0xFF00) >> 8, ints & 0xFF);
+
+    uint16_t command = kpci_configread(ide_device->bus, ide_device->subclass, ide_device->function, PCI_OFFSET_COMMAND);
+    kpci_configwrite16(ide_device->bus, ide_device->device, ide_device->function, PCI_OFFSET_COMMAND, command | 7);
+
+    kdesc_setinterruptfunc(14, *kfs_atainterrupt1);
+    kdesc_setinterruptfunc(15, *kfs_atainterrupt2);
 }
 
-void kfs_patatest(kfs_patadrive *drive)
+int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, uint32_t addr)
+{
+    kfs_atawrite(drive->channel, PATA_REG_CONTROL, 0);
+    
+    uint64_t *prdt = kmem_alloc(1);
+    prdt[0] = (1UL << 63) | (sec_count * drive->sector_size << 32) | addr;
+
+    //set direction of data with rw in bm command reg
+    outb(kfs_channel[drive->channel].bmide, inb(kfs_channel[drive->channel].bmide) | (read << 3));
+
+    //clear error and interrupt bit in bm status reg
+    outb(kfs_channel[drive->channel].bmide + 2, inb(kfs_channel[drive->channel].bmide + 2) | 0x4 | 0x2);
+
+    //send prdt phys addr to bm prdt reg
+    outl(kfs_channel[drive->channel].bmide + 4, (uint32_t)((uintptr_t)prdt) & 0xFFFFFFFF);
+
+    while (kfs_ataread(drive->channel, PATA_REG_STATUS) & PATA_STATUS_BUSY);
+
+    //select drive
+    kfs_atawrite(drive->channel, PATA_REG_HDDEVSEL, 0xE0 | (drive->drive << 4));
+    ksleep(1);
+
+    //send lba and sec_count to ports
+    kfs_atawrite(drive->channel, PATA_REG_SECCNT1, (sec_count >> 8) & 0xFF);
+    kfs_atawrite(drive->channel, PATA_REG_LBA3, (lba >> 24) & 0xFF);
+    kfs_atawrite(drive->channel, PATA_REG_LBA4, (lba >> 32) & 0xFF);
+    kfs_atawrite(drive->channel, PATA_REG_LBA5, (lba >> 40) & 0xFF);
+
+    kfs_atawrite(drive->channel, PATA_REG_SECCNT0, sec_count & 0xFF);
+    kfs_atawrite(drive->channel, PATA_REG_LBA0, lba & 0xFF);
+    kfs_atawrite(drive->channel, PATA_REG_LBA1, (lba >> 8) & 0xFF);
+    kfs_atawrite(drive->channel, PATA_REG_LBA2, (lba >> 16) & 0xFF);
+
+    while (kfs_ataread(drive->channel, PATA_REG_STATUS) & PATA_STATUS_BUSY);
+    
+    //send dma transfer command to ata controller
+    kfs_atawrite(drive->channel, PATA_REG_COMMAND, read ? 0x25 : 0x35);
+    ksleep(1);
+
+    //set start/stop bit on bm command register
+    outb(kfs_channel[drive->channel].bmide, inb(kfs_channel[drive->channel].bmide) | 1);
+
+    //respond to interrupt by resetting start/stop bit
+    // handled in interrupt handlers i think
+
+    while (kfs_ataint[drive->channel] == 0)
+        asm("hlt");
+    kfs_ataint[drive->channel] = 0;
+
+    //read the controller and drive status to check for error
+    uint8_t dstatus = kfs_ataread(drive->channel, PATA_REG_STATUS);
+    //kdebug_outf("\r\nkfs_test: drive status %8b", dstatus);
+    kpci_device *ide_device = kfs_channel[drive->channel].pci;
+    uint16_t cstatus = kpci_configread(ide_device->bus, ide_device->subclass, ide_device->function, PCI_OFFSET_STATUS) & 0xFF;
+    //kdebug_outf("\r\nkfs_test: controller status %16b", cstatus);
+
+    kmem_free(prdt, 1);
+
+    kfs_atawrite(drive->channel, PATA_REG_CONTROL, 2);
+
+    if (dstatus & 0x1)
+        return -1;
+    return 0;
+}
+
+uint8_t kfs_patatest(kfs_patadrive *drive)
 {
 #ifdef AQUA_DEBUG
     uint64_t size = drive->sectors * drive->sector_size;
-    kdebug_outf("\r\nkfs_i: pata device %d named '%s' size %d mb", drive->drive, 
-        drive->model, size / 1024 / 1024);
+    kdebug_outf("\r\nkfs_test: pata device %d channel %d named '%s' size %d mb", drive->drive, 
+        drive->channel, drive->model, size / 1024 / 1024);
 #endif
+
+    //goals of this test:
+    // - read ESP fs info
+    // - echo the info from startup.nsh
+	
+    kdebug_outf("\r\nkfs_test: bus master register %x sector size %d",
+        kfs_channel[drive->channel].bmide, drive->sector_size);
+    
+    uint8_t *addr = kmem_alloc(1);
+    //kdebug_outf("\r\nkfs_test: addr %x", (uintptr_t)addr);
+    uint32_t buffer = (uint32_t)((uintptr_t)addr & 0xFFFFFFFF);
+    
+    int result = kfs_atadma(drive, 0, 1, 1, buffer);
+
+    if (!result)
+    {
+        if (addr[510] == 0x55 && addr[511] == 0xaa)
+        {
+            kdebug_outf("\r\nkfs_test: successfully found MBR signature!");
+            result = 1;
+        }
+        else
+            kdebug_outf("\r\nkfs_test: no read error - unknown format");
+    }
+    else
+        kdebug_outf("\r\nkfs_test: unable to read");
+
+    kmem_free(addr, 1);
+
+    return result;
 }
 
 void kfs_satainit(kpci_device *ide_device)

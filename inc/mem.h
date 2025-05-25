@@ -29,6 +29,7 @@ void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flag
 void kmem_unpage(uint64_t address, uint64_t size);
 
 void* kmem_kalloc(uint64_t size);
+void kmem_kfree(uint64_t size);
 
 void* kmem_alloc(size_t pages);
 void kmem_free(void* addr, size_t pages);

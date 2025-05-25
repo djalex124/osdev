@@ -75,6 +75,12 @@ void* kmem_kalloc(uint64_t size)
     return (uintptr_t *)addr;
 }
 
+void kmem_kfree(uint64_t size)
+{
+    kmem_heap -= size;
+    memset((uintptr_t *)kmem_heap, 0, size);
+}
+
 void kmem_init(boot_table *table)
 {
     efi_memory_descriptor *mmap = table->mmap;
