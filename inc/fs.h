@@ -1,6 +1,7 @@
 #pragma once
 #include <pci.h>
 
+void kfs_printread(uint8_t drive, size_t sector, size_t sector_end);
 void kfs_printinfo();
 
 typedef struct {

@@ -135,6 +135,7 @@ void kterm_run()
         kscreen_putf("\n help - lists available commands");
         kscreen_putf("\n mem_info - prints current memory usage");
         kscreen_putf("\n pci_info - prints pci busses and devices");
+        kscreen_putf("\n read [drive] [starting sector] [sectors] - attempt read of given number of sectors on selected drive");
         kscreen_putf("\n test - test random features");
         kscreen_putf("\n test_mouse - tests ps2 mouse input");
         kscreen_putf("\n wait [num1] - wait given number of seconds");
@@ -157,6 +158,22 @@ void kterm_run()
                 kpci_getclassname(kpci_table[i].class),
                 kpci_getsubclassname(kpci_table[i].class, kpci_table[i].subclass));
         }
+    }
+    else if (str_cmp(kterm_argv[0], "read") == 0)
+    {
+        if (kterm_argc < 4)
+        {
+            kscreen_putf("\nNot enough arguments.");
+            return;
+        }
+        uint64_t a = 0, b = 0, c = 0;
+        if (kterm_argv[1])
+            a = str_atoi(kterm_argv[1]);
+        if (kterm_argv[2])
+            b = str_atoi(kterm_argv[2]);
+        if (kterm_argv[3])
+            c = str_atoi(kterm_argv[3]);
+        kfs_printread(a, b, c);
     }
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {

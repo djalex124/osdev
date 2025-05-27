@@ -269,8 +269,6 @@ void kfs_patainit(kpci_device *ide_device)
 
 int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, uint32_t addr)
 {
-    kfs_atawrite(drive->channel, PATA_REG_CONTROL, 0);
-    
     uint64_t *prdt = kmem_alloc(1);
     prdt[0] = (1UL << 63) | (sec_count * drive->sector_size << 32) | addr;
 
@@ -309,6 +307,8 @@ int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read,
     //set start/stop bit on bm command register
     outb(kfs_channel[drive->channel].bmide, inb(kfs_channel[drive->channel].bmide) | 1);
 
+    kfs_atawrite(drive->channel, PATA_REG_CONTROL, 0);
+    
     //respond to interrupt by resetting start/stop bit
     // handled in interrupt handlers i think
 
@@ -328,7 +328,10 @@ int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read,
     kfs_atawrite(drive->channel, PATA_REG_CONTROL, 2);
 
     if (dstatus & 0x1)
+    {
+        kdebug_outf("\r\nkfs_ata: error reading!");
         return -1;
+    }
     return 0;
 }
 

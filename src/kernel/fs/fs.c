@@ -5,9 +5,54 @@
 #include <debug.h>
 #include <mem.h>
 #include <pci.h>
+#include <pit.h>
 #include <fs.h>
 
 extern kfs_patadrive kfs_patadrives[4];
+
+void kfs_printread(uint8_t drive, size_t sector, size_t length)
+{
+    if (!kfs_patadrives[drive].exists)
+    {
+        kscreen_putf("\ndrive does not exist!");
+        return;
+    }
+    if (sector < 0 || (sector + length) > kfs_patadrives[drive].sectors)
+    {
+        kscreen_putf("\nout of sector bounds! (0 - 0x%x)", kfs_patadrives[drive].sectors);
+        return;
+    }
+    uint8_t *buffer = kmem_alloc(1);
+    for (size_t t = sector; t < (sector + length); t++)
+    {
+        kscreen_putf("\nkfs attempting read of drive %d sector %d...", drive, t);
+        int error = kfs_atadma(&kfs_patadrives[drive], t, 1, 1, (uint32_t)((uintptr_t)buffer & 0xFFFFFFFF));
+        if (error < 0)
+        {
+            kscreen_putf("\nerror during read!");
+            kmem_free(buffer, 1);
+            return;
+        }
+        kscreen_putf("\nsuccessful read! dumping data to screen...\n");
+        size_t not_empty = 0;
+        for (int i = 0; i < kfs_patadrives[drive].sector_size; i++)
+        {
+            if (buffer[i])
+                not_empty++;
+        }
+        if (not_empty)
+        {
+            for (int i = 0; i < kfs_patadrives[drive].sector_size; i++)
+                kscreen_putf("%2x", buffer[i]);
+        }
+        else
+        {
+            kscreen_putf("empty sector");
+            ksleep(500);
+        }
+    }
+    kmem_free(buffer, 1);
+}
 
 void kfs_printinfo()
 {
@@ -35,34 +80,32 @@ void kfs_printinfo()
 
 typedef struct
 {
-    uint8_t jump[3];
-    uint8_t oem_id[8];
-    uint16_t bytes_per_sector;
-    uint8_t sectors_per_cluster;
-    uint16_t reserved_sectors;
-    uint8_t num_FAT;
-    uint16_t num_root;
-    uint16_t total_sectors;
-    uint8_t media_type;
-    uint16_t resv;
-    uint16_t sectors_per_track;
-    uint16_t num_heads;
-    uint32_t num_hidden_sectors;
-    uint32_t large_sectors;
-    uint32_t sectors_per_fat;
-    uint16_t flags;
-    uint16_t fat_version;
-    uint32_t root_cluster;
-    uint16_t fsinfo_sector;
-    uint16_t backupboot_sector;
-    uint8_t resv2[12];
-    uint8_t drive_number;
-    uint8_t windows_flags;
-    uint8_t signature; //0x28 or 0x29
-    uint32_t volume_idnumber;
-    uint8_t volume_label[11];
-    uint8_t systemid_label[8];
-}fat32;
+    unsigned char 		bootjmp[3];
+	unsigned char 		oem_name[8];
+	unsigned short 	        bytes_per_sector;
+	unsigned char		sectors_per_cluster;
+	unsigned short		reserved_sector_count;
+	unsigned char		table_count;
+	unsigned short		root_entry_count;
+	unsigned short		total_sectors_16;
+	unsigned char		media_type;
+	unsigned short		table_size_16;
+	unsigned short		sectors_per_track;
+	unsigned short		head_side_count;
+	unsigned int 		hidden_sector_count;
+	unsigned int 		total_sectors_32;
+}__attribute__((packed)) bpb;
+
+typedef struct
+{
+    uint32_t numsectors;
+    uint32_t fatoffset;
+    uint32_t numrootenteries;
+    uint32_t rootoffset;
+    uint32_t rootsize;
+    uint32_t fatsize;
+    uint32_t fatentrysize;
+}fat16_info;
 
 void kfs_readpartitions(kfs_patadrive *drive)
 {
@@ -70,6 +113,10 @@ void kfs_readpartitions(kfs_patadrive *drive)
         drive->channel, drive->drive);
     uint8_t *mbr = kmem_alloc(1);
     kfs_atadma(drive, 0, 1, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
+
+    kdebug_outf("\r\n");
+    for (int i = 0x1b8; i < 512; i++)
+        kdebug_outf("%2x", mbr[i]);
 
     size_t entry = 0;
     if (mbr[0x1be] == 0x80)
@@ -85,10 +132,43 @@ void kfs_readpartitions(kfs_patadrive *drive)
     uint32_t start = *(uint32_t*)&mbr[entry];
     kdebug_outf("\r\nstarting lba = %x", start);
 
-    kfs_atadma(drive, start, 1, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
-    fat32 *esp = (fat32 *)mbr;
+    kfs_atadma(drive, start, 2, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
+    bpb *esp = (bpb *)mbr;
 
-    kdebug_outf("\r\nmbr strings %8s", (char *)esp->oem_id);
+    fat16_info *info = kmem_kalloc(sizeof(fat16_info));
+
+    kdebug_outf("\r\nmbr strings %8s", (char *)esp->oem_name);
+    if (mbr[38] == 0x28 || mbr[38] == 0x29)
+    {
+        kdebug_outf("\r\nfat12/16");
+        uint32_t root_dir_sectors = ((esp->root_entry_count * 32) + (esp->bytes_per_sector - 1)) / esp->bytes_per_sector;
+        if (esp->total_sectors_16)
+            info->numsectors = esp->total_sectors_16;
+        else
+            info->numsectors = esp->total_sectors_32;
+        info->fatoffset = esp->reserved_sector_count;
+        info->fatsize = esp->table_size_16;
+        info->fatentrysize = 8;
+        info->rootoffset = (esp->table_count * esp->table_size_16) + 1;
+        info->rootsize = (esp->root_entry_count * 32) / esp->bytes_per_sector;
+        uint32_t first_data_sector = esp->reserved_sector_count + (esp->table_count * esp->table_size_16) + root_dir_sectors;
+        uint32_t first_lba = (info->rootoffset * esp->bytes_per_sector) / drive->sector_size;
+        kdebug_outf("\r\nfirst data sector lba : %x?", first_lba);
+        kfs_atadma(drive, first_lba, 1, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
+        kdebug_outf("\r\n");
+        for (int i = 0; i < 512; i++)
+            kdebug_outf("%2x", mbr[i]);
+    }
+    else if (mbr[66] == 0x28 || mbr[66] == 0x29)
+    {
+        kdebug_outf("\r\nfat32");
+    }
+
+    kdebug_outf("\r\nfirst fat info:");
+    kdebug_outf("\r\n - numsectors %x", info->numsectors);
+    kdebug_outf("\r\n - fatsize %x", info->fatsize);
+    kdebug_outf("\r\n - rootoffset %x", info->rootoffset);
+    kdebug_outf("\r\n - rootsize %x", info->rootsize);
 
     kmem_free(mbr, 1);
 }
