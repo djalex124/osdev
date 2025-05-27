@@ -335,17 +335,13 @@ int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read,
     return 0;
 }
 
-uint8_t kfs_patatest(kfs_patadrive *drive)
+kfs_drive* kfs_patatest(kfs_patadrive *drive)
 {
 #ifdef AQUA_DEBUG
     uint64_t size = drive->sectors * drive->sector_size;
     kdebug_outf("\r\nkfs_test: pata device %d channel %d named '%s' size %d mb", drive->drive, 
         drive->channel, drive->model, size / 1024 / 1024);
 #endif
-
-    //goals of this test:
-    // - read ESP fs info
-    // - echo the info from startup.nsh
 	
     kdebug_outf("\r\nkfs_test: bus master register %x sector size %d",
         kfs_channel[drive->channel].bmide, drive->sector_size);
@@ -371,7 +367,16 @@ uint8_t kfs_patatest(kfs_patadrive *drive)
 
     kmem_free(addr, 1);
 
-    return result;
+    if (result == 1)
+    {
+        kfs_drive *d = kmem_kalloc(sizeof(kfs_drive));
+        d->drive_data = (uint8_t *)drive;
+        d->drive_type = 1;
+
+        return d;
+    }
+    else
+        return NULL;
 }
 
 void kfs_satainit(kpci_device *ide_device)

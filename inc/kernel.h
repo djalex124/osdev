@@ -43,12 +43,16 @@ typedef struct {
 #include <stddef.h>
 #include <mem.h>
 #include <pci.h>
+#include <fs.h>
 
 typedef struct {
     size_t kpci_tablesize;
     kpci_device *kpci_table;
 
     kmem_stack *kmem_table;
+
+    size_t kfs_partitionsdetected;
+    kfs_partition *kfs_partitions;
 } info_table;
 
 #ifndef kernel_file

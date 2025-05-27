@@ -116,6 +116,14 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "fs_info") == 0)
     {
         kfs_printinfo();
+        kscreen_putf("\nmounted partitions:");
+        kfs_partition *ptr = k_infotable.kfs_partitions;
+        for (int i = 0; i < k_infotable.kfs_partitionsdetected; i++)
+        {
+            kscreen_putf("\n partition %d:", i);
+            kfs_printpartition(ptr);
+            ptr = (kfs_partition *)ptr->next;
+        }
     }
     else if (str_cmp(kterm_argv[0], "font") == 0)
     {
