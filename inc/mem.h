@@ -16,6 +16,7 @@ typedef struct
     uint8_t  eom : 1;
     uint8_t  pad : 5;
 }__attribute__((packed)) kmem_stack;
+//use pad as needed later. maybe user/os split and process flags?
 
 void kmem_physinit();
 void kmem_virtinit();

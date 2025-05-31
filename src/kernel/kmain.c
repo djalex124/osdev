@@ -40,10 +40,10 @@ void kmain(boot_table *table)
     kscreen_init();
     kscreen_clr(default_color);
 
+    asm("sti");
+
     kacpi_init();
     kpci_init();
-
-    asm("sti");
 
     kfs_init();
 

@@ -144,65 +144,6 @@ typedef struct
 
 typedef struct
 {
-    acpi_madt_header h;
-    uint8_t acpi_processor_id;
-    uint8_t apic_id;
-    uint32_t flags;
-}acpi_madt_type0;
-
-typedef struct
-{
-    acpi_madt_header h;
-    uint8_t io_apic_id;
-    uint8_t zero;
-    uint32_t io_apic_addr;
-    uint32_t gsi_base;
-}acpi_madt_type1;
-
-typedef struct
-{
-    acpi_madt_header h;
-    uint8_t bus_source;
-    uint8_t irq_source;
-    uint32_t gsi;
-    uint16_t flags;
-}acpi_madt_type2;
-
-typedef struct
-{
-    acpi_madt_header h;
-    uint8_t nmi_source;
-    uint8_t zero;
-    uint16_t flags;
-    uint32_t gsi;
-}acpi_madt_type3;
-
-typedef struct
-{
-    acpi_madt_header h;
-    uint8_t acpi_processor_id;
-    uint16_t flags;
-    uint8_t lint;
-}acpi_madt_type4;
-
-typedef struct
-{
-    acpi_madt_header h;
-    uint16_t zero;
-    uint64_t local_apic_addr;
-}acpi_madt_type5;
-
-typedef struct
-{
-    acpi_madt_header h;
-    uint16_t zero;
-    uint64_t processor_x2apic_id;
-    uint64_t flags;
-    uint64_t acpi_id;
-}acpi_madt_type9;
-
-typedef struct
-{
     acpi_sdt_header h;
     uint32_t local_apic_addr;
     uint32_t flags;

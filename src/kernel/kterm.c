@@ -28,6 +28,8 @@ uint32_t kterm_bg = default_color;
 kkeyboard_state *kterm_next;
 uint8_t kterm_changed = 0;
 
+extern uint8_t kacpi_apsrunning;
+
 void kterm_input(kkeyboard_state *k)
 {
     kterm_next = k;
@@ -112,6 +114,8 @@ void kterm_run()
             kscreen_putf(" SSE4.2");
         if (cx & (1 << 28))
             kscreen_putf(" AVX");
+
+        kscreen_putf("\n - Total APs Running: %d", kacpi_apsrunning);
     }
     else if (str_cmp(kterm_argv[0], "fs_info") == 0)
     {

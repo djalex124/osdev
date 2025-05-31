@@ -21,60 +21,60 @@ void kwrapper_isr(kframe_int *k)
     kscreen_putf("\r\n%n%m --- exception --- ", 0xFF0000, 0x0);
     kscreen_putf("\r\nkisr: isr 0x%d #%s code 0b%b", k->int_no, kdesc_ints[k->int_no], k->err_code);
 #ifdef AQUA_DEBUG
-    kscreen_putf("\r\nkisr: rax 0x%16x rbx 0x%16x rcx 0x%16x rdx 0x%16x",
+    kdebug_outf("\r\nkisr: rax 0x%16x rbx 0x%16x rcx 0x%16x rdx 0x%16x",
         k->rax, k->rbx, k->rcx, k->rdx);
-    kscreen_putf("\r\nkisr: rsp 0x%16x rbp 0x%16x rsi 0x%16x rdi 0x%16x",
+    kdebug_outf("\r\nkisr: rsp 0x%16x rbp 0x%16x rsi 0x%16x rdi 0x%16x",
         k->rsp, k->rbp, k->rsi, k->rdi);
-    kscreen_putf("\r\nkisr: r8  0x%16x r9  0x%16x r10 0x%16x r11 0x%16x",
+    kdebug_outf("\r\nkisr: r8  0x%16x r9  0x%16x r10 0x%16x r11 0x%16x",
         k->r8, k->r9, k->r10, k->r11);
-    kscreen_putf("\r\nkisr: r12 0x%16x r13 0x%16x r14 0x%16x r15 0x%16x",
+    kdebug_outf("\r\nkisr: r12 0x%16x r13 0x%16x r14 0x%16x r15 0x%16x",
         k->r12, k->r13, k->r14, k->r15);
-    kscreen_putf("\r\nkisr: rip 0x%16x cs  0x%x ss 0x%x",
+    kdebug_outf("\r\nkisr: rip 0x%16x cs  0x%x ss 0x%x",
         k->rip, k->cs, k->ss);
-    kscreen_putf("\r\nkisr: eflags 0b%b user_rsp 0x%x",
+    kdebug_outf("\r\nkisr: eflags 0b%b user_rsp 0x%x",
         k->eflags, k->user_rsp);
     if (k->int_no == 0xD && k->err_code != 0)
     {
-        kscreen_putf("\r\nkisr: gpf from ");
+        kdebug_outf("\r\nkisr: gpf from ");
         uint16_t which = (k->err_code >> 1) & 3;
         if (which == 0b00)
-            kscreen_putf("gdt");
+            kdebug_outf("gdt");
         else if (which == 0b01 || which == 0b11)
-            kscreen_putf("idt");
+            kdebug_outf("idt");
         else if (which == 0b10)
-            kscreen_putf("ldt");
-        kscreen_putf(" at index %d", k->err_code >> 3);
+            kdebug_outf("ldt");
+        kdebug_outf(" at index %d", k->err_code >> 3);
     }
     else if (k->int_no == 0xE)
     {
         uint64_t cr2;
         asm volatile ("mov %%cr2, %0" : "=r"(cr2));
-        kscreen_putf("\r\nkisr: cr2 [0x%x]", cr2);
-        kscreen_putf("\r\nkisr: pf code: |");
+        kdebug_outf("\r\nkisr: cr2 [0x%x]", cr2);
+        kdebug_outf("\r\nkisr: pf code: |");
         if (k->err_code & 1)
         {    
-            kscreen_putf("present|");
+            kdebug_outf("present|");
             if (k->err_code & (1 << 2))
-                kscreen_putf("user|");
+                kdebug_outf("user|");
             else
-                kscreen_putf("system|");
+                kdebug_outf("system|");
         }
         else
-            kscreen_putf("non-present|");
+            kdebug_outf("non-present|");
         if (k->err_code & (1 << 1))
-            kscreen_putf("write|");
+            kdebug_outf("write|");
         else
-            kscreen_putf("read|");
+            kdebug_outf("read|");
         if (k->err_code & (1 << 3))
-            kscreen_putf("reserved bits|");
+            kdebug_outf("reserved bits|");
         if (k->err_code & (1 << 4))
-            kscreen_putf("instruction fetch|");
+            kdebug_outf("instruction fetch|");
         if (k->err_code & (1 << 5))
-            kscreen_putf("pk violation|");
+            kdebug_outf("pk violation|");
         if (k->err_code & (1 << 6))
-            kscreen_putf("ss access|");
+            kdebug_outf("ss access|");
         if (k->err_code & (1 << 14))
-            kscreen_putf("sgx violation|");
+            kdebug_outf("sgx violation|");
     }
 #endif
 
@@ -93,7 +93,7 @@ void kwrapper_isr(kframe_int *k)
 }
 
 typedef void (*kdesc_irqfunc)(void);
-static kdesc_irqfunc kdesc_irqs[16];
+kdesc_irqfunc kdesc_irqs[16];
 
 void kwrapper_irq(kframe_int *k)
 {
@@ -110,7 +110,7 @@ void kwrapper_irq(kframe_int *k)
     outb(0x20, 0x20);
 }
 
-static gdt_entry kgdt_table[6];
+gdt_entry kgdt_table[6];
 gdt_pointer kgdt;
 
 void kdesc_setgdt(int entry, uint64_t base, uint64_t limit, uint8_t access, uint8_t gran)
@@ -125,7 +125,7 @@ void kdesc_setgdt(int entry, uint64_t base, uint64_t limit, uint8_t access, uint
     kgdt_table[entry].access = access;
 }
 
-static idt_entry __attribute__((aligned(0x10))) kidt_table[256];
+idt_entry __attribute__((aligned(0x10))) kidt_table[256];
 idt_pointer kidt;
 
 void kdesc_setidt(int entry, uint64_t handler, uint8_t flags)

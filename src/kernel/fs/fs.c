@@ -115,7 +115,7 @@ int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read,
 void kfs_addpartition(kfs_partition* partition)
 {
     kfs_partition* ptr = k_infotable.kfs_partitions;
-    kdebug_outf("\nkfs add partition");
+    kdebug_outf("\nkfs_addp: adding");
 
     if (k_infotable.kfs_partitionsdetected == 0)
         k_infotable.kfs_partitions = partition;
@@ -138,6 +138,7 @@ void kfs_addpartition(kfs_partition* partition)
 void kfs_removepartition(kfs_partition* partition)
 {
     kfs_partition* ptr = k_infotable.kfs_partitions;
+    kdebug_outf("\nkfs_remp: removing");
     for (int i = 0; i < k_infotable.kfs_partitionsdetected; i++)
     {
         if ((uintptr_t)partition == (uintptr_t)ptr->next)

@@ -9,7 +9,8 @@ void* kmem_alloc(size_t pages)
 {
     size_t index;
     size_t connected = 0;
-    for (index = kmem_lowestfree + 1; kmem_table[index].eom != 1; index++)
+
+    for (index = kmem_lowestfree; kmem_table[index].eom != 1; index++)
     {
         if (kmem_table[index].used == 1)
         {
@@ -20,7 +21,7 @@ void* kmem_alloc(size_t pages)
         if (kmem_table[index].eos)
             connected = 0;
         
-        if (connected == pages - 1)
+        if (connected == pages)
         {
 #ifdef AQUA_DEBUG_MEM
             kdebug_outf("\r\nkm_a: setting entry[%x] pages[%x]", index - pages, pages);
@@ -28,13 +29,13 @@ void* kmem_alloc(size_t pages)
             for (size_t i = 0; i < pages; i++)
                 kmem_table[index - pages + i].used = 1;
             
-            void* addr = (void*)(uint64_t)(kmem_table[index - pages].page * 0x1000);
-            kmem_page((uint64_t)addr, (uint64_t)addr, pages * 0x1000, 0b11);
+            uint64_t addr = (kmem_table[index - pages].page * 0x1000);
+            kmem_page(addr, addr, pages * 0x1000, 0b11);
 
-            if (kmem_lowestfree < index - pages + 1)
-                kmem_lowestfree = index - pages + 1;
+            if (kmem_lowestfree < index - pages)
+                kmem_lowestfree = index - pages;
 
-            return addr;
+            return (void *)addr;
         }
 
         connected++;
@@ -54,11 +55,12 @@ void kmem_free(void* addr, size_t pages)
         kmem_table[i].used = 0;
     memset(addr, 0, pages * 0x1000);
     kmem_unpage((uint64_t)addr, pages * 0x1000);
-    if (index + pages < kmem_lowestfree)
+    if (index + pages - 1 < kmem_lowestfree)
         kmem_lowestfree = index + pages - 1;
 }
 
 extern uint64_t kmem_heap;
+extern uint32_t *kacpi_apstartup;
 
 void kmem_physinit()
 {
@@ -75,7 +77,13 @@ void kmem_physinit()
         if (mmap_entries->type == 7)
         {
             if (mmap_entries->physical_start < 0x100000)
-                continue; //ignored, pagetables
+            {
+                if ((mmap_entries->physical_start < 0x8001) && 
+                    ((mmap_entries->physical_start + mmap_entries->num_pages * 0x1000) > 0x8FFF)
+                    && (uint64_t)kacpi_apstartup == 0)
+                    kacpi_apstartup = (uint32_t *)0x8000;
+                continue; //ensure 0x8000 - ~0x8200 for smp startup code
+            }
             kdebug_outf("\r\nkm_i: open physical mem [0x%x] pages %x", mmap_entries->physical_start, 
                 mmap_entries->num_pages);
             pages += mmap_entries->num_pages;
@@ -95,7 +103,7 @@ void kmem_physinit()
         if (mmap_entries->type == 7)
         {
             if (mmap_entries->physical_start < 0x100000)
-                continue; //ignored, pagetables
+                continue; //ignored, reserved
             uint64_t size = mmap_entries->num_pages;
             for (size_t i = index; i < index + size; i++)
             {

@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <screen.h>
+#include <kstring.h>
 #include <debug.h>
 #include <mem.h>
 #include <pci.h>
@@ -90,27 +91,42 @@ void kfs_readfat(kfs_partition *partition)
         if (buffer[index + 11] == 0x0F)
         {
             formatLFN *lfn = (formatLFN *)&buffer[index];
-            kscreen_putf("\n LFN entry -");
-            kscreen_putf(" index %x ", lfn->order);
-            kscreen_putf(" name %c%c%c%c%c", lfn->name[0], lfn->name[2], lfn->name[4], lfn->name[6], lfn->name[8]);
-            kscreen_putf("%c%c%c%c%c%c ", lfn->name2[0], lfn->name2[2], lfn->name2[4], lfn->name2[6], lfn->name2[8], lfn->name2[10]);
-            kscreen_putf("%c%c", lfn->name3[0], lfn->name3[2]);
+            //kscreen_putf("\n LFN entry -");
+            //kscreen_putf(" index %x ", lfn->order);
+            if (tmp_string)
+            {
+                kmem_kalloc(13);
+                memcpy(tmp_string + 13, tmp_string, 13);
+            }
+            else
+                tmp_string = kmem_kalloc(13);
+            for (int i = 0; i < 5; i++)
+                tmp_string[i] = lfn->name[2 * i];
+            for (int i = 0; i < 6; i++)
+                tmp_string[i + 5] = lfn->name2[2 * i];
+            for (int i = 0; i < 2; i++)
+                tmp_string[i + 11] = lfn->name3[2 * i];
         }
         else
         {
             format83 *file = (format83 *)&buffer[index];
-            kscreen_putf("\n 8.3 entry -");
+            kscreen_putf("\n");
             if (file->attributes & 0x8)
                 kscreen_putf(" VOLUME_ID:");
             else if (file->attributes & 0x10)
                 kscreen_putf(" DIRECTORY:");
             else
                 kscreen_putf(" FILE:");
-            kscreen_putf(" %11s", file->name);
             if (tmp_string)
-                kscreen_putf(" LFN: [%s]", tmp_string);
-            kscreen_putf(" SIZE: 0x%x bytes", file->size);
-            kscreen_putf(" CLUSTER: 0x%x", (file->first_cluster_higher << 16) + file->first_cluster_lower);
+            {
+                kscreen_putf(" LFN %s", tmp_string);
+                kmem_kfree(((str_len(tmp_string) + 12) / 13) * 13);
+                tmp_string = 0;
+            }
+            else
+                kscreen_putf(" %11s", file->name);
+            if (file->size)
+                kscreen_putf(" SIZE: 0x%x bytes", file->size);
             uint32_t lba = (((file->first_cluster_higher << 16) + file->first_cluster_lower - 2) * info->sectorspercluster)
                 + info->rootsize + lba_root_dir;
             kscreen_putf(" LBA: 0x%x", lba);
@@ -127,9 +143,9 @@ kfs_partition* kfs_detectfat(kfs_drive *drive)
 
     kfs_readsector(drive, 0, 1, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
 
-    kdebug_outf("\r\n");
-    for (int i = 0x1b8; i < 512; i++)
-        kdebug_outf("%2x", mbr[i]);
+    //kdebug_outf("\r\n");
+    //for (int i = 0x1b8; i < 512; i++)
+    //    kdebug_outf("%2x", mbr[i]);
 
     size_t entry = 0;
     if (mbr[0x1be] == 0x80)
@@ -143,18 +159,20 @@ kfs_partition* kfs_detectfat(kfs_drive *drive)
     
     entry += 8;
     uint32_t start = *(uint32_t*)&mbr[entry];
-    kdebug_outf("\r\nstarting lba = %x", start);
+    //kdebug_outf("\r\nstarting lba = %x", start);
 
     kfs_readsector(drive, start, 2, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
     bpb *esp = (bpb *)mbr;
 
+    //read sector count to discern type of FAT
+
     kfs_partition* fat_partition = kmem_kalloc(sizeof(kfs_partition));
 
-    kdebug_outf("\r\nmbr strings %8s", (char *)esp->oem_name);
+    //kdebug_outf("\r\nmbr strings %8s", (char *)esp->oem_name);
     if (mbr[38] == 0x28 || mbr[38] == 0x29)
     {
         fat16_info *info = kmem_kalloc(sizeof(fat16_info));
-        kdebug_outf("\r\nfat12/16");
+        kdebug_outf("\r\nkfs_test: fat12/16 detected");
         if (esp->total_sectors_16)
             info->numsectors = esp->total_sectors_16;
         else

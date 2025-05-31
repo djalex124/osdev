@@ -24,7 +24,7 @@ uint64_t* kmem_newpt()
     return (uintptr_t *)page;
 }
 
-static uint64_t *ptab4;
+volatile uint64_t *ptab4;
 
 void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags)
 {
@@ -160,11 +160,11 @@ void kmem_virtinit()
     kmem_newpt_start += kernel_virtual;
     kmem_newpt_end += kernel_virtual;
 
-    ptab4 = kmem_newpt();
+    ptab4 = (uint64_t*)phys_from_virt((uintptr_t)kmem_newpt());
     //page tables have to be identity mapped
 
     kmem_page(0, 0, kmem_heapend - kernel_virtual, 0b11);
     kmem_page(0, kernel_virtual, kmem_heapend - kernel_virtual, 0b11);
 
-    asm volatile("mov %0, %%cr3" ::"r"(((uintptr_t)ptab4 - kernel_virtual)));
+    asm volatile("mov %0, %%cr3" ::"r"((uintptr_t)ptab4));
 }
