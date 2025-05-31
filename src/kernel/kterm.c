@@ -235,6 +235,7 @@ void kterm_run()
 
 char *kterm_prompt = "aqua >";
 extern unsigned int cw;
+extern unsigned int ch;
 
 void kterm_processinput()
 {
@@ -270,7 +271,10 @@ void kterm_processinput()
             kterm_argc = 0;
             memset(kterm_buffer, 0, sizeof(kterm_buffer));
             kterm_bufferindex = 0;
-            kscreen_putf("\n%s", kterm_prompt);
+            kterm_pos = kscreen_getpos();
+            if (kterm_pos.x != 0 && kterm_pos.y != ch)
+                kscreen_putf("\n");
+            kscreen_putf("%s", kterm_prompt);
             break;
         default:
             if (kterm_bufferindex == kterm_buffersize - 1)

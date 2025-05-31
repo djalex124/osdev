@@ -59,7 +59,7 @@ void kmem_free(void* addr, size_t pages)
         kmem_lowestfree = index + pages - 1;
 }
 
-extern uint64_t kmem_heap;
+extern uint64_t kmem_heapend;
 extern uint32_t *kacpi_apstartup;
 
 void kmem_physinit()
@@ -108,7 +108,7 @@ void kmem_physinit()
             for (size_t i = index; i < index + size; i++)
             {
                 kmem_table[i].page = (uint32_t)(mmap_entries->physical_start/0x1000) + i;
-                if (mmap_entries->physical_start >= 0x100000 && (mmap_entries->physical_start <= kmem_heap - kernel_virtual))
+                if (mmap_entries->physical_start == 0x100000 && (mmap_entries->physical_start + 0x1000*i <= kmem_heapend - kernel_virtual))
                     kmem_table[i].used = 1;
                 else
                     kmem_table[i].used = 0;

@@ -1,6 +1,7 @@
 #include <kstring.h>
 #include <debug.h>
 #include <acpi.h>
+#include <port.h>
 #include <mem.h>
 #include <pit.h>
 
@@ -206,6 +207,8 @@ void kacpi_processapic(acpi_madt *madt)
     }
 
     kmem_kfree(total_processors);
+
+    asm ("sti");
 
     bsplock = 1;
     //releases all aps that were started to enter kacpi_apicloop

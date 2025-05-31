@@ -137,15 +137,11 @@ void kfs_readfat(kfs_partition *partition)
     kmem_free(buffer, 1);
 }
 
-kfs_partition* kfs_detectfat(kfs_drive *drive)
+void kfs_detectfat(kfs_drive *drive)
 {
     uint8_t *mbr = kmem_alloc(1);
 
     kfs_readsector(drive, 0, 1, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
-
-    //kdebug_outf("\r\n");
-    //for (int i = 0x1b8; i < 512; i++)
-    //    kdebug_outf("%2x", mbr[i]);
 
     size_t entry = 0;
     if (mbr[0x1be] == 0x80)
@@ -157,9 +153,15 @@ kfs_partition* kfs_detectfat(kfs_drive *drive)
     else if (mbr[0x1ee] == 0x80)
         entry = 0x1ee;
     
-    entry += 8;
-    uint32_t start = *(uint32_t*)&mbr[entry];
-    //kdebug_outf("\r\nstarting lba = %x", start);
+    uint32_t start = 0;
+
+    if (entry != 0)
+    {
+        entry += 8;
+        start = *(uint32_t*)&mbr[entry];
+    }
+    else
+        kdebug_outf("\r\nkfs_testfat: no valid mbr, trying zero lba");
 
     kfs_readsector(drive, start, 2, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
     bpb *esp = (bpb *)mbr;
@@ -172,7 +174,7 @@ kfs_partition* kfs_detectfat(kfs_drive *drive)
     if (mbr[38] == 0x28 || mbr[38] == 0x29)
     {
         fat16_info *info = kmem_kalloc(sizeof(fat16_info));
-        kdebug_outf("\r\nkfs_test: fat12/16 detected");
+        kdebug_outf("\r\nkfs_testfat: fat12/16 detected");
         if (esp->total_sectors_16)
             info->numsectors = esp->total_sectors_16;
         else
@@ -197,10 +199,10 @@ kfs_partition* kfs_detectfat(kfs_drive *drive)
     {
         kmem_kfree(sizeof(kfs_partition));
         kmem_free(mbr, 1);
-        return NULL;
+        return;
     }
 
     kmem_free(mbr, 1);
 
-    return fat_partition;
+    kfs_addpartition(fat_partition);
 }

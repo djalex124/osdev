@@ -170,11 +170,7 @@ void kfs_init()
         {
             kfs_drive *patadrive = kfs_patatest(&kfs_patadrives[i]);
             if ((uintptr_t)patadrive)
-            {
-                kfs_partition* fat = kfs_detectfat(patadrive);
-                if ((uintptr_t)fat)
-                    kfs_addpartition(fat);
-            }
+                kfs_detectfat(patadrive);
         }
     }
 }

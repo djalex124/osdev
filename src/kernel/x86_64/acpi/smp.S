@@ -20,7 +20,7 @@ ap_gdtp:
 
     .align 64
 
-    lidt 0x8030
+    lidt 0x8100
 
     mov $0xA0, %eax
     mov %eax, %cr4
@@ -38,8 +38,6 @@ ap_gdtp:
     or $0x80000001, %ebx
     mov %ebx, %cr0
 
-    xor %ax, %ax
-    mov %ax, %ds
     lgdt 0x8030
 
     ljmp $0x8, $0x8108
@@ -77,8 +75,6 @@ long_mode:
     addq %rax, %rbx
 
     movq %rbx, %rsp
-
-    sti
 
 .extern bsplock
 

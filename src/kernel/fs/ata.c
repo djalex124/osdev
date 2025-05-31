@@ -85,12 +85,14 @@ uint8_t kfs_ataint[2] = {0, 0};
 
 void kfs_atainterrupt1()
 {
+    inb(kfs_channel[0].bmide + 2);
     outb(kfs_channel[0].bmide, inb(kfs_channel[0].bmide) & ~1);
     kfs_ataint[0] = 1;
 }
 
 void kfs_atainterrupt2()
 {
+    inb(kfs_channel[1].bmide + 2);
     outb(kfs_channel[1].bmide, inb(kfs_channel[1].bmide) & ~1);
     kfs_ataint[1] = 1;
 }
@@ -146,9 +148,18 @@ void kfs_patainit(kpci_device *ide_device)
 
     outb(kfs_channel[PATA_PRIMARY].ctrl, 4);
     outb(kfs_channel[PATA_SECONDARY].ctrl, 4);
+    ksleep(1);
+
+    outb(kfs_channel[PATA_PRIMARY].ctrl, 0);
+    outb(kfs_channel[PATA_SECONDARY].ctrl, 0);
+    ksleep(2);
+
+    kfs_ataread(PATA_PRIMARY, PATA_REG_ERROR);
+    kfs_ataread(PATA_SECONDARY, PATA_REG_ERROR);
 
     kfs_atawrite(PATA_PRIMARY, PATA_REG_CONTROL, 2);
-    kfs_atawrite(PATA_SECONDARY, PATA_REG_CONTROL, 2);
+    kfs_atawrite(PATA_PRIMARY, PATA_REG_CONTROL, 2);
+    ksleep(5);
 
     uint8_t packet, status, error = 0, count = 0;
 
@@ -160,6 +171,11 @@ void kfs_patainit(kpci_device *ide_device)
             
             kfs_atawrite(i, PATA_REG_HDDEVSEL, 0xA0 | (j << 4));
             ksleep(1);
+
+            kfs_atawrite(i, PATA_REG_SECCNT0, 0);
+            kfs_atawrite(i, PATA_REG_LBA0, 0);
+            kfs_atawrite(i, PATA_REG_LBA1, 0);
+            kfs_atawrite(i, PATA_REG_LBA2, 0);
 
             kfs_atawrite(i, PATA_REG_COMMAND, 0xEC);
             ksleep(1);
@@ -308,9 +324,6 @@ int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read,
     outb(kfs_channel[drive->channel].bmide, inb(kfs_channel[drive->channel].bmide) | 1);
 
     kfs_atawrite(drive->channel, PATA_REG_CONTROL, 0);
-    
-    //respond to interrupt by resetting start/stop bit
-    // handled in interrupt handlers i think
 
     while (kfs_ataint[drive->channel] == 0)
         asm("hlt");
@@ -318,14 +331,10 @@ int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read,
 
     //read the controller and drive status to check for error
     uint8_t dstatus = kfs_ataread(drive->channel, PATA_REG_STATUS);
-    //kdebug_outf("\r\nkfs_test: drive status %8b", dstatus);
-    kpci_device *ide_device = kfs_channel[drive->channel].pci;
-    uint16_t cstatus = kpci_configread(ide_device->bus, ide_device->subclass, ide_device->function, PCI_OFFSET_STATUS) & 0xFF;
-    //kdebug_outf("\r\nkfs_test: controller status %16b", cstatus);
-
-    kmem_free(prdt, 1);
 
     kfs_atawrite(drive->channel, PATA_REG_CONTROL, 2);
+
+    kmem_free(prdt, 1);
 
     if (dstatus & 0x1)
     {

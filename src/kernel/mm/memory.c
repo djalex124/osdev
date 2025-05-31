@@ -108,7 +108,12 @@ void kmem_init(boot_table *table)
                     kmem_newpt_end = (kmem_newpt_start + mmap_entries->num_pages*0x1000);
                 } // find lowest chunk of mem for kernel paging
                 else if (mmap_entries->physical_start == 0x100000)
-                    kmem_heapend = mmap_entries->physical_start + mmap_entries->num_pages*0x1000 + kernel_virtual;
+                {
+                    if (mmap_entries->num_pages > 0x700)
+                        kmem_heapend = mmap_entries->physical_start + 0x700000 + kernel_virtual;
+                    else
+                        kmem_heapend = mmap_entries->physical_start + mmap_entries->num_pages*0x1000 + kernel_virtual;
+                }
                 break;
         }
     }
