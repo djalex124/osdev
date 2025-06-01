@@ -1,9 +1,11 @@
-#include <kstring.h>
-#include <debug.h>
-#include <acpi.h>
-#include <port.h>
-#include <mem.h>
-#include <pit.h>
+#include <kernel/kstring.h>
+#include <kernel/debug.h>
+
+#include <x86_64/acpi/acpi.h>
+#include <x86_64/port.h>
+#include <x86_64/pit.h>
+
+#include <mm/mem.h>
 
 typedef struct
 {

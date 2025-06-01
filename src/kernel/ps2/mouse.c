@@ -1,8 +1,11 @@
-#include <screen.h>
-#include <debug.h>
-#include <port.h>
-#include <desc.h>
-#include <kbd.h>
+#include <output/screen.h>
+
+#include <kernel/debug.h>
+
+#include <x86_64/desc.h>
+#include <x86_64/port.h>
+
+#include <ps2/kbd.h>
 
 uint8_t mcycle = 0;
 uint8_t mbyte[3];

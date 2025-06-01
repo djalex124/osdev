@@ -1,12 +1,17 @@
-#include <kstring.h>
 #include <stdint.h>
-#include <kernel.h>
-#include <screen.h>
-#include <debug.h>
-#include <mem.h>
-#include <pci.h>
-#include <pit.h>
-#include <fs.h>
+
+#include <kernel/kstring.h>
+#include <kernel/kernel.h>
+#include <kernel/debug.h>
+
+#include <output/screen.h>
+
+#include <x86_64/pci.h>
+#include <x86_64/pit.h>
+
+#include <mm/mem.h>
+
+#include <fs/fs.h>
 
 extern kfs_patadrive kfs_patadrives[4];
 

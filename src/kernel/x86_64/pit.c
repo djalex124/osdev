@@ -1,7 +1,9 @@
 #include <stdint.h>
-#include <screen.h>
-#include <desc.h>
-#include <port.h>
+
+#include <output/screen.h>
+
+#include <x86_64/desc.h>
+#include <x86_64/port.h>
 
 static volatile uint64_t ticks;
 static uint8_t waiting = 0;

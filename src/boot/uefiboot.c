@@ -5,8 +5,8 @@
 
 #define EFI_BOOT
 
-#include <kernel.h>
-#include <acpi.h>
+#include <kernel/kernel.h>
+#include <x86_64/acpi/acpi.h>
 
 #define kernel_virtual   0xFFFFFF8000000000 
 #define phys_from_virt(x) ((x) - kernel_virtual)

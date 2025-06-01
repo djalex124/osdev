@@ -1,8 +1,10 @@
-#include <stdint.h>
-#include <stddef.h>
 #include <stdarg.h>
-#include <kstring.h>
-#include <port.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include <kernel/kstring.h>
+
+#include <x86_64/port.h>
 
 #define PORT1 0x3F8
 

@@ -2,19 +2,25 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <mem.h>
-#include <serial.h>
-#include <desc.h>
-#include <screen.h>
-#include <debug.h>
-#include <acpi.h>
-#include <kernel.h>
-#include <kbd.h>
-#include <mouse.h>
-#include <kterm.h>
-#include <pci.h>
-#include <fs.h>
-#include <pit.h>
+
+#include <output/serial.h>
+#include <output/screen.h>
+#include <output/kterm.h>
+
+#include <x86_64/acpi/acpi.h>
+#include <x86_64/desc.h>
+#include <x86_64/pci.h>
+#include <x86_64/pit.h>
+
+#include <kernel/kernel.h>
+#include <kernel/debug.h>
+
+#include <ps2/mouse.h>
+#include <ps2/kbd.h>
+
+#include <mm/mem.h>
+
+#include <fs/fs.h>
 
 void khalt(void)
 {

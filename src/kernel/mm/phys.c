@@ -1,6 +1,7 @@
-#include <kstring.h>
-#include <debug.h>
-#include <mem.h>
+#include <kernel/kstring.h>
+#include <kernel/debug.h>
+
+#include <mm/mem.h>
 
 size_t kmem_lowestfree = 0;
 kmem_stack* kmem_table;

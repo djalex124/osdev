@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <kernel.h>
+#include <kernel/kernel.h>
 
 void kscreen_init();
 void kscreen_copy();

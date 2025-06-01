@@ -1,11 +1,12 @@
-#include <debug.h>
-#include <screen.h>
-#include <port.h>
-#include <pci.h>
-#include <mem.h>
-#include <kernel.h>
+#include <kernel/kernel.h>
+#include <kernel/debug.h>
 
-#define AQUA_IDE_DEBUG
+#include <output/screen.h>
+
+#include <x86_64/port.h>
+#include <x86_64/pci.h>
+
+#include <mm/mem.h>
 
 char* kpci_classname[] =
 {

@@ -1,7 +1,9 @@
-#include <acpi.h>
-#include <debug.h>
-#include <mem.h>
-#include <kstring.h>
+#include <x86_64/acpi/acpi.h>
+
+#include <kernel/kstring.h>
+#include <kernel/debug.h>
+
+#include <mm/mem.h>
 
 void kacpi_fail(int line)
 {

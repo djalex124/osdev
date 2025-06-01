@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#define AQUA_IDE_DEBUG
+
 #define PCI_OFFSET_VENDORID   0x0
 #define PCI_OFFSET_DEVICEID   0x2
 #define PCI_OFFSET_COMMAND    0x4

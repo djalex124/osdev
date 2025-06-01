@@ -23,7 +23,7 @@ void kmem_virtinit();
 
 //#define AQUA_DEBUG_MEM
 
-#include <kernel.h>
+#include <kernel/kernel.h>
 void kmem_init(boot_table *table);
 
 void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags);

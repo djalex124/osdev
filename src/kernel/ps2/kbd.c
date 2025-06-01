@@ -1,8 +1,11 @@
-#include <screen.h>
-#include <debug.h>
-#include <port.h>
-#include <desc.h>
-#include <kbd.h>
+#include <output/screen.h>
+
+#include <kernel/debug.h>
+
+#include <x86_64/desc.h>
+#include <x86_64/port.h>
+
+#include <ps2/kbd.h>
 
 const char kkeyboard_keymapUSqwerty[] =
 {
@@ -26,14 +29,14 @@ const char kkeyboard_keymapUSqwerty_upper[] =
     0, 0, 0, 0, 0,
 }; //standard keys up to f12
 
-static kkeyboard_handler kkeyboard_input;
+kkeyboard_handler kkeyboard_input;
 
 void kkeyboard_setinput(kkeyboard_handler input)
 {
     kkeyboard_input = input;
 }
 
-static kkeyboard_state keyboard_state;
+kkeyboard_state keyboard_state;
 
 void kkeyboard_interrupt()
 {

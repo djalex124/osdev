@@ -1,11 +1,13 @@
-#include <screen.h>
-#include <serial.h>
-#include <stdint.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <mem.h>
-#include <debug.h>
-#include <kstring.h>
+#include <stdint.h>
+
+#include <kernel/kstring.h>
+#include <kernel/debug.h>
+
+#include <output/screen.h>
+
+#include <mm/mem.h>
 
 graphics_info kgraphics;
 uint32_t *kscreen_buffer;

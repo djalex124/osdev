@@ -1,9 +1,12 @@
-#include <kstring.h>
 #include <stddef.h>
-#include <debug.h>
-#include <acpi.h>
-#include <aml.h>
-#include <mem.h>
+
+#include <x86_64/acpi/acpi.h>
+#include <x86_64/acpi/aml.h>
+
+#include <kernel/kstring.h>
+#include <kernel/debug.h>
+
+#include <mm/mem.h>
 
 uint8_t *aml_ptr = 0;
 

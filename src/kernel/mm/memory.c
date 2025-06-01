@@ -1,9 +1,12 @@
 #include <stdint.h>
-#include <kstring.h>
-#include <kernel.h>
-#include <screen.h>
-#include <debug.h>
-#include <mem.h>
+
+#include <kernel/kstring.h>
+#include <kernel/kernel.h>
+#include <kernel/debug.h>
+
+#include <output/screen.h>
+
+#include <mm/mem.h>
 
 uint64_t kmem_heap;
 uint64_t kmem_heapend;

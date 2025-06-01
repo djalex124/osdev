@@ -1,19 +1,25 @@
-#include <kstring.h>
-#include <screen.h>
-#include <kbd.h>
-#include <mem.h>
-#include <pci.h>
 #include <limits.h>
 #include <cpuid.h>
-#include <kernel.h>
-#include <pit.h>
-#include <fs.h>
-#include <mouse.h>
+
+#include <kernel/kstring.h>
+#include <kernel/kernel.h>
+
+#include <output/screen.h>
+
+#include <x86_64/pci.h>
+#include <x86_64/pit.h>
+
+#include <ps2/mouse.h>
+#include <ps2/kbd.h>
+
+#include <mm/mem.h>
+
+#include <fs/fs.h>
 
 #define kterm_buffersize 100
 #define kterm_maxargs 16
 
-#define kterm_titletext "[AQUA Kernel (" AQUA_VER_STRING ")] - [Built " __TIMESTAMP__ " Central Time]"
+#define kterm_titletext "[AQUA Kernel (" AQUA_VER_STRING ")] - [Built " __TIME__" "__DATE__ " Central Time]"
 
 static kscreen_pos kterm_pos;
 static char kterm_buffer[kterm_buffersize];

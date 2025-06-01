@@ -1,9 +1,11 @@
 #include <stddef.h>
 #include <stdint.h>
-#include <kstring.h>
-#include <kernel.h>
-#include <debug.h>
-#include <mem.h>
+
+#include <kernel/kstring.h>
+#include <kernel/kernel.h>
+#include <kernel/debug.h>
+
+#include <mm/mem.h>
 
 uint64_t kmem_newpt_start;
 uint64_t kmem_newpt_end;

@@ -14,6 +14,8 @@
 #define AQUA_VER_STRING string1(AQUA_VER_MAJOR) "." string1(AQUA_VER_MINOR) "." string1(AQUA_VER_REV) "-" string1(AQUA_VER_STR) "+" string1(AQUA_VER_BUILD)
 #endif
 
+#include <stdint.h>
+
 typedef struct {
     uint32_t type;
     uint32_t pad;
@@ -41,9 +43,9 @@ typedef struct {
 } boot_table;
 
 #include <stddef.h>
-#include <mem.h>
-#include <pci.h>
-#include <fs.h>
+#include <mm/mem.h>
+#include <x86_64/pci.h>
+#include <fs/fs.h>
 
 typedef struct {
     size_t kpci_tablesize;

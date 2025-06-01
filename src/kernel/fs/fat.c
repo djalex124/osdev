@@ -1,10 +1,15 @@
 #include <stddef.h>
-#include <screen.h>
-#include <kstring.h>
-#include <debug.h>
-#include <mem.h>
-#include <pci.h>
-#include <fs.h>
+
+#include <kernel/kstring.h>
+#include <kernel/debug.h>
+
+#include <output/screen.h>
+
+#include <x86_64/pci.h>
+
+#include <mm/mem.h>
+
+#include <fs/fs.h>
 
 typedef struct
 {

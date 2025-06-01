@@ -112,7 +112,7 @@ kirq\num:
     jmp kcommon_irq
 .endr
 
-#include <mem.h>
+#include <mm/mem.h>
 
 .global kdesc_setdescriptors
 kdesc_setdescriptors:

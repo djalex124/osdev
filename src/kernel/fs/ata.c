@@ -1,13 +1,16 @@
 #define ata_file
 
-#include <kstring.h>
-#include <debug.h>
-#include <desc.h>
-#include <port.h>
-#include <mem.h>
-#include <pci.h>
-#include <pit.h>
-#include <fs.h>
+#include <kernel/kstring.h>
+#include <kernel/debug.h>
+
+#include <x86_64/desc.h>
+#include <x86_64/port.h>
+#include <x86_64/pci.h>
+#include <x86_64/pit.h>
+
+#include <mm/mem.h>
+
+#include <fs/fs.h>
 
 #define PATA_PRIMARY   0
 #define PATA_SECONDARY 1

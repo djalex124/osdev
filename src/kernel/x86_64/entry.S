@@ -1,5 +1,3 @@
-#include <mem.h>
-
 .code64
 .text
 

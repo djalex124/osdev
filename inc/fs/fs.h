@@ -1,5 +1,5 @@
 #pragma once
-#include <pci.h>
+#include <x86_64/pci.h>
 
 typedef struct {
     uint8_t exists;
