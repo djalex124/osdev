@@ -68,6 +68,14 @@ char* kpci_subclassname_3[] =
     "3D Controller"
 };
 
+char* kpci_subclassname_4[] =
+{
+    "Video Device",
+    "Audio Device",
+    "Telephone Device",
+    "HD Audio"
+};
+
 char* kpci_subclassname_6[] =
 {
     "Host Bridge",
@@ -81,6 +89,17 @@ char* kpci_subclassname_6[] =
     "RACEway Bridge",
     "PCI-PCI Bridge",
     "InfiniBand-PCI Bridge"
+};
+
+char* kpci_subclassname_8[] =
+{
+    "PIC",
+    "DMA Controller",
+    "Timer",
+    "RTC Controller",
+    "PCI Hot-Plug",
+    "SD Host",
+    "IOMMU"
 };
 
 char* kpci_subclassname_12[] =
@@ -119,10 +138,18 @@ char* kpci_getsubclassname(uint8_t class, uint8_t subclass)
             if (subclass >= 3)
                 return kpci_classname[22];
             return kpci_subclassname_3[subclass];
+        case 4:
+            if (subclass >= 4)
+                return kpci_classname[22];
+            return kpci_subclassname_4[subclass];
         case 6:
             if (subclass >= 11)
                 return kpci_classname[22];
             return kpci_subclassname_6[subclass];
+        case 8:
+            if (subclass >= 7)
+                return kpci_classname[22];
+            return kpci_subclassname_8[subclass];
         case 12:
             if (subclass >= 10)
                 return kpci_classname[22];

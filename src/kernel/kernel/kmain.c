@@ -65,10 +65,13 @@ void kmain(boot_table *table)
     Things to still add
 
     - ACPI decoding
-        - SMP support (multiple cores/threads)
+        - AML (DSDT)
         - PCI device support
             - USB support
-    - File system driver (close)
+    - Halt and Catch Fire for all processors
+    - Threads
+    - Processes
+    - ELF Support
     
     */
 

@@ -166,13 +166,13 @@ void kterm_run()
     {
         kscreen_putf("\nkpci_info: current pci device table");
         kpci_device* kpci_table = k_infotable.kpci_table;
-        uint8_t progif;
+        uint32_t dev_id;
         for (int i = 0; i < k_infotable.kpci_tablesize; i++)
         {
-            progif = kpci_configread(kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function, PCI_OFFSET_PROGIF) & 0xFF;
-            kscreen_putf("\n - Bus %2x Device %2x Function %2x", kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
-            kscreen_putf(": VendorID %4x ProgIF %2x [%s]/[%s]",
-                kpci_table[i].vendorid, progif,
+            dev_id = kpci_configread(kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function, PCI_OFFSET_DEVICEID);
+            kscreen_putf("\n - %2x:%2x:%2x ", kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
+            kscreen_putf("VendorID %4x DeviceID %4x [%s]/[%s]",
+                kpci_table[i].vendorid, dev_id,
                 kpci_getclassname(kpci_table[i].class),
                 kpci_getsubclassname(kpci_table[i].class, kpci_table[i].subclass));
         }
