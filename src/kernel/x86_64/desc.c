@@ -2,6 +2,7 @@
 
 #include <output/screen.h>
 
+#include <kernel/crash.h>
 #include <kernel/debug.h>
 
 #include <x86_64/desc.h>
@@ -83,16 +84,7 @@ void kwrapper_isr(kframe_int *k)
 
     //should attempt fix or ret if non crashing isr before stack trace and hlt
 
-    struct kstackframe* stack = (struct kstackframe*)k->rbp;
-    kscreen_putf("\r\nkisr: stack trace");
-    kscreen_putf("\r\nkisr: [0x%x]", k->rip);
-    for(unsigned frame = 0; stack && frame < 5; ++frame)
-    {
-        kscreen_putf("\r\nkisr: [0x%x]", stack->rip);
-        stack = stack->rbp;
-    }
-
-    while (1) asm("hlt");
+    kcrash("Exception");
 }
 
 typedef void (*kdesc_irqfunc)(void);

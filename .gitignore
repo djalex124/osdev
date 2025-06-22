@@ -6,3 +6,5 @@ firmware/
 *.efi
 *.d
 *.bin
+*.dsl
+*.map

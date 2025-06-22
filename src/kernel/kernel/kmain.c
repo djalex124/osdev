@@ -13,6 +13,7 @@
 #include <x86_64/pit.h>
 
 #include <kernel/kernel.h>
+#include <kernel/crash.h>
 #include <kernel/debug.h>
 
 #include <ps2/mouse.h>
@@ -36,6 +37,7 @@ void kmain(boot_table *table)
 {
 #ifdef AQUA_DEBUG
     kserial_init();
+    kcrash_initsym();
 #endif
 
     kdesc_install();

@@ -3,6 +3,7 @@
 
 #include <kernel/kstring.h>
 #include <kernel/kernel.h>
+#include <kernel/crash.h>
 
 #include <output/screen.h>
 
@@ -123,6 +124,11 @@ void kterm_run()
 
         kscreen_putf("\n - Total APs Running: %d", kacpi_apsrunning);
     }
+    else if (str_cmp(kterm_argv[0], "crash") == 0)
+    {
+        kscreen_putf("\nInitiating crash...");
+        kcrash("User Requested");
+    }
     else if (str_cmp(kterm_argv[0], "fs_info") == 0)
     {
         kfs_printinfo();
@@ -148,6 +154,7 @@ void kterm_run()
         kscreen_putf("\n clear - clears the screen");
         kscreen_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
         kscreen_putf("\n cpu_info - lists CPU model and capabilities");
+        kscreen_putf("\n crash - crashes the AQUA kernel");
         kscreen_putf("\n fs_info - lists detected disks and drives");
         kscreen_putf("\n font - prints all characters in boot font");
         kscreen_putf("\n help - lists available commands");
