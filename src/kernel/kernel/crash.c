@@ -8,7 +8,7 @@
 #include <x86_64/desc.h>
 
 #include <stdint.h>
-#include <elf.h>
+#include </usr/include/elf.h>
 
 extern int cw, ch;
 uint8_t screen = 0;

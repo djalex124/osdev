@@ -34,7 +34,7 @@ drive/dbg_kernel.bin: $(obj) bin/link.ld
 
 obj/%.o: src/%.c 
 	@mkdir -p $(@D)
-	@$(gcc) $(debug_flag) $(kernel_flags) -I/usr/include -c -MMD -MP $< -o $@ -lgcc
+	@$(gcc) $(debug_flag) $(kernel_flags) -c -MMD -MP $< -o $@ -lgcc
 
 obj/%.o: src/%.S 
 	@mkdir -p $(@D)
@@ -43,7 +43,7 @@ obj/%.o: src/%.S
 efi_cc := /usr/bin/gcc
 
 gnu_efi_inc := /usr/include/efi
-gnu_efi_lib := /usr/lib64
+gnu_efi_lib := /usr/lib
 
 drive/boot.efi:
 	gcc $(debug_flag) -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o src/boot/uefiboot.o
@@ -70,6 +70,7 @@ image: drive/boot.efi
 	mkfs.vfat -F 16 bin/dev.img
 
 	mcopy -i bin/dev.img drive/kernel.bin ::/
+	mcopy -i bin/dev.img drive/kernel.map ::/
 	mcopy -i bin/dev.img drive/boot.efi ::/
 	mcopy -i bin/dev.img drive/startup.nsh ::/
 
