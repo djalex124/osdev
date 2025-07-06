@@ -26,7 +26,7 @@ typedef struct
     uint8_t depth;
     kacpi_expression* obj;
     uint64_t* next;
-}__attribute__((packed)) kacpi_termlist;
+} kacpi_termlist;
 
 typedef struct
 {
@@ -320,7 +320,17 @@ typedef struct
     kacpi_namestring* name;
 }__attribute__((packed)) kacpi_defcreatedwordfield;
 
+typedef struct
+{
+    kacpi_expression* object;
+    uint64_t* next;
+
+    uint8_t names;
+    char name[];
+}__attribute__((packed)) kacpi_tree;
+
 void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **returnlist);
+kacpi_expression* kacpi_getexpression(uint64_t *parent);
 uint64_t* kacpi_getpackageelementlist(uint32_t length, uint32_t elements);
 kacpi_datarefobj* kacpi_getdatarefobj();
 uint8_t kacpi_getbytedata();
@@ -328,7 +338,7 @@ kacpi_namepath* kacpi_getnamepath();
 kacpi_namestring* kacpi_getnamestring();
 uint32_t kacpi_getpkglength();
 kacpi_termarg* kacpi_gettermarg(uint64_t *parent);
-kacpi_target* kacpi_gettarget();
+kacpi_target* kacpi_gettarget(uint64_t *parent);
 
 void kacpi_printtarget(kacpi_target *target);
 void kacpi_printtermarg(kacpi_termarg *termarg);

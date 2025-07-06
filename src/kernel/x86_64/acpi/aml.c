@@ -11,6 +11,297 @@
 uint8_t *aml_ptr = 0;
 
 kacpi_termlist *kacpi_dsdt = 0;
+kacpi_tree *kacpi_systemtree = 0;
+
+uint8_t nametest = 0;
+
+char *kacpi_getparentname(uint8_t *names, uint64_t *parent)
+{
+    kacpi_termlist *termlistptr = (kacpi_termlist *)parent;
+    kacpi_namestring *addname = 0;
+    char *name = 0;
+
+    while ((uint64_t)termlistptr)
+    {
+        kacpi_expression *termlistobj = termlistptr->obj;
+        addname = 0;
+        if ((uint64_t)termlistobj)
+        {
+            //kdebug_outf("\n termlistobj %x %x", termlistobj->encodingvalue[0], termlistobj->encodingvalue[1]);
+            if (termlistobj->encodingvalue[0] == 0x10)
+                addname = ((kacpi_defscope *)termlistobj)->namestring;
+            else if (termlistobj->encodingvalue[0] == 0x14)
+                addname = ((kacpi_defmethod *)termlistobj)->namestring;
+            else if (termlistobj->encodingvalue[0] == 0x5B && termlistobj->encodingvalue[1] == 0x82)
+                addname = ((kacpi_defdevice *)termlistobj)->namestring;
+            else if (termlistobj->encodingvalue[0] == 0x5B && termlistobj->encodingvalue[1] == 0x83)
+                addname = ((kacpi_defprocessor *)termlistobj)->namestring;
+            
+            if ((uint64_t)addname)
+            {
+                uint8_t length = 0;
+                if (addname->namepath->names)
+                {
+                    length = addname->namepath->names * 4;
+                    kmem_kalloc(length);
+                    //kdebug_outf(" %x %x", name, name + length);
+                    for (int lenptr = *names * 4; lenptr > -1; lenptr -= 4)
+                            memcpy(name + length + lenptr, name + lenptr, 4);
+
+                    for (int names = 0; names < addname->namepath->names; names++)
+                        memcpy(name + (names * 4), addname->namepath->name[names], 4);
+                }
+                else
+                {
+                    length = 4;
+                    kmem_kalloc(length);
+                    memcpy(name + length, name, *names * 4);
+                    memcpy(name, "NULL", 4);
+                }
+
+                *names += length / 4;
+
+                if (addname->first == '\\')
+                    break;
+            }
+        }
+
+        termlistptr = (kacpi_termlist *)termlistptr->parent;
+    }
+
+    return name;
+}
+
+void kacpi_treeadd(kacpi_expression *obj, uint64_t *parent)
+{
+    kacpi_tree *tree = 0;
+    
+    kacpi_termlist *termlistptr = (kacpi_termlist *)parent;
+    kacpi_namestring *addname = 0;
+    size_t namelen = 0;
+    char *name = 0;
+
+    if (obj->encodingvalue[0] == 0x06)
+        addname = ((kacpi_defalias *)obj)->namestring1;
+    else if (obj->encodingvalue[0] == 0x08)
+        addname = ((kacpi_defname *)obj)->namestring;
+    else if (obj->encodingvalue[0] == 0x14)
+        addname = ((kacpi_defmethod *)obj)->namestring;
+    else if (obj->encodingvalue[0] == 0x8A)
+        addname = ((kacpi_defcreatedwordfield *)obj)->name;
+    else if (obj->encodingvalue[0] == 0x5B && obj->encodingvalue[1] == 0x01)
+        addname = ((kacpi_defmutexop *)obj)->namestring;
+    else if (obj->encodingvalue[0] == 0x5B && obj->encodingvalue[1] == 0x81)
+        addname = ((kacpi_deffield *)obj)->namestring;
+    else if (obj->encodingvalue[0] == 0x5B && obj->encodingvalue[1] == 0x82)
+        addname = ((kacpi_defdevice *)obj)->namestring;
+    else
+        return;
+    
+    if (addname->first == '\\')
+    {
+        tree = kmem_kalloc(17 + addname->namepath->names * 4);
+        tree->object = obj;
+        tree->names = addname->namepath->names + 1;
+        for (uint8_t names = 0; names < addname->namepath->names; names++)
+            memcpy(&tree->name[names * 4], addname->namepath->name[names], 4);
+    }
+    else
+    {
+        tree = kmem_kalloc(25);
+        tree->object = obj;
+
+        memcpy(name, addname->namepath->name[0], 4);
+        namelen += 4;
+        
+        while ((uint64_t)termlistptr)
+        {
+            kacpi_expression *termlistobj = termlistptr->obj;
+            addname = 0;
+            if ((uint64_t)termlistobj)
+            {
+                //kdebug_outf("\n termlistobj %x %x", termlistobj->encodingvalue[0], termlistobj->encodingvalue[1]);
+                if (termlistobj->encodingvalue[0] == 0x10)
+                    addname = ((kacpi_defscope *)termlistobj)->namestring;
+                else if (termlistobj->encodingvalue[0] == 0x14)
+                    addname = ((kacpi_defmethod *)termlistobj)->namestring;
+                else if (termlistobj->encodingvalue[0] == 0x5B && termlistobj->encodingvalue[1] == 0x82)
+                    addname = ((kacpi_defdevice *)termlistobj)->namestring;
+                else if (termlistobj->encodingvalue[0] == 0x5B && termlistobj->encodingvalue[1] == 0x83)
+                    addname = ((kacpi_defprocessor *)termlistobj)->namestring;
+                //kacpi_printnamestring(addname);
+                
+                if ((uint64_t)addname)
+                {
+                    //kdebug_outf("\nname ");
+                    //kacpi_printnamestring(addname);
+                    uint8_t length = 0;
+                    
+                    if (addname->namepath->names)
+                    {
+                        length = addname->namepath->names * 4;
+                        kmem_kalloc(length);
+                        //kdebug_outf(" %x %x", name, name + length);
+                        for (int lenptr = namelen; lenptr > -1; lenptr -= 4)
+                            memcpy(name + length + lenptr, name + lenptr, 4);
+
+                        for (int names = 0; names < addname->namepath->names; names++)
+                            memcpy(name + (names * 4), addname->namepath->name[names], 4);
+                        //kdebug_outf("\nnames %d", addname->namepath->names);
+                    }
+                    else
+                    {
+                        length = 4;
+                        kmem_kalloc(length);
+                        memcpy(name + length, name, namelen);
+                        memcpy(name, "NULL", 4);
+                    }
+
+                    namelen += length;
+
+                    if (addname->first == '\\')
+                        break;
+                }
+            }
+
+            termlistptr = (kacpi_termlist *)termlistptr->parent;
+
+            //kdebug_outf("\n %x", termlistptr);
+        }
+
+        tree->names = namelen / 4;
+        memcpy(tree->name, name, namelen);
+    }
+
+    //kdebug_outf("\ntreeadd: %4s", &name[0]);
+    //for (int i = 1; i < (namelen / 4); i++)
+    ///    kdebug_outf(".%4s", &name[i * 4]);
+
+    if ((uint64_t)kacpi_systemtree)
+    {
+        kacpi_tree *treeptr = kacpi_systemtree;
+        while ((uint64_t)treeptr->next)
+            treeptr = (kacpi_tree *)treeptr->next;
+        treeptr->next = (uint64_t *)tree;
+    }
+    else
+        kacpi_systemtree = tree;
+
+    nametest++;
+}
+
+kacpi_expression *kacpi_treefind(kacpi_namestring *name, uint64_t *parent)
+{
+    //kdebug_outf("\ntreefind %x ", parent);
+    //kacpi_printnamestring(name);
+
+    kacpi_tree *treeptr = kacpi_systemtree;
+
+    uint8_t names = 0;
+    char *parentname = 0;
+    if (name->first == '\\')
+    {
+        parentname = (char *)name->namepath->name;
+        names = name->namepath->names - 1;
+    }
+    else
+        parentname = kacpi_getparentname(&names, parent);
+
+    //kdebug_outf("\ntreefind: ");
+    //for (int i = 0; i < names * 4; i++)
+    //    kdebug_outf("%c", parentname[i]);
+    //kacpi_printnamestring(name);
+
+    //if (strn_cmp((const char*)name->namepath->name[0], (const char*)"CEJ0", 4) == 0)
+    //    while (1);
+
+    while ((uint64_t)treeptr)
+    {
+        //kdebug_outf("\ntreefind: tree name ");
+        //for (int i = 0; i < treeptr->names * 4; i++)
+        //    kdebug_outf("%c", treeptr->name[i]);
+        uint8_t namecount = 0;
+        for (namecount = 0; namecount < names; namecount++)
+        {
+            //kdebug_outf("\ncheck name %4s %4s", (const char*)&parentname[namecount * 4], (const char*)&treeptr->name[namecount * 4]);
+            if (strn_cmp((const char*)&parentname[namecount * 4], (const char*)&treeptr->name[namecount * 4], 4) == 0)
+            {
+                if (treeptr->object->encodingvalue[0] == 0x08)
+                {
+                    kacpi_namestring *namename = ((kacpi_defname *)treeptr->object)->namestring;
+                    if (strn_cmp((const char*)name->namepath->name[name->namepath->names - 1], 
+                        (const char*)namename->namepath->name[namename->namepath->names - 1], 4) == 0)
+                        return treeptr->object;
+                }
+                else if (treeptr->object->encodingvalue[0] == 0x14)
+                {
+                    kacpi_namestring *methodname = ((kacpi_defmethod *)treeptr->object)->namestring;
+                    if (strn_cmp((const char*)name->namepath->name[name->namepath->names - 1], 
+                        (const char*)methodname->namepath->name[methodname->namepath->names - 1], 4) == 0)
+                        return treeptr->object;
+                }
+                else if (treeptr->object->encodingvalue[0] == 0x8A)
+                {
+                    kacpi_namestring *dwordfieldname = ((kacpi_defcreatedwordfield *)treeptr->object)->name;
+                    if (strn_cmp((const char*)name->namepath->name[name->namepath->names - 1], 
+                        (const char*)dwordfieldname->namepath->name[dwordfieldname->namepath->names - 1], 4) == 0)
+                        return treeptr->object;
+                }
+                else if (treeptr->object->encodingvalue[0] == 0x5B && treeptr->object->encodingvalue[1] == 0x01)
+                {
+                    kacpi_namestring *mutexname = ((kacpi_defmutexop *)treeptr->object)->namestring;
+                    if (strn_cmp((const char*)name->namepath->name[name->namepath->names - 1], 
+                        (const char*)mutexname->namepath->name[mutexname->namepath->names - 1], 4) == 0)
+                        return treeptr->object;
+                }
+                else if (treeptr->object->encodingvalue[0] == 0x5B && treeptr->object->encodingvalue[1] == 0x82)
+                {
+                    kacpi_namestring *devicename = ((kacpi_defdevice *)treeptr->object)->namestring;
+                    if (strn_cmp((const char*)name->namepath->name[name->namepath->names - 1], 
+                        (const char*)devicename->namepath->name[devicename->namepath->names - 1], 4) == 0)
+                        return treeptr->object;
+                }
+            }
+            else
+                break;
+        }
+
+        treeptr = (kacpi_tree *)treeptr->next;
+    }
+
+    treeptr = kacpi_systemtree;
+
+    while ((uint64_t)treeptr)
+    {
+        uint8_t namecount = 0;
+        for (namecount = 0; namecount < names; namecount++)
+        {
+            if (strn_cmp((const char*)&parentname[namecount * 4], (const char*)&treeptr->name[namecount * 4], 4) == 0)
+            {
+                if (treeptr->object->encodingvalue[0] == 0x5B && treeptr->object->encodingvalue[1] == 0x81)
+                {
+                    kacpi_fieldlist *fieldlistptr = ((kacpi_deffield *)treeptr->object)->fieldlist;
+                    while ((uint64_t)fieldlistptr)
+                    {
+                        if (fieldlistptr->element->type == 4)
+                        {
+                            if (strn_cmp((const char*)name->namepath->name[name->namepath->names - 1], 
+                                (const char*)((kacpi_namepath *)*((uint64_t *)fieldlistptr->element->data))->name[0], 4) == 0)
+                                return treeptr->object;
+                        }
+                        fieldlistptr = (kacpi_fieldlist *)fieldlistptr->next;
+                    }
+                }
+            }
+            else
+                break;
+        }
+
+        treeptr = (kacpi_tree *)treeptr->next;
+    }
+
+    return 0;
+}
 
 kacpi_fieldlist* kacpi_getfield(uint32_t length)
 {
@@ -21,7 +312,7 @@ kacpi_fieldlist* kacpi_getfield(uint32_t length)
 
     while ((uint64_t)aml_ptr < end)
     {
-        kdebug_outf(" field %2x", *aml_ptr);
+        //kdebug_outf(" field %2x", *aml_ptr);
         
         kacpi_fieldelement *fieldelement = 0;
         switch (*aml_ptr)
@@ -41,8 +332,8 @@ kacpi_fieldlist* kacpi_getfield(uint32_t length)
                 fieldelement->data[1] = kacpi_getbytedata();
                 break;
             case 0x02:
-                kdebug_outf(" element 0x02");
-                asm("hlt");
+                //kdebug_outf(" element 0x02");
+                while (1);
                 break;
             case 0x03:
                 fieldelement = kmem_kalloc(4);
@@ -77,7 +368,7 @@ kacpi_supername* kacpi_getsupername(uint64_t *parent)
 {
     kacpi_supername* supername = kmem_kalloc(sizeof(kacpi_supername));
 
-    kdebug_outf("[ snta%2x", *aml_ptr);
+    //kdebug_outf("[ snta%2x", *aml_ptr);
 
     if (*aml_ptr >= 0x60 && *aml_ptr <= 0x6E)
         supername->type = *aml_ptr;
@@ -107,7 +398,7 @@ kacpi_supername* kacpi_getsupername(uint64_t *parent)
         }
     }
 
-    kdebug_outf("]");
+    //kdebug_outf("]");
 
     return supername;
 }
@@ -154,7 +445,7 @@ uint64_t kacpi_termarginteger(kacpi_termarg *arg)
             constant = arg->type;
             break;
         default:
-            kdebug_outf(" tai fail! %2x", arg->type);
+            //kdebug_outf(" tai fail! %2x", arg->type);
             break;
     }
 
@@ -163,7 +454,7 @@ uint64_t kacpi_termarginteger(kacpi_termarg *arg)
 
 uint8_t kacpi_depth = 0;
 
-kacpi_expression* kacpi_getexpression(uint64_t *parent)
+kacpi_expression *kacpi_getexpression(uint64_t *parent)
 {
     kacpi_expression *expression = kmem_kalloc(2);
     expression->encodingvalue[0] = *aml_ptr;
@@ -173,7 +464,7 @@ kacpi_expression* kacpi_getexpression(uint64_t *parent)
 
     kacpi_defmethod *method = 0;
 
-    kdebug_outf(" EX:%2x", *aml_ptr);
+    //kdebug_outf(" EX:%2x", *aml_ptr);
 
     switch (*aml_ptr)
     {
@@ -294,7 +585,7 @@ kacpi_expression* kacpi_getexpression(uint64_t *parent)
         case 0x5B:
             aml_ptr++;
             expression->encodingvalue[1] = *aml_ptr;
-            kdebug_outf(" %2x", *aml_ptr);
+            //kdebug_outf(" %2x", *aml_ptr);
             switch (*aml_ptr)
             {
                 case 0x01:
@@ -304,6 +595,7 @@ kacpi_expression* kacpi_getexpression(uint64_t *parent)
                     ptr = (uint64_t *)&expression->data[8];
                     aml_ptr++;
                     *ptr = kacpi_getbytedata();
+                    kacpi_treeadd(expression, parent);
                     break;
                 case 0x23:
                     kmem_kalloc(16);
@@ -329,21 +621,7 @@ kacpi_expression* kacpi_getexpression(uint64_t *parent)
                     aml_ptr++;
                     distance = (uint64_t)aml_ptr - distance;
                     field->fieldlist = kacpi_getfield(field->pkglength - distance);
-                    break;
-                case 0x82:
-                    kmem_kalloc(sizeof(kacpi_defdevice) - 2);
-                    kacpi_defdevice *device = (kacpi_defdevice *)expression;
-                    aml_ptr++;
-                    distance = (uint64_t)aml_ptr;
-                    device->pkglength = kacpi_getpkglength();
-                    aml_ptr++;
-                    device->namestring = kacpi_getnamestring();
-                    kdebug_outf(" namepath %dnames [%4s]", 
-                        device->namestring->namepath->names,
-                        device->namestring->namepath->name[0]);
-                    aml_ptr++;
-                    distance = (uint64_t)aml_ptr - distance;
-                    kacpi_gettermlist(device->pkglength - distance, parent, &device->termlist);
+                    kacpi_treeadd(expression, parent);
                     break;
             }
             break;
@@ -353,29 +631,34 @@ kacpi_expression* kacpi_getexpression(uint64_t *parent)
             kacpi_namestring *namestring = kacpi_getnamestring();
             *ptr = (uint64_t)namestring;
 
-            if (namestring->first != '\\')
-            {
-                //get full name and scope
-            }
+            kacpi_expression *check = kacpi_treefind(namestring, parent);
+            //kdebug_outf("\n\ntreefind returned: ");
+            //kacpi_printtermlistentry(check);
 
-            //need to store everything based on scope, device, name
-
-            if (expression->encodingvalue[0] == 0xFE)
+            if ((uint64_t)check == 0)
+                expression->encodingvalue[0] = 0xFC;
+            else if (check->encodingvalue[0] == 0x14)
             {
-                method = (kacpi_defmethod *)0;
+                expression->encodingvalue[0] = 0xFE;
+                method = (kacpi_defmethod *)check;
                 *ptr = (uint64_t)method;
                 kacpi_termarglist *termarglist = kmem_kalloc(sizeof(kacpi_termarglist));
                 ptr = (uint64_t *)&expression->data[8];
                 *ptr = (uint64_t)termarglist;
-                kdebug_outf(" args%d", method->methodflags & 0b111);
+                //kdebug_outf(" args%d", method->methodflags & 0b111);
                 for (uint8_t args = method->methodflags & 0b111; args > 0; args--)
                 {
                     aml_ptr++;
-                    termarglist->arg = kacpi_gettermarg(0);
+                    termarglist->arg = kacpi_gettermarg(parent);
                     kacpi_termarglist *next = kmem_kalloc(sizeof(kacpi_termarglist));
                     termarglist->next = (uint64_t *)next;
                     termarglist = next;
                 }
+            }
+            else
+            {
+                ptr = (uint64_t *)&expression->data[8];
+                *ptr = (uint64_t)check;
             }
 
             break;
@@ -399,7 +682,7 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
     uint64_t distance = 0;
     uint8_t cont = 1;
 
-    kdebug_outf("\nTL:");
+    //kdebug_outf("\nTL:");
     
     size_t end = length + (uint64_t)aml_ptr - 1;
 
@@ -420,6 +703,7 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 alias->namestring1 = kacpi_getnamestring();
                 aml_ptr++;
                 alias->namestring2 = kacpi_getnamestring();
+                kacpi_treeadd(object, parent);
                 break;
             case 0x08:
                 object = kmem_kalloc(sizeof(kacpi_defname));
@@ -430,6 +714,7 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 name->namestring = kacpi_getnamestring();
                 aml_ptr++;
                 name->datarefobj = kacpi_getdatarefobj();
+                kacpi_treeadd(object, parent);
                 break;
             case 0x10:
                 object = kmem_kalloc(sizeof(kacpi_defscope));
@@ -441,9 +726,13 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 scope->pkglength = kacpi_getpkglength();
                 aml_ptr++;
                 scope->namestring = kacpi_getnamestring();
+                //kdebug_outf("\ndefscope %x", listptr);
+                //kacpi_printnamestring(scope->namestring);
+                //kdebug_outf(" %x", parent);
                 aml_ptr++;
                 distance = (uint64_t)aml_ptr - distance;
                 kacpi_gettermlist(scope->pkglength - distance, (uint64_t *)listptr, &scope->termlist);
+                //kdebug_outf("\n\nendscope\n");
                 break;
             case 0x14:
                 object = kmem_kalloc(sizeof(kacpi_defmethod));
@@ -455,13 +744,14 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 method->pkglength = kacpi_getpkglength();
                 aml_ptr++;
                 method->namestring = kacpi_getnamestring();
-                kdebug_outf("\n\nmethod named ");
-                kacpi_printnamestring(method->namestring);
+                //kdebug_outf("\n\nmethod named ");
+                //kacpi_printnamestring(method->namestring);
                 aml_ptr++;
                 method->methodflags = kacpi_getbytedata();
                 aml_ptr++;
                 distance = (uint64_t)aml_ptr - distance;
                 kacpi_gettermlist(method->pkglength - distance, (uint64_t *)listptr, &method->termlist);
+                kacpi_treeadd(object, parent);
                 break;
             case 0x86:
                 object = kmem_kalloc(sizeof(kapci_defnotify));
@@ -484,9 +774,10 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 createdwordfield->byteindex = kacpi_gettermarg((uint64_t *)listptr);
                 aml_ptr++;
                 createdwordfield->name = kacpi_getnamestring();
+                kacpi_treeadd(object, parent);
                 break;
             case 0xA0:
-                kdebug_outf(" DefIfOp");
+                //kdebug_outf(" DefIfOp");
                 object = kmem_kalloc(sizeof(kacpi_defifop));
                 listptr->obj = object;
                 kacpi_defifop *dif = (kacpi_defifop *)object;
@@ -501,7 +792,7 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 kacpi_gettermlist(dif->pkglength - distance, (uint64_t *)listptr, &dif->termlist);
                 break;
             case 0xA1:
-                kdebug_outf(" DefElseOp");
+                //kdebug_outf(" DefElseOp");
                 object = kmem_kalloc(sizeof(kacpi_defelseop));
                 listptr->obj = object;
                 kacpi_defelseop *delse = (kacpi_defelseop *)object;
@@ -514,7 +805,7 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 kacpi_gettermlist(delse->pkglength - distance, (uint64_t *)listptr, &delse->termlist);
                 break;
             case 0xA2:
-                kdebug_outf(" DefWhile");
+                //kdebug_outf(" DefWhile");
                 object = kmem_kalloc(26);
                 listptr->obj = object;
                 kacpi_defwhile *dwhile = (kacpi_defwhile *)object;
@@ -529,7 +820,7 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 kacpi_gettermlist(dwhile->pkglength - distance, (uint64_t *)listptr, &dwhile->termlist);
                 break;
             case 0xA4:
-                kdebug_outf(" DefReturn");
+                //kdebug_outf(" DefReturn");
                 object = kmem_kalloc(sizeof(kacpi_defreturnop));
                 listptr->obj = object;
                 kacpi_defreturnop *dreturn = (kacpi_defreturnop *)object;
@@ -546,7 +837,7 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 switch (*(aml_ptr + 1))
                 {
                     case 0x27:
-                        kdebug_outf(" ReleaseOp");
+                        //kdebug_outf(" ReleaseOp");
                         object = kmem_kalloc(sizeof(kacpi_defreleaseop));
                         listptr->obj = object;
                         kacpi_defreleaseop *release = (kacpi_defreleaseop *)object;
@@ -557,7 +848,7 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                         release->mutexobject = kacpi_getsupername((uint64_t *)listptr);
                         break;
                     case 0x80:
-                        kdebug_outf(" OpRegionOp");
+                        //kdebug_outf(" OpRegionOp");
                         object = kmem_kalloc(sizeof(kacpi_defopregion));
                         listptr->obj = object;
                         kacpi_defopregion *opregion = (kacpi_defopregion *)object;
@@ -573,8 +864,27 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                         aml_ptr++;
                         opregion->regionlen = kacpi_gettermarg((uint64_t *)listptr);
                         break;
+                    case 0x82:
+                        object = kmem_kalloc(sizeof(kacpi_defdevice));
+                        listptr->obj = object;
+                        kacpi_defdevice *device = (kacpi_defdevice *)object;
+                        device->encodingvalue[0] = *aml_ptr;
+                        aml_ptr++;
+                        device->encodingvalue[1] = *aml_ptr;
+                        aml_ptr++;
+                        distance = (uint64_t)aml_ptr;
+                        device->pkglength = kacpi_getpkglength();
+                        aml_ptr++;
+                        device->namestring = kacpi_getnamestring();
+                        //kdebug_outf(" add device");
+                        //kacpi_printnamestring(device->namestring);
+                        aml_ptr++;
+                        distance = (uint64_t)aml_ptr - distance;
+                        kacpi_gettermlist(device->pkglength - distance, (uint64_t *)listptr, &device->termlist);
+                        kacpi_treeadd(object, parent);
+                        break;
                     case 0x83:
-                        kdebug_outf(" ProcessorOp");
+                        //kdebug_outf(" ProcessorOp");
                         object = kmem_kalloc(sizeof(kacpi_defprocessor));
                         listptr->obj = object;
                         kacpi_defprocessor *processor = (kacpi_defprocessor *)object;
@@ -607,9 +917,11 @@ void kacpi_gettermlist(uint32_t length, uint64_t *parent, kacpi_termlist **retur
                 if ((uint64_t)object)
                     break;
             default:
+                //kdebug_outf("\nget expression %x", listptr);
                 object = kacpi_getexpression((uint64_t *)listptr);
                 listptr->obj = object;
-                if ((uint64_t)object == 0)
+                //kdebug_outf("\nget expression %x", listptr->obj);
+                if ((uint64_t)listptr->obj == 0)
                     cont = 0;
                 break;
         }
@@ -632,7 +944,7 @@ kacpi_termarg* kacpi_gettermarg(uint64_t *parent)
     uint64_t *ptr = 0;
     uint32_t len;
 
-    kdebug_outf(" TA:%2x", *aml_ptr);
+    //kdebug_outf(" TA:%2x", *aml_ptr);
 
     if (*aml_ptr >= 0x60 && *aml_ptr <= 0x6E)
     {
@@ -701,8 +1013,7 @@ kacpi_termarg* kacpi_gettermarg(uint64_t *parent)
             default:
                 termarg = kmem_kalloc(9);
                 ptr = (uint64_t *)termarg->data;
-                kacpi_expression *expression = kacpi_getexpression(parent);
-                *ptr = (uint64_t)expression;
+                *ptr = (uint64_t)kacpi_getexpression(parent);
                 termarg->type = 0xF0;
                 break;
         }
@@ -822,7 +1133,7 @@ kacpi_datarefobj* kacpi_getdatarefobj()
                 varpackage->pkglength - distance, kacpi_termarginteger(varpackage->varnumelements));
             break;
         default:
-            kdebug_outf(" uhgdro %x", *aml_ptr);
+            //kdebug_outf(" uhgdro %x", *aml_ptr);
             break;
     }
 
@@ -836,7 +1147,7 @@ uint64_t* kacpi_getpackageelementlist(uint32_t length, uint32_t elements)
     uint64_t end = (uint64_t)aml_ptr + length;
     uint32_t counted = 0;
 
-    kdebug_outf("\nPEL: length%x", length);
+    //kdebug_outf("\nPEL: length%x", length);
 
     if (length > 0)
     {
@@ -858,14 +1169,14 @@ uint64_t* kacpi_getpackageelementlist(uint32_t length, uint32_t elements)
             {
                 packageelement->type = 0;
                 packageelement->value = (uint64_t)datarefobj;
-                kdebug_outf(" datarefobj");
+                //kdebug_outf(" datarefobj");
                 aml_ptr++;
             }
             else
             {
                 packageelement->type = 1;
                 packageelement->value = (uint64_t)kacpi_getnamestring();
-                kdebug_outf(" namestring");
+                //kdebug_outf(" namestring");
                 aml_ptr++;
             }
 
@@ -889,7 +1200,7 @@ uint64_t* kacpi_getpackageelementlist(uint32_t length, uint32_t elements)
         packageelement->value = elements - counted;
     }
     aml_ptr = (uint8_t *)end - 1;
-    kdebug_outf("\n");
+    //kdebug_outf("\n");
 
     return packageelementlist;
 }
@@ -1212,8 +1523,13 @@ void kacpi_printtermarg(kacpi_termarg *termarg)
                 kdebug_outf(" < ");
                 kacpi_printtermarg((kacpi_termarg *)(*(uint64_t *)&data[8]));
                 break;
+            case 0xFC:
+                kdebug_outf(" FR(");
+                kacpi_printnamestring((kacpi_namestring *)(*(uint64_t *)&data[0]));
+                kdebug_outf(")");
+                break;
             case 0xFD:
-                kdebug_outf("Field(");
+                kdebug_outf(" R(");
                 kacpi_printnamestring((kacpi_namestring *)(*(uint64_t *)&data[0]));
                 kdebug_outf(")");
                 break;
@@ -1373,7 +1689,7 @@ void kacpi_printtermlistentry(kacpi_expression *obj)
             kdebug_outf("method");
             depth++;
             kacpi_printnamestring(method->namestring);
-            kdebug_outf(" flags %x", method->methodflags);
+            kdebug_outf(" flags %x args %x", method->methodflags, method->methodflags & 0b111);
             kacpi_printtermlist(method->termlist);
             break;
         case 0x5B:
@@ -1557,8 +1873,14 @@ void kacpi_printtermlistentry(kacpi_expression *obj)
             kdebug_outf("break");
             depth++;
             break;
+        case 0xFC:
+            kdebug_outf(" FR(");
+            kacpi_printnamestring((kacpi_namestring *)(*(uint64_t *)&obj->data[0]));
+            kdebug_outf(")");
+            depth++;
+            break;
         case 0xFD:
-            kdebug_outf("Field(");
+            kdebug_outf(" R(");
             kacpi_printnamestring((kacpi_namestring *)(*(uint64_t *)&obj->data[0]));
             kdebug_outf(")");
             depth++;
@@ -1622,14 +1944,10 @@ void kacpi_printscope(kacpi_defscope *defscope)
 void kacpi_parseaml(uint8_t *aml, size_t length)
 {
     aml_ptr = aml;
-    kdebug_outf("\r\nkacpi: parsing aml, %x %x", (uintptr_t)aml_ptr, (uintptr_t)aml_ptr + 5);
+    kdebug_outf("\r\nkacpi: parsing aml");
 
-    kacpi_gettermlist(length, 0, &kacpi_dsdt);
+    kacpi_gettermlist(length, (uint64_t *)kacpi_dsdt, &kacpi_dsdt);
     kacpi_printtermlist(kacpi_dsdt);
-
-    //create real tree of scopes and devices
-    //not just a term list
-    // - this will solve method finding issue
 }
 
 void kacpi_processdsdt(acpi_dsdt *dsdt)
