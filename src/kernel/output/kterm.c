@@ -7,6 +7,7 @@
 
 #include <output/screen.h>
 
+#include <x86_64/acpi/acpi.h>
 #include <x86_64/pci.h>
 #include <x86_64/pit.h>
 
@@ -61,7 +62,12 @@ void kterm_run()
     }
     kterm_argv[kterm_argc] = 0;
 
-    if (str_cmp(kterm_argv[0], "clear") == 0)
+    if (str_cmp(kterm_argv[0], "acpi_tree") == 0)
+    {
+        kscreen_putf("\n All acpi named objects:\n");
+        kacpi_printdsdttree();
+    }
+    else if (str_cmp(kterm_argv[0], "clear") == 0)
     {
         kscreen_clr(default_color);
         kterm_header();
@@ -151,6 +157,7 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "help") == 0)
     {
         kscreen_putf("\nList of currently available commands:");
+        kscreen_putf("\n acpi_tree - lists all objects found in DSDT");
         kscreen_putf("\n clear - clears the screen");
         kscreen_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
         kscreen_putf("\n cpu_info - lists CPU model and capabilities");

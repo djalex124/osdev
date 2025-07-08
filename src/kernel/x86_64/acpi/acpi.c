@@ -1,4 +1,5 @@
 #include <x86_64/acpi/acpi.h>
+#include <x86_64/acpi/aml.h>
 
 #include <kernel/kstring.h>
 #include <kernel/debug.h>
@@ -139,5 +140,32 @@ void kacpi_init()
 
         kmem_unpage((uintptr_t)rsdt & 0xFFFFF000, rsdt_len);
         kmem_unpage((uintptr_t)table & 0xFFFFF000, 0x1000);
+    }
+}
+
+#include <output/screen.h>
+
+extern kacpi_tree *kacpi_systemtree;
+
+void kacpi_printdsdttree()
+{
+    if ((uint64_t)kacpi_systemtree == 0)
+    {
+        kscreen_putf("Failed to get systemtree from DSDT!");
+        return;
+    }
+
+    kacpi_tree *treeptr = kacpi_systemtree;
+    while ((uint64_t)treeptr)
+    {
+        kscreen_putf("[");
+        if (treeptr->names)
+        {
+            kscreen_putf("%4s", (char*)&treeptr->name[0]);
+            for (int i = 1; i < treeptr->names; i++)
+                kscreen_putf(".%4s", (char*)&treeptr->name[i * 4]);
+        }
+        kscreen_putf("]");
+        treeptr = (kacpi_tree *)treeptr->next;
     }
 }

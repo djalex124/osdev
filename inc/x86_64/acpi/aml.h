@@ -110,7 +110,17 @@ typedef struct
     kacpi_namestring* namestring;
     uint8_t fieldflags;
     kacpi_fieldlist* fieldlist;
-}__attribute__((packed)) kacpi_deffield;
+} kacpi_deffield;
+
+typedef struct
+{
+    uint8_t encodingvalue[2];
+    uint32_t pkglength;
+    kacpi_namestring* namestring1;
+    kacpi_namestring* namestring2;
+    uint8_t fieldflags;
+    kacpi_fieldlist* fieldlist;
+} kacpi_defindexfield;
 
 typedef struct
 {
@@ -256,6 +266,13 @@ typedef struct
 typedef struct
 {
     uint8_t encodingvalue[2];
+    kacpi_supername *supername;
+    kacpi_target *target;
+}__attribute__((packed)) kacpi_defcondrefof;
+
+typedef struct
+{
+    uint8_t encodingvalue[2];
     kacpi_termarg *buffpkgstrobj;
     kacpi_termarg *indexvalue;
     kacpi_target *target;
@@ -271,10 +288,25 @@ typedef struct
 typedef struct
 {
     uint8_t encodingvalue[2];
+    kacpi_termarg* operand;
+    kacpi_target* target;
+}__attribute__((packed)) kacpi_deffindsetxbit;
+
+typedef struct
+{
+    uint8_t encodingvalue[2];
     kacpi_termarg* operand1;
     kacpi_termarg* operand2;
     kacpi_target* target;
-}__attribute__((packed)) kacpi_defsubtract;
+}__attribute__((packed)) kacpi_defmathoperation;
+
+typedef struct
+{
+    uint8_t encodingvalue[2];
+    kacpi_termarg* data1;
+    kacpi_termarg* data2;
+    kacpi_target* target;
+}__attribute__((packed)) kacpi_defconcat, kacpi_defconcatres;
 
 typedef struct
 {
@@ -295,7 +327,7 @@ typedef struct
 {
     uint8_t encodingvalue[2];
     kacpi_supername *supername;
-}__attribute__((packed)) kacpi_defincrement;
+}__attribute__((packed)) kacpi_defincrement, kacpi_defdecrement;
 
 typedef struct
 {
@@ -318,7 +350,7 @@ typedef struct
     kacpi_termarg* buffer;
     kacpi_termarg* byteindex;
     kacpi_namestring* name;
-}__attribute__((packed)) kacpi_defcreatedwordfield;
+}__attribute__((packed)) kacpi_defcreatexwordfield;
 
 typedef struct
 {
@@ -342,7 +374,7 @@ kacpi_target* kacpi_gettarget(uint64_t *parent);
 
 void kacpi_printtarget(kacpi_target *target);
 void kacpi_printtermarg(kacpi_termarg *termarg);
-void kacpi_printfield(kacpi_fieldlist *fieldlist);
+void kacpi_printfield(kacpi_fieldlist *fieldlist, uint8_t fieldflags);
 void kacpi_printtermlist(kacpi_termlist *list);
 void kacpi_printtermlistentry(kacpi_expression *obj);
 void kacpi_printdatarefobj(kacpi_datarefobj *obj);

@@ -65,7 +65,19 @@ debug: drive/boot.efi drive/dbg_kernel.bin
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
 					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -s -serial stdio -smp 2
 
-image: drive/boot.efi
+image_run: drive/boot.efi drive/kernel.bin
+	dd if=/dev/zero of=bin/dev.img count=10 bs=1M
+	mkfs.vfat -F 16 bin/dev.img
+
+	mcopy -i bin/dev.img drive/kernel.bin ::/
+	mcopy -i bin/dev.img drive/boot.efi ::/
+	mcopy -i bin/dev.img drive/startup.nsh ::/
+
+	qemu-img convert -f raw -O qcow2 bin/dev.img bin/dev.qcow2
+	rm bin/dev.img
+
+image_debug: debug_flag += -DAQUA_DEBUG
+image_debug: drive/boot.efi drive/dbg_kernel.bin
 	dd if=/dev/zero of=bin/dev.img count=10 bs=1M
 	mkfs.vfat -F 16 bin/dev.img
 
