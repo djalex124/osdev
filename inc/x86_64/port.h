@@ -13,6 +13,17 @@ inline uint8_t inb(uint16_t p)
     return ret;
 }
 
+inline uint16_t inw(uint16_t p)
+{
+    uint16_t ret;
+    asm volatile (
+        "inw %1, %0"
+        : "=a"(ret)
+        : "Nd"(p)
+        : "memory");
+    return ret;
+}
+
 inline uint32_t inl(uint16_t p)
 {
     uint32_t ret;

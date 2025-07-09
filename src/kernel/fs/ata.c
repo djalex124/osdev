@@ -243,6 +243,7 @@ void kfs_patainit(kpci_device *ide_device)
                 kfs_patadrives[count].model[n + 1] = read_buffer[PATA_IDENT_MODEL + n];
             }
             kfs_patadrives[count].model[40] = 0;
+            str_trim(kfs_patadrives[count].model);
 
             kfs_atawrite(i, PATA_REG_COMMAND, 0xEC);
             ksleep(1);

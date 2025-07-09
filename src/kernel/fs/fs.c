@@ -59,27 +59,13 @@ void kfs_printread(uint8_t drive, size_t sector, size_t length)
     kmem_free(buffer, 1);
 }
 
-void kfs_printpata(kfs_patadrive *drive)
-{
-    kscreen_putf("\n PATA drive%d c%d", drive->drive, drive->channel);
-
-    int a = -1, b = 0;
-    char* trim = drive->model;
-    while (trim[b] != '\0')
-    {
-        if (trim[b] != ' ')
-            a = b;
-        b++;
-    }
-    trim[a + 1] = '\0';
-
-    kscreen_putf(" label [%s]", trim);
-}
-
 void kfs_printpartition(kfs_partition *part)
 {
     if (part->drive->drive_type == 1)
-        kfs_printpata((kfs_patadrive *)part->drive->drive_data);
+    {
+        kfs_patadrive *drive = (kfs_patadrive *)part->drive->drive_data;
+        kscreen_putf("\n PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
+    }
 
     if (part->fs == 1)
         kfs_readfat(part);
@@ -93,18 +79,7 @@ void kfs_printinfo()
         if (kfs_patadrives[i].exists)
         {
             uint64_t size = kfs_patadrives[i].sectors * kfs_patadrives[i].sector_size;
-            
-            int a = -1, b = 0;
-            char* trim = kfs_patadrives[i].model;
-            while (trim[b] != '\0')
-            {
-                if (trim[b] != ' ')
-                    a = b;
-                b++;
-            }
-            trim[a + 1] = '\0';
-
-            kscreen_putf("\n - device %d [%s] %d MB", i, trim, size / 1024 / 1024);
+            kscreen_putf("\n - device %d [%s] %d MB", i, kfs_patadrives[i].model, size / 1024 / 1024);
         }
     }
 }

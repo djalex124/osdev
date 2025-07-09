@@ -43,6 +43,21 @@ void* memcpy_ssealign(void* restrict dstptr, const void* restrict srcptr, size_t
     return dstptr;
 }
 
+char* str_trim(char* s)
+{
+    int a = -1, b = 0;
+    char* trim = s;
+    while (trim[b] != '\0')
+    {
+        if (trim[b] != ' ')
+            a = b;
+        b++;
+    }
+    trim[a + 1] = '\0';
+
+    return s;
+}
+
 size_t str_len(const char* s)
 {
     size_t len = 0;

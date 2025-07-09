@@ -107,6 +107,8 @@ void kterm_run()
             __cpuid(0x80000003, name[4], name[5], name[6], name[7]);
             __cpuid(0x80000004, name[8], name[9], name[10], name[11]);
             name[12] = 0;
+            
+            str_trim((char *)name);
             kscreen_putf(" Brand [%s]", name);
             kmem_free(name, 1);
         }
