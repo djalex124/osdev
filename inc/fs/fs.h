@@ -38,9 +38,11 @@ extern kfs_patadrive kfs_patadrives[4];
 int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, uint32_t addr);
 
 int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, uint32_t addr);
+int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, uint32_t addr);
 
 void kfs_detectfat(kfs_drive *drive);
 void kfs_readfat(kfs_partition *partition);
+uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_length);
 
 kfs_drive* kfs_patatest(kfs_patadrive *drive);
 
@@ -48,6 +50,7 @@ void kfs_patainit(kpci_device *ide_device);
 void kfs_satainit(kpci_device *ide_device);
 
 void kfs_printpartition(kfs_partition *part);
+void kfs_printreadfile(uint8_t drive, char *filename);
 void kfs_printread(uint8_t drive, size_t sector, size_t sector_end);
 void kfs_printinfo();
 

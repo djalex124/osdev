@@ -77,6 +77,13 @@ extern void ap_trampoline();
 void kacpi_aploop()
 {
     kacpi_apsrunning++;
+    while (!bsplock)
+        asm("hlt");
+
+    //from here the ap should be
+    //marked available for tasks
+    //(just halted for now)
+
     while (1)
         asm("hlt");
 }

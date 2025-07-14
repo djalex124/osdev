@@ -239,18 +239,17 @@ void kpci_confirmedfunction(uint8_t bus, uint8_t device, uint8_t func)
     kdebug_outf("\r\nkpci_i: PCI(B%xD%x) F%x V%x CLASS %2x:%2x", bus, device, func, ven, base, sub);
 #endif
 
-    if (kpci_table != NULL)
-        kpci_table = kmem_kalloc(sizeof(kpci_device));
+    kpci_table = kmem_kalloc(sizeof(kpci_device));
 
-    kpci_table[kpci_tablesize].bus = bus;
-    kpci_table[kpci_tablesize].device = device;
-    kpci_table[kpci_tablesize].function = func;
-    kpci_table[kpci_tablesize].class = base;
-    kpci_table[kpci_tablesize].subclass = sub;
-    kpci_table[kpci_tablesize].vendorid = ven;
-    
-    if (kpci_tablesize != 0)
-        kmem_kalloc(sizeof(kpci_device));
+    if ((uint64_t)k_infotable.kpci_table == 0)
+        k_infotable.kpci_table = kpci_table;
+
+    kpci_table->bus = bus;
+    kpci_table->device = device;
+    kpci_table->function = func;
+    kpci_table->class = base;
+    kpci_table->subclass = sub;
+    kpci_table->vendorid = ven;
 
     kpci_tablesize++;
 }
@@ -327,5 +326,4 @@ void kpci_init()
     kpci_checkall();
 
     k_infotable.kpci_tablesize = kpci_tablesize;
-    k_infotable.kpci_table = kpci_table;
 }

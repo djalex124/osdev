@@ -70,6 +70,108 @@ typedef struct
     uint8_t name3[4];
 }formatLFN;
 
+uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_length)
+{
+    uint8_t *fat = kmem_alloc(1);
+    fat16_info *info = (fat16_info *)partition->fs_data;
+
+    uint32_t lba_root_dir = info->startlba + info->fatoffset + (info->fatentrycount * info->fatsize);
+    kfs_readsector(partition->drive, lba_root_dir, 1, 1, (uint32_t)((uintptr_t)fat & 0xFFFFFFFF));
+
+    uint32_t index = 0;
+    char* tmp_string = 0;
+
+    uint8_t *findfile = 0;
+    while (fat[index] && index < 512)
+    {
+        if (fat[index] == 0xE5)
+        {
+            index += 32;
+            continue;
+        }
+        
+        if (fat[index + 11] == 0x0F)
+        {
+            formatLFN *lfn = (formatLFN *)&fat[index];
+            //kscreen_putf("\n LFN entry -");
+            //kscreen_putf(" index %x ", lfn->order);
+            if (tmp_string)
+            {
+                kmem_kalloc(13);
+                memcpy(tmp_string + 13, tmp_string, 13);
+            }
+            else
+                tmp_string = kmem_kalloc(13);
+            for (int i = 0; i < 5; i++)
+                tmp_string[i] = lfn->name[2 * i];
+            for (int i = 0; i < 6; i++)
+                tmp_string[i + 5] = lfn->name2[2 * i];
+            for (int i = 0; i < 2; i++)
+                tmp_string[i + 11] = lfn->name3[2 * i];
+        }
+        else
+        {
+            format83 *file = (format83 *)&fat[index];
+            if (file->attributes & 0x8 || file->attributes & 0x10)
+            {
+                index += 32;
+                continue;
+            }
+
+            uint8_t check = 0;
+
+            if (tmp_string)
+            {
+                if (strn_cmp(filename, tmp_string, str_len(tmp_string)) == 0)
+                {
+                    kscreen_putf("\nfound file %s", tmp_string);
+                    check = 1;
+                }
+                kmem_kfree(((str_len(tmp_string) + 12) / 13) * 13);
+                tmp_string = 0;
+            }
+            else
+            {
+                char *first = str_tok((char *)file->name, " ");
+                uint8_t length = str_len(first);
+                if (length > 8)
+                    length = 8;
+                if (strn_cmp(filename, (const char*)first, length) == 0
+                    && strn_cmp(filename + length + 1, (const char*)&file->name[8], 3) == 0)
+                {
+                    kscreen_putf("\nfound file %s", filename);
+                    check = 1;
+                }
+            }
+            
+            if (check)
+            {
+                if (file->size)
+                {
+                    uint32_t lba = (((file->first_cluster_higher << 16) + file->first_cluster_lower - 2) * info->sectorspercluster)
+                    + info->rootsize + lba_root_dir;
+
+                    *file_length = file->size;
+                    findfile = kmem_alloc((file->size + 0x1000 - 1) / 0x1000);
+
+                    kfs_read(partition, lba, file->size, 1, (uint32_t)((uintptr_t)findfile & 0xFFFFFFFF));
+                }
+                else
+                    kscreen_putf("\nempty file");
+
+                break;
+            }
+        }
+        index += 32;
+    }
+
+    kmem_free(fat, 1);
+
+    if ((uint64_t)findfile)
+        return findfile;
+    return 0;
+}
+
 void kfs_readfat(kfs_partition *partition)
 {
     uint8_t *buffer = kmem_alloc(1);
@@ -116,25 +218,39 @@ void kfs_readfat(kfs_partition *partition)
         {
             format83 *file = (format83 *)&buffer[index];
             kscreen_putf("\n");
+            uint8_t isfile = 0;
             if (file->attributes & 0x8)
                 kscreen_putf(" VOLUME_ID:");
             else if (file->attributes & 0x10)
                 kscreen_putf(" DIRECTORY:");
             else
-                kscreen_putf(" FILE:");
-            if (tmp_string)
             {
-                kscreen_putf(" LFN %s", tmp_string);
-                kmem_kfree(((str_len(tmp_string) + 12) / 13) * 13);
-                tmp_string = 0;
+                kscreen_putf(" FILE:");
+                isfile = 1;
+            }
+
+            if (isfile)
+            {
+                if (tmp_string)
+                {
+                    kscreen_putf(" LFN %s", tmp_string);
+                    kmem_kfree(((str_len(tmp_string) + 12) / 13) * 13);
+                    tmp_string = 0;
+                }
+                else
+                {
+                    char *first = str_tok((char *)file->name, " ");
+                    kscreen_putf(" %8s.%3s", first, (char *)&file->name[8]);
+                }
+                if (file->size)
+                    kscreen_putf(" SIZE: 0x%x bytes", file->size);
             }
             else
                 kscreen_putf(" %11s", file->name);
-            if (file->size)
-                kscreen_putf(" SIZE: 0x%x bytes", file->size);
+            
             uint32_t lba = (((file->first_cluster_higher << 16) + file->first_cluster_lower - 2) * info->sectorspercluster)
                 + info->rootsize + lba_root_dir;
-            kscreen_putf(" LBA: 0x%x", lba);
+            kscreen_putf(" LBA: %d", lba);
         }
         index += 32;
     }

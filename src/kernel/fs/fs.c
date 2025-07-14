@@ -15,6 +15,43 @@
 
 extern kfs_patadrive kfs_patadrives[4];
 
+void kfs_printreadfile(uint8_t partition, char *filename)
+{
+    if (partition > k_infotable.kfs_partitionsdetected)
+    {
+        kscreen_putf("\ninvalid partition number!");
+        return;
+    }
+    if ((uint64_t)filename == 0)
+    {
+        kscreen_putf("\nunable to parse file name!");
+        return;
+    }
+    
+    kfs_partition *selected_partition = k_infotable.kfs_partitions;
+    for (int i = 0; i < partition; i++)
+        selected_partition = (kfs_partition *)selected_partition->next;
+
+    size_t file_length = 0;
+    uint8_t *file = 0;
+    
+    if (selected_partition->fs == 1)
+        file = kfs_readfilefat(selected_partition, filename, &file_length);
+
+    if ((uint64_t)file)
+    {
+        kscreen_putf("\nhex output 0x%x bytes:\n", file_length);
+        int i;
+        for (i = 0; i < (file_length - 7); i += 8)
+            kscreen_putf("%2x%2x%2x%2x%2x%2x%2x%2x", 
+                file[i], file[i + 1], file[i + 2], file[i + 3], 
+                file[i + 4], file[i + 5], file[i + 6], file[i + 7]);
+        for (; i < file_length; i++)
+            kscreen_putf("%2x", file[i]);
+        kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
+    }
+}
+
 void kfs_printread(uint8_t drive, size_t sector, size_t length)
 {
     if (!kfs_patadrives[drive].exists)
@@ -43,7 +80,10 @@ void kfs_printread(uint8_t drive, size_t sector, size_t length)
         for (int i = 0; i < kfs_patadrives[drive].sector_size; i++)
         {
             if (buffer[i])
-                not_empty++;
+            {
+                not_empty = 1;
+                break;
+            }
         }
         if (not_empty)
         {
@@ -89,6 +129,25 @@ int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read,
     int result = 0;
     if (drive->drive_type == 1)
         result = kfs_atadma((kfs_patadrive *)drive->drive_data, lba, sec_count, read, addr);
+    return result;
+}
+
+int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, uint32_t addr)
+{
+    int result = 0;
+    if (partition->drive->drive_type == 1)
+    {
+        size_t sector_size = ((kfs_patadrive *)partition->drive->drive_data)->sector_size;
+        size_t sectors = (length + sector_size - 1) / sector_size;
+        kscreen_putf("\n%d sectors", sectors);
+        for (size_t sector = 0; sector < sectors; sector++)
+        {
+            result = kfs_readsector(partition->drive, lba + sector, 1, read, addr + (sector_size * sector));
+
+            if (result != 0)
+                return result;
+        }
+    }
     return result;
 }
 

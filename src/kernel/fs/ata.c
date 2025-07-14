@@ -328,6 +328,7 @@ int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read,
     outb(kfs_channel[drive->channel].bmide, inb(kfs_channel[drive->channel].bmide) | 1);
 
     kfs_atawrite(drive->channel, PATA_REG_CONTROL, 0);
+    ksleep(1); //give drive time to recieve command
 
     while (kfs_ataint[drive->channel] == 0)
         asm("hlt");
@@ -360,10 +361,7 @@ kfs_drive* kfs_patatest(kfs_patadrive *drive)
         kfs_channel[drive->channel].bmide, drive->sector_size);
     
     uint8_t *addr = kmem_alloc(1);
-    //kdebug_outf("\r\nkfs_test: addr %x", (uintptr_t)addr);
-    uint32_t buffer = (uint32_t)((uintptr_t)addr & 0xFFFFFFFF);
-    
-    int result = kfs_atadma(drive, 0, 1, 1, buffer);
+    int result = kfs_atadma(drive, 0, 1, 1, (uint32_t)((uintptr_t)addr & 0xFFFFFFFF));
 
     if (!result)
     {

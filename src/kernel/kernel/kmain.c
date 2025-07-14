@@ -23,13 +23,6 @@
 
 #include <fs/fs.h>
 
-void khalt(void)
-{
-    kdebug_outf("\r\nkhalt: halting indefinitely!");
-    while(1)
-        asm("hlt");
-}
-
 boot_table k_boottable;
 info_table k_infotable;
 
@@ -67,16 +60,22 @@ void kmain(boot_table *table)
     Things to still add
 
     - ACPI decoding
-        - AML (DSDT)
+        - Simple power management
         - PCI device support
             - USB support
-    - Halt and Catch Fire for all processors
-    - Threads
-    - Processes
+    - Switch to APIC for interrupts/timers
+        - Get current time from RTC
+    - Scheduling
+        - Mutexes, Semaphores, etc
+        - Threads
+        - Processes
     - ELF Support
+    - Syscalls
+        - Memory management
+        - Screen Printing (until real desktop)
     
     */
 
     //Should be unreachable...
-    khalt();
+    kcrash("Reached end of kernel!");
 }

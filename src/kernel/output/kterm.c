@@ -23,12 +23,12 @@
 
 #define kterm_titletext "[AQUA Kernel (" AQUA_VER_STRING ")] - [Built " __TIME__" "__DATE__ " Central Time]"
 
-static kscreen_pos kterm_pos;
-static char kterm_buffer[kterm_buffersize];
-static uint8_t kterm_bufferindex = 0;
+kscreen_pos kterm_pos;
+char kterm_buffer[kterm_buffersize];
+uint8_t kterm_bufferindex = 0;
 
-static char *kterm_argv[kterm_maxargs];
-static unsigned int kterm_argc;
+char *kterm_argv[kterm_maxargs];
+unsigned int kterm_argc;
 
 uint32_t kterm_fg = 0xC5C5C5;
 uint32_t kterm_bg = default_color;
@@ -170,6 +170,7 @@ void kterm_run()
         kscreen_putf("\n mem_info - prints current memory usage");
         kscreen_putf("\n pci_info - prints pci busses and devices");
         kscreen_putf("\n read [drive] [starting sector] [sectors] - attempt read of given number of sectors on selected drive");
+        kscreen_putf("\n read_file [filename] [partition] - attempt read of file on selected partition");
         kscreen_putf("\n test - test random features");
         kscreen_putf("\n test_mouse - tests ps2 mouse input");
         kscreen_putf("\n wait [num1] - wait given number of seconds");
@@ -208,6 +209,21 @@ void kterm_run()
         if (kterm_argv[3])
             c = str_atoi(kterm_argv[3]);
         kfs_printread(a, b, c);
+    }
+    else if (str_cmp(kterm_argv[0], "read_file") == 0)
+    {
+        if (kterm_argc < 3)
+        {
+            kscreen_putf("\nNot enough arguments.");
+            return;
+        }
+        char *filename = 0;
+        uint64_t part = 0;
+        if (kterm_argv[1])
+            filename = kterm_argv[1];
+        if (kterm_argv[2])
+            part = str_atoi(kterm_argv[2]);
+        kfs_printreadfile(part, filename);
     }
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {
@@ -259,10 +275,21 @@ char *kterm_prompt = "aqua >";
 extern unsigned int cw;
 extern unsigned int ch;
 
+inline void kterm_prevtermpos()
+{
+    if (kterm_pos.x == 0)
+    {
+        kterm_pos.y--;
+        kterm_pos.x = cw - 1;
+    }
+    else
+        kterm_pos.x--;
+}
+
 void kterm_processinput()
 {
     char key = kkeyboard_keymapUSqwerty[kterm_next->scancode];
-    if (key == 0)
+    if (key == 0 || kterm_next->pressed == 0)
         return;
 
     switch (key)
@@ -273,21 +300,21 @@ void kterm_processinput()
         case '\b':
             if (kterm_bufferindex)
             {
-                if (kterm_pos.x == 0)
-                {
-                    kterm_pos.y--;
-                    kterm_pos.x = cw - 1;
-                }
-                else
-                    kterm_pos.x--;
+                kterm_prevtermpos();
+                kscreen_pos p = kterm_pos;
+                kterm_prevtermpos();
                 kscreen_setpos(kterm_pos);
-                kscreen_putf(" ");
-                kscreen_setpos(kterm_pos);
+                kscreen_putf("%c ", 128);
+                kscreen_setpos(p);
                 kterm_bufferindex--;
                 kterm_buffer[kterm_bufferindex] = 0;
             }
             break;
         case '\r':
+            kterm_prevtermpos();
+            kscreen_setpos(kterm_pos);
+            kscreen_putf(" ");
+            kscreen_setpos(kterm_pos);
             kterm_run();
             memset(kterm_argv, 0, sizeof(kterm_argv));
             kterm_argc = 0;
@@ -296,11 +323,12 @@ void kterm_processinput()
             kterm_pos = kscreen_getpos();
             if (kterm_pos.x != 0 && kterm_pos.y != ch)
                 kscreen_putf("\n");
-            kscreen_putf("%s", kterm_prompt);
+            kscreen_putf("%s%c", kterm_prompt, 128);
             break;
         default:
             if (kterm_bufferindex == kterm_buffersize - 1)
                 break;
+            kterm_prevtermpos();
             kscreen_setpos(kterm_pos);
             uint8_t upper = 0;
             if (key >= 'a' && key <= 'z')
@@ -312,7 +340,7 @@ void kterm_processinput()
                 upper = 1;
             if (upper)
                 key = kkeyboard_keymapUSqwerty_upper[kterm_next->scancode];
-            kscreen_putf("%c", key);
+            kscreen_putf("%c%c", key, 128);
             kterm_buffer[kterm_bufferindex] = key;
             kterm_bufferindex++;
             break;
@@ -341,7 +369,7 @@ void kterm_init()
     kkeyboard_setinput(*kterm_input);
     kscreen_putf("\nWelcome to ConcatenOS!");
     kscreen_putf("\nTo get started, run 'help' for a list of commands.");
-    kscreen_putf("\n%s", kterm_prompt);
+    kscreen_putf("\n%s%c", kterm_prompt, 128);
     kterm_pos = kscreen_getpos();
     kscreen_copy();
 }

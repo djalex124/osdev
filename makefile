@@ -30,6 +30,7 @@ drive/dbg_kernel.bin: $(obj) bin/link.ld
 	@echo $$(($$(cat build.txt) + 1)) > build.txt
 	@$(gcc) $(kernel_link) $(obj) -o drive/kernel.bin -nostdlib -lgcc
 	@objcopy --only-keep-debug drive/kernel.bin bin/kernel.map
+	@objcopy --strip-debug drive/kernel.bin
 	@cp bin/kernel.map drive/kernel.map
 
 obj/%.o: src/%.c 
@@ -43,7 +44,7 @@ obj/%.o: src/%.S
 efi_cc := /usr/bin/gcc
 
 gnu_efi_inc := /usr/include/efi
-gnu_efi_lib := /usr/lib
+gnu_efi_lib := /usr/lib64
 
 drive/boot.efi:
 	gcc $(debug_flag) -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o src/boot/uefiboot.o

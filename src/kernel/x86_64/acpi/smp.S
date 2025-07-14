@@ -40,12 +40,10 @@ ap_gdtp:
 
     lgdt 0x8030
 
-    ljmp $0x8, $0x8108
+    ljmp $0x8, $0x8100
 
 .code64
     .align 0x100
-count:
-    .quad 0
 long_mode:
     mov $0x10, %ax
     mov %ax, %ds
@@ -75,14 +73,6 @@ long_mode:
     addq %rax, %rbx
 
     movq %rbx, %rsp
-
-.extern bsplock
-
-1:  pause
-    movabs bsplock, %rax
-    cmp $0, %rax
-    jz 1b
-    lock incq 0x8100
 
 .extern kacpi_aploop
     movabsq $kacpi_aploop, %rax

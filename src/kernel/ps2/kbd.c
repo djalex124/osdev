@@ -69,24 +69,28 @@ void kkeyboard_interrupt()
                 break;
             case 0x9D:
                 keyboard_state.lctrl = 0;
+                keyboard_state.pressed = 0;
                 break;
             case 0x2A:
                 keyboard_state.lshift = 1;
                 break;
             case 0xAA:
                 keyboard_state.lshift = 0;
+                keyboard_state.pressed = 0;
                 break;
             case 0x36:
                 keyboard_state.rshift = 1;
                 break;
             case 0xB6:
                 keyboard_state.rshift = 0;
+                keyboard_state.pressed = 0;
                 break;
             case 0x38:
                 keyboard_state.lalt = 1;
                 break;
             case 0xB8:
                 keyboard_state.lalt = 0;
+                keyboard_state.pressed = 0;
                 break;
             case 0x3A:
                 keyboard_state.capslk ^= 1;
@@ -97,20 +101,18 @@ void kkeyboard_interrupt()
             case 0x46:
                 keyboard_state.scrlk ^= 1;
                 break;
+            default:
+                if (scan > 0x80 && kkeyboard_keymapUSqwerty[released(scan)])
+                    keyboard_state.pressed = 0;
+                else if (scan < 0x80 && kkeyboard_keymapUSqwerty[scan])
+                    keyboard_state.pressed = 1;
+                break;
         }
-
-        if (scan > 0x80 && kkeyboard_keymapUSqwerty[released(scan)])
-            keyboard_state.pressed = 0;
-        //    kscreen_putf("kkeyboard_interrupt: released [%c]", kkeyboard_keymapUSqwerty[released(scan)]);
-        else if (scan < 0x80 && kkeyboard_keymapUSqwerty[scan])
-            keyboard_state.pressed = 1;
-        //    kscreen_putf("kkeyboard_interrupt: pressed  [%c]", kkeyboard_keymapUSqwerty[scan]);
     }
 
     keyboard_state.scancode = scan;
 
-    if (keyboard_state.pressed)
-        kkeyboard_input(&keyboard_state);
+    kkeyboard_input(&keyboard_state);
 }
 
 void kkeyboard_init()
