@@ -2,13 +2,18 @@
 ##### Forgive the poor name. Even I forgot why I chose that as the name...
 
 
-This project OS is the result of a few years of aimless
-tinkering around osdev project ideas.
+This OS project is the result of a few years of aimless tinkering around osdev project ideas.
 
-Current look of the OS so far:
-![Screenshot_20250302_201959](https://github.com/user-attachments/assets/40baaa71-0fdf-4be3-8a70-3c934f514b31)
+Here's the current look of the OS:
 
-Built on top of the (made-up) AQUA kernel, the OS
-has the primary goal of eventually self-hosting.
+<img width="1024" height="768" alt="VirtualBox_concatenOS test_13_07_2025_23_39_29" src="https://github.com/user-attachments/assets/35b4f4a7-a7cf-4212-9bbd-f5b2ba6703b2" title=" concatenOS running in VirtualBox "/>
 
-Support for USB and ACPI are on the way.
+
+Built on top of the (made-up) AQUA kernel,
+concatenOS has the primary goal of self-hosting.
+
+Current goals include:
+- USB
+- ACPI Power Management
+- Scheduling/Tasks/Processes
+- Userland
