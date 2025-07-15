@@ -3,6 +3,7 @@
 #include <kernel/kstring.h>
 #include <kernel/kernel.h>
 #include <kernel/debug.h>
+#include <kernel/crash.h>
 
 #include <output/screen.h>
 
@@ -17,7 +18,7 @@ extern kfs_patadrive kfs_patadrives[4];
 
 void kfs_printreadfile(uint8_t partition, char *filename)
 {
-    if (partition > k_infotable.kfs_partitionsdetected)
+    if ((uint64_t)k_infotable.kfs_partitions[partition] == 0)
     {
         kscreen_putf("\ninvalid partition number!");
         return;
@@ -28,9 +29,7 @@ void kfs_printreadfile(uint8_t partition, char *filename)
         return;
     }
     
-    kfs_partition *selected_partition = k_infotable.kfs_partitions;
-    for (int i = 0; i < partition; i++)
-        selected_partition = (kfs_partition *)selected_partition->next;
+    kfs_partition *selected_partition = k_infotable.kfs_partitions[partition];
 
     size_t file_length = 0;
     uint8_t *file = 0;
@@ -50,6 +49,8 @@ void kfs_printreadfile(uint8_t partition, char *filename)
             kscreen_putf("%2x", file[i]);
         kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
     }
+    else
+        kscreen_putf("\nfile not found!");
 }
 
 void kfs_printread(uint8_t drive, size_t sector, size_t length)
@@ -104,7 +105,7 @@ void kfs_printpartition(kfs_partition *part)
     if (part->drive->drive_type == 1)
     {
         kfs_patadrive *drive = (kfs_patadrive *)part->drive->drive_data;
-        kscreen_putf("\n PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
+        kscreen_putf("\n  PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
     }
 
     if (part->fs == 1)
@@ -153,42 +154,35 @@ int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, 
 
 void kfs_addpartition(kfs_partition* partition)
 {
-    kfs_partition* ptr = k_infotable.kfs_partitions;
     kdebug_outf("\nkfs_addp: adding");
 
-    if (k_infotable.kfs_partitionsdetected == 0)
-        k_infotable.kfs_partitions = partition;
-    else
+    for (int i = 0; i < 15; i++)
     {
-        for (int i = 0; i < k_infotable.kfs_partitionsdetected; i++)
+        if (k_infotable.kfs_partitions[i] == 0)
         {
-            if ((uintptr_t)ptr->next == 0)
-            {
-                ptr->next = (uint8_t *)partition;
-                break;
-            }
-            ptr = (kfs_partition *)ptr->next;
+            k_infotable.kfs_partitions[i] = partition;
+            break;
         }
     }
 
-    k_infotable.kfs_partitionsdetected++;
+    kdebug_outf("\nkfs: failed to add partition!");
 }
 
 void kfs_removepartition(kfs_partition* partition)
 {
-    kfs_partition* ptr = k_infotable.kfs_partitions;
     kdebug_outf("\nkfs_remp: removing");
-    for (int i = 0; i < k_infotable.kfs_partitionsdetected; i++)
+
+    for (int i = 0; i < 15; i++)
     {
-        if ((uintptr_t)partition == (uintptr_t)ptr->next)
+        kfs_partition* ptr = k_infotable.kfs_partitions[i];
+        if ((uintptr_t)partition == (uintptr_t)ptr)
         {
-            k_infotable.kfs_partitionsdetected--;
-            ptr->next = partition->next;
+            k_infotable.kfs_partitions[i] = 0;
             break;
         }
-        ptr = (kfs_partition *)ptr->next;
     }
-    //if this loop ends, partition not found
+    
+    kdebug_outf("\nkfs: failed to removed partition!");
 }
 
 void kfs_init()

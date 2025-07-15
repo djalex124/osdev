@@ -28,8 +28,7 @@ typedef struct {
     // 1 = fat16
     kfs_drive *drive;
     uint8_t *fs_data;
-    uint8_t *next;
-} kfs_partition;
+}__attribute__((packed)) kfs_partition;
 
 #ifndef ata_file
 extern kfs_patadrive kfs_patadrives[4];

@@ -53,8 +53,7 @@ typedef struct {
 
     kmem_stack *kmem_table;
 
-    size_t kfs_partitionsdetected;
-    kfs_partition *kfs_partitions;
+    kfs_partition *kfs_partitions[16];
 } info_table;
 
 #ifndef kernel_file

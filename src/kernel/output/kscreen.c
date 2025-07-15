@@ -93,6 +93,16 @@ void kscreen_scroll()
     cy--;
 }
 
+inline void kscreen_next()
+{
+    if (++cx == cw)
+    {
+        cx = 0;
+        if (++cy == ch)
+            kscreen_scroll();
+    }
+}
+
 void kscreen_printc(uint16_t c)
 {
     if (c == '\r')
@@ -112,12 +122,7 @@ void kscreen_printc(uint16_t c)
     else
         kscreen_putc(c);
     
-    if (++cx == cw)
-    {
-        cx = 0;
-        if (++cy == ch)
-            kscreen_scroll();
-    }
+    kscreen_next();
 }
 
 void kscreen_prints(char* s)
@@ -200,7 +205,8 @@ void kscreen_putf(const char *fmt, ...)
                 c = va_arg(arg, int);
                 if (c == 0)
                     break;
-                kscreen_printc(c);
+                kscreen_putc(c);
+                kscreen_next();
                 break;
             case 'b':
                 unsign = va_arg(arg, uint64_t);

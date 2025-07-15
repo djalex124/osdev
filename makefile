@@ -44,7 +44,12 @@ obj/%.o: src/%.S
 efi_cc := /usr/bin/gcc
 
 gnu_efi_inc := /usr/include/efi
+
+ifneq (,$(wildcard /usr/lib/crt0-efi-x86_64.o))
+gnu_efi_lib := /usr/lib
+else ifneq (,$(wildcard /usr/lib64/crt0-efi-x86_64.o))
 gnu_efi_lib := /usr/lib64
+endif
 
 drive/boot.efi:
 	gcc $(debug_flag) -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o src/boot/uefiboot.o
