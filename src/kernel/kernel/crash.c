@@ -129,6 +129,86 @@ uint8_t kcrash_sleb128(uint8_t* num, int64_t* value)
 char kcrash_file[128];
 char kcrash_string[64];
 
+/*
+const char* kdbg_tags[] =
+{
+    "null", "TAG_array_type", "TAG_class_type", "TAG_entry_point",
+    "TAG_enumeration_type", "TAG_formal_parameter", "resv", "resv",
+    "TAG_imported_declaration", "resv", "TAG_label", "TAG_lexical_block",
+    "resv", "TAG_member", "resv", "TAG_pointer_type",
+    "TAG_reference_type", "TAG_compile_unit", "TAG_string_type", "TAG_structure_type",
+    "resv", "TAG_subroutine_type", "TAG_typedef", "TAG_union_type",
+    "TAG_unspecified_parameters", "TAG_variant", "TAG_common_block", "TAG_common_inclusion",
+    "TAG_inheritance", "TAG_inlined_subroutine", "TAG_module", "TAG_ptr_to_member_type",
+    "TAG_set_type", "TAG_subrange_type", "TAG_with_stmt", "TAG_access_declaration",
+    "TAG_base_type", "TAG_catch_block", "TAG_const_type", "TAG_constant",
+    "TAG_enumerator", "TAG_file_type", "TAG_friend", "TAG_namelist",
+    "TAG_namelist_item", "TAG_packed_type", "TAG_subprogram", "TAG_template_type_parameter",
+    "TAG_template_value_parameter", "TAG_try_block", "TAG_variant_part", "TAG_variable",
+    "TAG_volatile_type", "TAG_dwarf_procedure", "TAG_restrict_type", "TAG_interface_type",
+    "TAG_namespace", "TAG_imported_module", "TAG_unspecified_type", "TAG_partial_unit",
+    "TAG_imported_unit", "resv", "TAG_condition", "TAG_shared_type",
+    "TAG_type_unit", "TAG_rvalue_reference_type", "TAG_template_alias", "TAG_coarray_type",
+    "TAG_generic_subrange", "TAG_dynamic_type", "TAG_atomic_type", "TAG_call_site",
+    "TAG_call_site_parameter", "TAG_skeleton_unit", "TAG_immutable_type",
+};
+
+const char* kdbg_forms[] =
+{
+    "null", "FORM_addr", "resv", "FORM_block2",
+    "FORM_block4", "FORM_data2", "FORM_data4", "FORM_data8",
+    "FORM_string", "FORM_block", "FORM_block1", "FORM_data1",
+    "FORM_flag", "FORM_sdata", "FORM_strp", "FORM_udata",
+    "FORM_ref_addr", "FORM_ref1", "FORM_ref2", "FORM_ref4",
+    "FORM_ref8", "FORM_ref_udata", "FORM_indirect", "FORM_sec_offset",
+    "FORM_exprloc", "FORM_flag_present", "FORM_strx", "FORM_addrx",
+    "FORM_ref_sup4", "FORM_strp_sup", "FORM_data16", "FORM_line_strp",
+    "FORM_ref_sig8", "FORM_implicit_const", "FORM_loclistx", "FORM_rnglistx",
+    "FORM_ref_sup8", "FORM_strx1", "FORM_strx2", "FORM_strx3",
+    "FORM_strx4", "FORM_addrx1", "FORM_addrx2", "FORM_addrx3",
+    "FORM_addrx4"
+};
+
+const char* kdbg_ats[] =
+{
+    "null", "AT_sibling", "AT_location", "AT_name",
+    "resv", "resv", "resv", "resv",
+    "resv", "AT_ordering", "resv", "AT_byte_size",
+    "resv", "AT_bit_size", "resv", "resv",
+    "AT_stmt_list", "AT_low_pc", "AT_high_pc", "AT_language",
+    "resv", "AT_discr", "AT_discr_value", "AT_visibility",
+    "AT_import", "AT_string_length", "AT_common_reference", "AT_comp_dir",
+    "AT_const_value", "AT_containing_type", "AT_default_value", "resv",
+    "AT_inline", "AT_is_optional", "AT_lower_bound", "resv",
+    "resv", "AT_producer", "resv", "AT_prototyped",
+    "resv", "resv", "AT_return_addr", "resv",
+    "AT_start_scope", "resv", "AT_bit_stride", "AT_upper_bound", "resv",
+    "AT_abstract_origin", "AT_accessibility", "AT_address_class", "AT_artificial",
+    "AT_base_types", "AT_calling_convention", "AT_count", "AT_data_member_location",
+    "AT_decl_column", "AT_decl_file", "AT_decl_line", "AT_declaration",
+    "AT_discr_list", "AT_encoding", "AT_external", "AT_frame_base",
+    "AT_friend", "AT_identifier_case", "resv", "AT_namelist_item",
+    "AT_priority", "AT_segment", "AT_specification", "AT_static_link",
+    "AT_type", "AT_use_location", "AT_variable_parameter", "AT_virtuality",
+    "AT_vtable_elem_location", "AT_allocated", "AT_associated", "AT_data_location",
+    "AT_byte_stride", "AT_entry_pc", "AT_use_UTF8", "AT_extension", "AT_ranges",
+    "AT_trampoline", "AT_call_column", "AT_call_file", "AT_call_line",
+    "AT_description", "AT_binary_scale", "AT_decimal_scale", "AT_small",
+    "AT_decimal_sign", "AT_digit_count", "AT_picture_string", "AT_mutable",
+    "AT_threads_scaled", "AT_explicit", "AT_object_pointer", "AT_endianity",
+    "AT_elemental", "AT_pure", "AT_recursive", "AT_signature",
+    "AT_main_subprogram", "AT_data_bit_offset", "AT_const_expr", "AT_enum_class",
+    "AT_linkage_name", "AT_string_length_bit_size", "AT_string_length_byte_size", "AT_rank",
+    "AT_str_offsets_base", "AT_addr_base", "AT_rnglists_base", "resv",
+    "AT_dwo_name", "AT_reference", "AT_rvalue_reference", "AT_macros",
+    "AT_call_all_calls", "AT_call_all_source_calls", "AT_all_tail_calls", "AT_call_return_pc",
+    "AT_call_value", "AT_call_origin", "AT_call_parameter", "AT_call_pc",
+    "AT_call_tail_call", "AT_call_target", "AT_call_target_clobbered", "AT_call_data_location",
+    "AT_call_data_value", "AT_noreturn", "AT_alignment", "AT_export_symbols",
+    "AT_deleted", "AT_defaulted", "AT_loclists_base",
+};
+*/
+
 void kcrash_checkcu(uint64_t compunit, uint64_t rip)
 {
     compilation_unit *cu = (compilation_unit *)compunit;
@@ -156,6 +236,9 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
             block = (abbrev_block *)abbrev_pointer;
             size = 0;
 
+            //if (abbrev_check == block->type)
+            //    kdebug_outf("\nkdbg: <%x><%x>: Abbrev Num %d (%s)", level, (uint64_t)pointer - debug_info, abbrev_check, kdbg_tags[block->tag]);
+
             if ((abbrev_check == block->type) && (block->children == 1))
                 level++;
             
@@ -171,8 +254,8 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
                 else if (block->data[index] == 0x21)
                     index += 2;
 
-                if (block->data[index] == 0 && block->data[index + 1] != 0)
-                    index++;
+                //if (abbrev_check == block->type)
+                //    kdebug_outf("\r\nkdbg:   <%x>  %s", (uint64_t)pointer + size - debug_info, kdbg_ats[block->data[index]]);
                 
                 uint8_t type = block->data[index + 1];
                 switch (type)
@@ -295,8 +378,8 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
                         break;
                     case 0xD:
                     case 0x21:
-                        index++;
-                        leb_size = kcrash_sleb128(&block->data[index + 1], &sleb_num);
+                        leb_size = kcrash_sleb128(&block->data[index + 2], &sleb_num);
+                        index += leb_size;
                         if (abbrev_check == block->type &&
                             block->tag == 0x2E)
                         {
