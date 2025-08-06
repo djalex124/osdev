@@ -68,10 +68,13 @@ size_t str_len(const char* s)
 
 int strn_cmp(const char* a, const char* b, size_t n)
 {
-	for (size_t s = 0; s < n; s++)
-    {
-        if (a[s] != b[s])
-            return a[s] - b[s];
+    if ((uint64_t)a && (uint64_t)b)
+	{
+        for (size_t s = 0; s < n; s++)
+        {
+            if (a[s] != b[s])
+                return a[s] - b[s];
+        }
     }
     return 0;
 }

@@ -62,12 +62,7 @@ void kterm_run()
     }
     kterm_argv[kterm_argc] = 0;
 
-    if (str_cmp(kterm_argv[0], "acpi_tree") == 0)
-    {
-        kscreen_putf("\n All acpi named objects:\n");
-        kacpi_printdsdttree();
-    }
-    else if (str_cmp(kterm_argv[0], "clear") == 0)
+    if (str_cmp(kterm_argv[0], "clear") == 0)
     {
         kscreen_clr(default_color);
         kterm_header();
@@ -160,7 +155,6 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "help") == 0)
     {
         kscreen_putf("\nList of currently available commands:");
-        kscreen_putf("\n acpi_tree - lists all objects found in DSDT");
         kscreen_putf("\n clear - clears the screen");
         kscreen_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
         kscreen_putf("\n cpu_info - lists CPU model and capabilities");
@@ -172,6 +166,7 @@ void kterm_run()
         kscreen_putf("\n pci_info - prints pci busses and devices");
         kscreen_putf("\n read [drive] [starting sector] [sectors] - attempt read of given number of sectors on selected drive");
         kscreen_putf("\n read_file [filename] [partition] - attempt read of file on selected partition");
+        kscreen_putf("\n shutdown - attempts acpi shutdown");
         kscreen_putf("\n test - test random features");
         kscreen_putf("\n test_mouse - tests ps2 mouse input");
         kscreen_putf("\n wait [num1] - wait given number of seconds");
@@ -225,6 +220,11 @@ void kterm_run()
         if (kterm_argv[2])
             part = str_atoi(kterm_argv[2]);
         kfs_printreadfile(part, filename);
+    }
+    else if (str_cmp(kterm_argv[0], "shutdown") == 0)
+    {
+        kscreen_putf("\nTrying to shutdown from ACPI...");
+        kacpi_shutdown();
     }
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {

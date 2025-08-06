@@ -49,14 +49,13 @@ EFI_STATUS load_graphics()
     assert(s);
 
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *gop_info;
-    UINTN gop_info_size, mode_num, mode_native;
+    UINTN gop_info_size, mode_native;
     s = uefi_call_wrapper(gop->QueryMode, 4, gop, 
         gop->Mode==NULL?0:gop->Mode->Mode, &gop_info_size, &gop_info);
     if (s == EFI_NOT_STARTED)
         s = uefi_call_wrapper(gop->SetMode, 2, gop, 0);
     assert(s);
     mode_native = gop->Mode->Mode;
-    mode_num = gop->Mode->MaxMode;
 
     s = uefi_call_wrapper(gop->SetMode, 2, gop, mode_native);
     assert(s);

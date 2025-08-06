@@ -153,4 +153,4 @@ typedef struct
 void kacpi_processapic(acpi_madt *madt);
 void kacpi_processdsdt(acpi_dsdt *dsdt);
 
-void kacpi_printdsdttree();
+void kacpi_shutdown();

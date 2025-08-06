@@ -1,5 +1,6 @@
 #include <x86_64/acpi/acpi.h>
-#include <x86_64/acpi/aml.h>
+
+#include <x86_64/port.h>
 
 #include <kernel/kstring.h>
 #include <kernel/debug.h>
@@ -56,8 +57,6 @@ void kacpi_processtable(acpi_sdt_header *h)
             kacpi_fail(__LINE__);
         else if (kacpi_sdtchecksum((acpi_sdt_header *)dsdt) != 0)
             kacpi_fail(__LINE__);
-
-        kacpi_processdsdt(dsdt);
         
         kmem_unpage((uintptr_t)dsdt & 0xFFFFF000, dsdt_len);
 
@@ -145,27 +144,7 @@ void kacpi_init()
 
 #include <output/screen.h>
 
-extern kacpi_tree *kacpi_systemtree;
-
-void kacpi_printdsdttree()
+void kacpi_shutdown()
 {
-    if ((uint64_t)kacpi_systemtree == 0)
-    {
-        kscreen_putf("Failed to get systemtree from DSDT!");
-        return;
-    }
-
-    kacpi_tree *treeptr = kacpi_systemtree;
-    while ((uint64_t)treeptr)
-    {
-        kscreen_putf("[");
-        if (treeptr->names)
-        {
-            kscreen_putf("%4s", (char*)&treeptr->name[0]);
-            for (int i = 1; i < treeptr->names; i++)
-                kscreen_putf(".%4s", (char*)&treeptr->name[i * 4]);
-        }
-        kscreen_putf("]");
-        treeptr = (kacpi_tree *)treeptr->next;
-    }
+    kscreen_putf("\nacpi not yet implemented!");
 }
