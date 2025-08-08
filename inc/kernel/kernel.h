@@ -51,7 +51,7 @@ typedef struct {
     size_t kpci_tablesize;
     kpci_device *kpci_table;
 
-    kmem_stack *kmem_table;
+    kmem_bitmap *kmem_table;
 
     kfs_partition *kfs_partitions[16];
 } info_table;

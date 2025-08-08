@@ -111,7 +111,9 @@ void kmouse_cmd(uint8_t cmd)
     outb(0x60, cmd);
 
     kmouse_wait(0);
-    inb(0x60);
+    unsigned char check = inb(0x60);
+    if (check == 0xFE)
+        kmouse_cmd(cmd);
 }
 
 void kmouse_init()
@@ -130,8 +132,8 @@ void kmouse_init()
     kmouse_wait(1);
     outb(0x60, status); //ensure both ports can send data
     
-    kmouse_cmd(0xFF);
-    while (inb(0x60) != 0); //reset mouse and clear buffer
+    kmouse_cmd(0xFF); //reset mouse and clear buffer
+    while (inb(0x60) != 0);
     
     //kmouse_cmd(0xF2); //get mouse type, can enable 4th/5th buttons later
     //uint8_t mouse_type = inb(0x60);

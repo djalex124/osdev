@@ -22,9 +22,8 @@ const char* kdesc_ints[] =
 
 void kwrapper_isr(kframe_int *k)
 {   
-    kscreen_putf("\r\n%n%m --- exception --- ", 0xFF0000, 0x0);
-    kscreen_putf("\r\nkisr: isr 0x%d #%s code 0b%b", k->int_no, kdesc_ints[k->int_no], k->err_code);
 #ifdef AQUA_DEBUG
+    kdebug_outf("\r\n --- exception --- ");
     kdebug_outf("\r\nkisr: rax 0x%16x rbx 0x%16x rcx 0x%16x rdx 0x%16x",
         k->rax, k->rbx, k->rcx, k->rdx);
     kdebug_outf("\r\nkisr: rsp 0x%16x rbp 0x%16x rsi 0x%16x rdi 0x%16x",
@@ -81,6 +80,8 @@ void kwrapper_isr(kframe_int *k)
             kdebug_outf("sgx violation|");
     }
 #endif
+    kscreen_putf("\r\n%n%m --- exception --- ", 0xFF0000, 0x0);
+    kscreen_putf("\r\nkisr: isr 0x%d #%s code 0b%b", k->int_no, kdesc_ints[k->int_no], k->err_code);
 
     //should attempt fix or ret if non crashing isr before stack trace and hlt
 

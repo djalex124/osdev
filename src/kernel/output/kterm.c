@@ -36,6 +36,8 @@ uint32_t kterm_bg = default_color;
 kkeyboard_state *kterm_next;
 uint8_t kterm_changed = 0;
 
+int kterm_currentpartition = -1;
+
 extern uint8_t kacpi_apsrunning;
 
 void kterm_input(kkeyboard_state *k)
@@ -70,22 +72,22 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "compare") == 0)
     {
         if (kterm_argc < 3)
-        {
             kscreen_putf("\nNot enough arguments.");
-            return;
-        }
-        long a = 0, b = 0;
-        if (kterm_argv[1])
-            a = str_atoi(kterm_argv[1]);
-        if (kterm_argv[2])
-            b = str_atoi(kterm_argv[2]);
-        kscreen_putf("\nlarger number is: ");
-        if (a == b)
-            kscreen_putf("both numbers (%d) (%d)", a, b);
-        else if (a > b)
-            kscreen_putf("number 1 (%d)", a);
         else
-            kscreen_putf("number 2 (%d)", b);
+        {
+            long a = 0, b = 0;
+            if (kterm_argv[1])
+                a = str_atoi(kterm_argv[1]);
+            if (kterm_argv[2])
+                b = str_atoi(kterm_argv[2]);
+            kscreen_putf("\nlarger number is: ");
+            if (a == b)
+                kscreen_putf("both numbers (%d) (%d)", a, b);
+            else if (a > b)
+                kscreen_putf("number 1 (%d)", a);
+            else
+                kscreen_putf("number 2 (%d)", b);
+        }
     }
     else if (str_cmp(kterm_argv[0], "cpu_info") == 0)
     {
@@ -132,6 +134,33 @@ void kterm_run()
         kscreen_putf("\nInitiating crash...");
         kcrash("User Requested");
     }
+    else if (str_cmp(kterm_argv[0], "fs") == 0)
+    {
+        if (kterm_argc < 2)
+            kscreen_putf("\nNot enough arguments.");
+        else
+        {
+            long part = 0;
+            if (kterm_argv[1])
+                part = str_atoi(kterm_argv[1]);
+            
+            if (part < 0 || part > 15)
+            {
+                kscreen_putf("\nInvalid partition selection.");
+                kterm_currentpartition = -1;
+            }
+            else if ((uint64_t)k_infotable.kfs_partitions[part] == 0)
+            {
+                kscreen_putf("\nPartition does not exist.");
+                kterm_currentpartition = -1;
+            }
+            else
+            {
+                kscreen_putf("\nPartition set to %d.", part);
+                kterm_currentpartition = part;
+            }
+        }
+    }
     else if (str_cmp(kterm_argv[0], "fs_info") == 0)
     {
         kfs_printinfo();
@@ -159,13 +188,14 @@ void kterm_run()
         kscreen_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
         kscreen_putf("\n cpu_info - lists CPU model and capabilities");
         kscreen_putf("\n crash - crashes the AQUA kernel");
+        kscreen_putf("\n fs - sets the currently selected partition for file operations");
         kscreen_putf("\n fs_info - lists detected disks and drives");
         kscreen_putf("\n font - prints all characters in boot font");
         kscreen_putf("\n help - lists available commands");
         kscreen_putf("\n mem_info - prints current memory usage");
         kscreen_putf("\n pci_info - prints pci busses and devices");
         kscreen_putf("\n read [drive] [starting sector] [sectors] - attempt read of given number of sectors on selected drive");
-        kscreen_putf("\n read_file [filename] [partition] - attempt read of file on selected partition");
+        kscreen_putf("\n read_file [filename] - attempt read of file on selected partition");
         kscreen_putf("\n shutdown - attempts acpi shutdown");
         kscreen_putf("\n test - test random features");
         kscreen_putf("\n test_mouse - tests ps2 mouse input");
@@ -193,33 +223,40 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "read") == 0)
     {
         if (kterm_argc < 4)
-        {
             kscreen_putf("\nNot enough arguments.");
-            return;
+        else
+        {
+            uint64_t a = 0, b = 0, c = 0;
+            if (kterm_argv[1])
+                a = str_atoi(kterm_argv[1]);
+            if (kterm_argv[2])
+                b = str_atoi(kterm_argv[2]);
+            if (kterm_argv[3])
+                c = str_atoi(kterm_argv[3]);
+            kfs_printread(a, b, c);
         }
-        uint64_t a = 0, b = 0, c = 0;
-        if (kterm_argv[1])
-            a = str_atoi(kterm_argv[1]);
-        if (kterm_argv[2])
-            b = str_atoi(kterm_argv[2]);
-        if (kterm_argv[3])
-            c = str_atoi(kterm_argv[3]);
-        kfs_printread(a, b, c);
     }
     else if (str_cmp(kterm_argv[0], "read_file") == 0)
     {
-        if (kterm_argc < 3)
-        {
+        if (kterm_argc < 2)
             kscreen_putf("\nNot enough arguments.");
-            return;
+        else if (kterm_currentpartition < 0 || kterm_currentpartition > 15)
+        {
+            kscreen_putf("\nInvalid partition selection.");
+            kterm_currentpartition = -1;
         }
-        char *filename = 0;
-        uint64_t part = 0;
-        if (kterm_argv[1])
-            filename = kterm_argv[1];
-        if (kterm_argv[2])
-            part = str_atoi(kterm_argv[2]);
-        kfs_printreadfile(part, filename);
+        else if ((uint64_t)k_infotable.kfs_partitions[kterm_currentpartition] == 0)
+        {
+            kscreen_putf("\nPartition does not exist.");
+            kterm_currentpartition = -1;
+        }
+        else
+        {
+            char *filename = 0;
+            if (kterm_argv[1])
+                filename = kterm_argv[1];
+            kfs_printreadfile(kterm_currentpartition, filename);
+        }
     }
     else if (str_cmp(kterm_argv[0], "shutdown") == 0)
     {
@@ -249,20 +286,20 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "wait") == 0)
     {
         if (kterm_argc < 2)
-        {
             kscreen_putf("\nNot enough arguments.");
-            return;
-        }
-        int64_t input = 0;
-        if (kterm_argv[1])
-            input = str_atoi(kterm_argv[1]);
-        if (input >= 0)
-        {    
-            kscreen_putf("\nWaiting %d seconds...", input);
-            ksleep(input * 1000);
-        }
         else
-            kscreen_putf("\nInvalid number.");
+        {
+            int64_t input = 0;
+            if (kterm_argv[1])
+                input = str_atoi(kterm_argv[1]);
+            if (input >= 0)
+            {    
+                kscreen_putf("\nWaiting %d seconds...", input);
+                ksleep(input * 1000);
+            }
+            else
+                kscreen_putf("\nInvalid number.");
+        }
     }
     else if (kterm_argv[0] == NULL)
         return;
@@ -324,6 +361,8 @@ void kterm_processinput()
             kterm_pos = kscreen_getpos();
             if (kterm_pos.x != 0 && kterm_pos.y != ch)
                 kscreen_putf("\n");
+            if (kterm_currentpartition != -1)
+                kscreen_putf("(%d) ", kterm_currentpartition);
             kscreen_putf("%s%c", kterm_prompt, 128);
             break;
         default:

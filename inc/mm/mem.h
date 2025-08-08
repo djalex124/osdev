@@ -12,22 +12,25 @@ typedef struct
 {
     uint32_t page;
     uint8_t  used : 1;
-    uint8_t  eos : 1;
     uint8_t  eom : 1;
-    uint8_t  pad : 5;
-}__attribute__((packed)) kmem_stack;
+    uint8_t  pad : 6;
+}__attribute__((packed)) kmem_bitmap;
 //use pad as needed later. maybe user/os split and process flags?
 
 void kmem_physinit();
 void kmem_virtinit();
+void kmem_virtbuildmap();
 
 //#define AQUA_DEBUG_MEM
 
 #include <kernel/kernel.h>
 void kmem_init(boot_table *table);
 
-void kmem_page(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags);
-void kmem_unpage(uint64_t address, uint64_t size);
+void kmem_pageinternal(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags);
+void kmem_unpageinternal(uint64_t address, uint64_t size);
+
+void* kmem_page(uint64_t address, uint64_t size, uint16_t flags);
+void kmem_unpage(void *address, uint64_t size);
 
 void* kmem_kalloc(uint64_t size);
 void kmem_kfree(uint64_t size);

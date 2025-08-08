@@ -273,14 +273,19 @@ void kscreen_init()
 {
     memcpy(&kgraphics, &k_boottable.graphics, sizeof(kgraphics));
     //assume 32 bpp as is standard from UEFI's GOP
-    kdebug_outf("\r\nkscr: [%d]x[%d] @ 32 bpp", kgraphics.horizontal_res, kgraphics.vertical_res);
-    kmem_page((uint64_t)kgraphics.framebuffer_base, (uint64_t)kgraphics.framebuffer_base + kernel_virtual, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b11);
-    kdebug_outf("\r\nkscr: framebuffer [0x%x]", kgraphics.framebuffer_base);
-    kgraphics.framebuffer_base = (uint64_t*)((uint64_t)kgraphics.framebuffer_base + kernel_virtual);
-    kdebug_outf("\r\nkscr: font [0x%x]", &_binary____font_psf_start);
-    cw = kgraphics.horizontal_res/((psf_font *)&_binary____font_psf_start)->width;
-    ch = kgraphics.vertical_res/((psf_font *)&_binary____font_psf_start)->height;
-    kdebug_outf("\r\nkscr: terminal %dx%d", cw, ch);
+    
+    kgraphics.framebuffer_base = kmem_page((uint64_t)kgraphics.framebuffer_base, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b11);
+    
+    cw = kgraphics.horizontal_res / ((psf_font *)&_binary____font_psf_start)->width;
+    ch = kgraphics.vertical_res / ((psf_font *)&_binary____font_psf_start)->height;
+    
     kscreen_buffer = kmem_alloc((kgraphics.horizontal_res * kgraphics.vertical_res * 4)/0x1000 + 1);
+
+#ifdef AQUA_DEBUG
     kdebug_outf("\r\nkscr: buffer [0x%x]", (uintptr_t)kscreen_buffer);
+    kdebug_outf("\r\nkscr: [%d]x[%d] @ 32 bpp", kgraphics.horizontal_res, kgraphics.vertical_res);
+    kdebug_outf("\r\nkscr: framebuffer [0x%x]", kgraphics.framebuffer_base);
+    kdebug_outf("\r\nkscr: font [0x%x]", &_binary____font_psf_start);
+    kdebug_outf("\r\nkscr: terminal %dx%d", cw, ch);
+#endif
 }

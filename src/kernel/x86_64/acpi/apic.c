@@ -66,7 +66,7 @@ typedef struct
     uint64_t acpi_id;
 }acpi_madt_type9;
 
-uint32_t *kacpi_apstartup = 0;
+uint32_t *kacpi_apstartup = (uint32_t *)0x8000;
 uint8_t kacpi_apsrunning = 1;
 volatile uint8_t bsplock = 0;
 
@@ -157,11 +157,6 @@ void kacpi_processapic(acpi_madt *madt)
     uint8_t current_apicid = 0;
     asm volatile ("mov $1, %%rax; cpuid; shr $24, %%rbx;" : "=b"(current_apicid) : : );
 
-    if ((uint64_t)kacpi_apstartup == 0)
-    {
-        kdebug_outf("\r\nkacpi: no memory available for startup code!");
-        return;
-    }
     kdebug_outf("\r\nkacpi: smp startup code at 0x%x", (uint64_t)kacpi_apstartup);
 
     //first 2mb should be identity mapped
@@ -178,10 +173,10 @@ void kacpi_processapic(acpi_madt *madt)
     pt2[0] = 0x83;
 
     //1 page of stack per processor to start
-    kacpi_apstacks = (uint64_t)kmem_alloc(total_processors);
+    kacpi_apstacks = (uint64_t)kmem_alloc(total_processors - 1);
 
     kdebug_outf("\r\nkacpi: lapic base at 0x%x", lapic_base);
-    kmem_page(lapic_base, lapic_base, 0x8000, 0b11);
+    kmem_pageinternal(lapic_base, lapic_base, 0x1000, 0b11);
 
     for (int i = 0; i < total_processors; i++)
     {
@@ -215,7 +210,9 @@ void kacpi_processapic(acpi_madt *madt)
         }
     }
 
-    kmem_kfree(total_processors);
+    kmem_unpageinternal(lapic_base, 0x1000);
+
+    //kmem_free((void *)kacpi_apstacks, total_processors);
 
     asm ("sti");
 

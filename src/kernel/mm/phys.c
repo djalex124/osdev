@@ -1,10 +1,11 @@
 #include <kernel/kstring.h>
 #include <kernel/debug.h>
+#include <kernel/crash.h>
 
 #include <mm/mem.h>
 
 size_t kmem_lowestfree = 0;
-kmem_stack* kmem_table;
+kmem_bitmap* kmem_table;
 
 void* kmem_alloc(size_t pages)
 {
@@ -18,9 +19,6 @@ void* kmem_alloc(size_t pages)
             connected = 0;
             continue;
         }
-
-        if (kmem_table[index].eos)
-            connected = 0;
         
         if (connected == pages)
         {
@@ -30,13 +28,13 @@ void* kmem_alloc(size_t pages)
             for (size_t i = 0; i < pages; i++)
                 kmem_table[index - pages + i].used = 1;
             
-            uint64_t addr = (kmem_table[index - pages].page * 0x1000);
-            kmem_page(addr, addr, pages * 0x1000, 0b11);
+            uint64_t phys_addr = (kmem_table[index - pages].page * 0x1000);
+            kmem_pageinternal(phys_addr, phys_addr, pages * 0x1000, 0b11);
 
             if (kmem_lowestfree < index - pages)
                 kmem_lowestfree = index - pages;
 
-            return (void *)addr;
+            return (void *)phys_addr;
         }
 
         connected++;
@@ -55,13 +53,10 @@ void kmem_free(void* addr, size_t pages)
     for (size_t i = index; i < index + pages; i++)
         kmem_table[i].used = 0;
     memset(addr, 0, pages * 0x1000);
-    kmem_unpage((uint64_t)addr, pages * 0x1000);
+    kmem_unpageinternal((uintptr_t)addr, pages * 0x1000);
     if (index + pages - 1 < kmem_lowestfree)
         kmem_lowestfree = index + pages - 1;
 }
-
-extern uint64_t kmem_heapend;
-extern uint32_t *kacpi_apstartup;
 
 void kmem_physinit()
 {
@@ -69,63 +64,108 @@ void kmem_physinit()
     efi_memory_descriptor *mmap_entries;
     uint64_t mmap_length = k_boottable.mmap_enteries * k_boottable.mmap_size;
 
-    uint64_t pages = 0;
-    
+    uint64_t total_pages = 0;
+
     for (mmap_entries = mmap;
         (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap_length;
         mmap_entries = (efi_memory_descriptor *) ((uint64_t) mmap_entries + k_boottable.mmap_size))
     {
-        if (mmap_entries->type == 7)
+        switch (mmap_entries->type)
         {
-            if (mmap_entries->physical_start < 0x100000)
-            {
-                if ((mmap_entries->physical_start < 0x8001) && 
-                    ((mmap_entries->physical_start + mmap_entries->num_pages * 0x1000) > 0x8FFF)
-                    && (uint64_t)kacpi_apstartup == 0)
-                    kacpi_apstartup = (uint32_t *)0x8000;
-                continue; //ensure 0x8000 - ~0x8200 for smp startup code
-            }
-            kdebug_outf("\r\nkm_i: open physical mem [0x%x] pages %x", mmap_entries->physical_start, 
-                mmap_entries->num_pages);
-            pages += mmap_entries->num_pages;
-            if (mmap_entries->physical_start == 0x100000)
-                kdebug_outf(" (kernel)");
+            case 1 ... 4:
+            case 7:
+                total_pages += mmap_entries->num_pages;
+#ifdef AQUA_DEBUG_MEM
+                kdebug_outf("\nkm_i: aqua available mem [0x%x] type %d pages 0x%x", mmap_entries->physical_start, 
+                    mmap_entries->type, mmap_entries->num_pages);
+                if (mmap_entries->physical_start == 0x100000)
+                    kdebug_outf(" (kernel ends 0x%x)", ((phys_from_virt(k_boottable.safe_mem) + 0xFFF) & ~0xFFF) - 1);
+                else if (mmap_entries->physical_start < 0x8000 && (mmap_entries->physical_start + mmap_entries->num_pages * 0x1000) > 0x8000)
+                    kdebug_outf(" (ap startup 0x8000 - 0x8FFF)");
+#endif
+                break;
         }
     }
 
-    kdebug_outf("\r\nkm_i: total mem needed %x (pages %x)", pages * sizeof(kmem_stack), pages);
-    kmem_table = (kmem_stack *)kmem_kalloc(pages * sizeof(kmem_stack));
-    
+    kdebug_outf("\nkm_i: total pages 0x%x", total_pages);
+    kdebug_outf("\nkm_i: bitmap size 0x%x", total_pages * sizeof(kmem_bitmap));
+
+    uint64_t bitmap_start = 0;
+
+    for (mmap_entries = mmap;
+        (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap_length;
+        mmap_entries = (efi_memory_descriptor *) ((uint64_t) mmap_entries + k_boottable.mmap_size))
+    {
+        if (mmap_entries->physical_start < 0x100000)
+            continue;
+        
+        switch (mmap_entries->type)
+        {
+            case 1 ... 4:
+            case 7:
+                uint64_t potential_start = mmap_entries->physical_start;
+                if (mmap_entries->physical_start == 0x100000)
+                    potential_start = (phys_from_virt(k_boottable.safe_mem) + 0xFFF) & ~0xFFF;
+
+                uint64_t entry_end = mmap_entries->num_pages * 0x1000 + mmap_entries->physical_start;
+
+                if (entry_end - potential_start > total_pages * sizeof(kmem_bitmap))
+                {
+                    kdebug_outf("\nkm_i: can start bitmap at 0x%x", potential_start);
+                    bitmap_start = potential_start;
+                }
+                break;
+        }
+
+        if (bitmap_start != 0)
+            break;
+    }
+
+    if (bitmap_start == 0)
+        kcrash("No room for mmap!");
+
+    kmem_table = (kmem_bitmap *)bitmap_start;
+    kmem_page(bitmap_start, total_pages * sizeof(kmem_bitmap), 0b11);
+
     uint64_t index = 0;
     for (mmap_entries = mmap;
         (uint8_t *)mmap_entries < (uint8_t *)mmap + mmap_length;
         mmap_entries = (efi_memory_descriptor *) ((uint64_t) mmap_entries + k_boottable.mmap_size))
     {
-        if (mmap_entries->type == 7)
+        switch (mmap_entries->type)
         {
-            if (mmap_entries->physical_start < 0x100000)
-                continue; //ignored, reserved
-            uint64_t size = mmap_entries->num_pages;
-            for (size_t i = index; i < index + size; i++)
-            {
-                kmem_table[i].page = (uint32_t)(mmap_entries->physical_start/0x1000) + i;
-                if (mmap_entries->physical_start == 0x100000 && (mmap_entries->physical_start + 0x1000*i <= kmem_heapend - kernel_virtual))
-                    kmem_table[i].used = 1;
-                else
-                    kmem_table[i].used = 0;
-                if (i == index + size - 1)
-                    kmem_table[i].eos = 1;
-                else
-                    kmem_table[i].eos = 0;
-                if (i == pages - 1)
-                    kmem_table[i].eom = 1;
-                else
-                    kmem_table[i].eom = 0;
-            }
-            index += size;
+            case 1 ... 4:
+            case 7:
+                uint64_t size = mmap_entries->num_pages;
+                for (size_t i = index; i < index + size; i++)
+                {
+                    kmem_table[i].page = (uint32_t)(mmap_entries->physical_start/0x1000) + i - index;
+
+                    if (i == total_pages - 1)
+                        kmem_table[i].eom = 1;
+                    else
+                        kmem_table[i].eom = 0;
+
+                    uint64_t current_addr = mmap_entries->physical_start + (i - index) * 0x1000;
+                    
+                    if (current_addr < 0x10000)
+                        kmem_table[i].used = 1;
+                    else if (current_addr >= bitmap_start &&
+                            current_addr <= bitmap_start + total_pages * sizeof(kmem_bitmap))
+                        kmem_table[i].used = 1;
+                    else if (current_addr >= 0x100000 &&
+                            current_addr <= ((phys_from_virt(k_boottable.safe_mem) + 0xFFF) & ~0xFFF))
+                        kmem_table[i].used = 1;
+                    else
+                        kmem_table[i].used = 0;
+                }
+
+                index += size;
+                break;
         }
     }
-    kdebug_outf("\r\nkm_i: total indexed [%x]", index);
+
+    kdebug_outf("\nkm_i: bitmap finished");
 
     k_infotable.kmem_table = kmem_table;
 }

@@ -133,14 +133,15 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
             else
             {
                 char *first = str_tok((char *)file->name, " ");
+                char *last = (char *)&file->name[8];
                 uint8_t length = str_len(first);
                 if (length > 8)
                     length = 8;
-                if (strn_cmp(filename, (const char*)first, length) == 0
-                    && strn_cmp(filename + length + 1, (const char*)&file->name[8], 3) == 0)
+                if (strn_cmp(str_tolower(filename), str_tolower(first), length) == 0
+                    && strn_cmp(str_tolower(filename + length + 1), str_tolower(last), 3) == 0)
                 {
                     kscreen_putf("\nfound file %s", filename);
-                    check = 1;
+                    check = 1; //non lfn should be non case sensitive
                 }
             }
             

@@ -23,54 +23,28 @@ int kacpi_sdtchecksum(acpi_sdt_header *h)
 
 void kacpi_processtable(acpi_sdt_header *h)
 {
-    kmem_page((uintptr_t)h & 0xFFFFF000, (uintptr_t)h & 0xFFFFF000, 0x1000, 0b11);
-    kdebug_outf("\r\nkacpi: table %04s", h->signature);
-    if (strn_cmp("APIC", h->signature, 4) == 0)
+    acpi_sdt_header *header = kmem_page((uintptr_t)h, 0x1000, 0b11);
+    kdebug_outf("\r\nkacpi: table %04s", header->signature);
+    if (strn_cmp("APIC", header->signature, 4) == 0)
     {
-        acpi_madt *madt = (acpi_madt *)h;
+        acpi_madt *madt = (acpi_madt *)header;
 
-        if (kacpi_sdtchecksum((acpi_sdt_header *)h) != 0)
+        if (kacpi_sdtchecksum((acpi_sdt_header *)header) != 0)
             kacpi_fail(__LINE__);
 
         kacpi_processapic(madt);
         
-        kmem_unpage((uintptr_t)h & 0xFFFFF000, 0x1000);
-    }
-    else if (strn_cmp("FACP", h->signature, 4) == 0)
-    {
-        acpi_fadt *fadt = (acpi_fadt *)h;
-        kdebug_outf("\r\nkacpi: processing FADT table");
-
-        if (kacpi_sdtchecksum((acpi_sdt_header *)h) != 0)
-            kacpi_fail(__LINE__);
-        
-        kdebug_outf("\r\n - dsdt %x", fadt->dsdt);
-
-        acpi_dsdt *dsdt = (acpi_dsdt *)(uint64_t)fadt->dsdt;
-        kmem_page((uintptr_t)dsdt & 0xFFFFF000, (uintptr_t)dsdt & 0xFFFFF000, 0x1000, 0b11);
-
-        uint64_t dsdt_len = dsdt->h.length;
-        kmem_unpage((uintptr_t)dsdt & 0xFFFFF000, 0x1000);
-        kmem_page((uintptr_t)dsdt & 0xFFFFF000, (uintptr_t)dsdt & 0xFFFFF000, dsdt_len, 0b11);
-
-        if (strn_cmp("DSDT", dsdt->h.signature, 4) != 0)
-            kacpi_fail(__LINE__);
-        else if (kacpi_sdtchecksum((acpi_sdt_header *)dsdt) != 0)
-            kacpi_fail(__LINE__);
-        
-        kmem_unpage((uintptr_t)dsdt & 0xFFFFF000, dsdt_len);
-
-        kmem_unpage((uintptr_t)h & 0xFFFFF000, 0x1000);
+        kmem_unpage(header, 0x1000);
     }
     else
-        kmem_unpage((uintptr_t)h & 0xFFFFF000, 0x1000);
+        kmem_unpage(header, 0x1000);
 }
 
 void kacpi_init()
 {
-    kmem_page(k_boottable.rsdp & 0xFFFFF000, k_boottable.rsdp & 0xFFFFF000, 0x1000, 0b11);
-    acpi_rsdp *table = (acpi_rsdp *)k_boottable.rsdp;
+    acpi_rsdp *table = (acpi_rsdp *)kmem_page(k_boottable.rsdp, 0x1000, 0b11);
 
+    kdebug_outf("\nkacpi_i: mapped table %x", table);
     kdebug_outf("\r\nkacpi_i: signature [%8s]", table->signature);
     if (!str_cmp(table->signature, "RSD PTR "))
         kacpi_fail(__LINE__);
@@ -78,9 +52,9 @@ void kacpi_init()
     if (k_boottable.acpi_ver == 2)
     {
         size_t rsdp_len = table->length;
-        kmem_unpage((uintptr_t)table & 0xFFFFF000, 0x1000);
+        kmem_unpage(table, 0x1000);
 
-        kmem_page((uintptr_t)table & 0xFFFFF000, (uintptr_t)table & 0xFFFFF000, rsdp_len, 0b11);
+        table = kmem_page(k_boottable.rsdp, rsdp_len, 0b11);
 
         uint32_t rsdp_checksum = table->checksum + table->extended_checksum;
         for (int i = 0; i < 36; i++)
@@ -89,8 +63,7 @@ void kacpi_init()
         if (rsdp_checksum & 0x1)
             kacpi_fail(__LINE__);
 
-        acpi_xsdt *xsdt = (acpi_xsdt *)table->xsdt_addr;
-        kmem_page((uintptr_t)xsdt & 0xFFFFF000, (uintptr_t)xsdt & 0xFFFFF000, 0x1000, 0b11);
+        acpi_xsdt *xsdt = kmem_page((uintptr_t)table->xsdt_addr, 0x1000, 0b11);
 
         if (kacpi_sdtchecksum((acpi_sdt_header *)xsdt) != 0)
             kacpi_fail(__LINE__);
@@ -98,8 +71,8 @@ void kacpi_init()
         size_t xsdt_len = xsdt->h.length;
         int xsdt_entries = (xsdt->h.length - sizeof(xsdt->h)) / 8;
     
-        kmem_unpage((uintptr_t)xsdt & 0xFFFFF000, 0x1000);
-        kmem_page((uintptr_t)xsdt & 0xFFFFF000, (uintptr_t)xsdt & 0xFFFFF000, xsdt_len, 0b11);
+        kmem_unpage(xsdt, 0x1000);
+        xsdt = kmem_page((uintptr_t)table->xsdt_addr, xsdt_len, 0b11);
     
         for (int i = 0; i < xsdt_entries; i++)
         {
@@ -107,8 +80,8 @@ void kacpi_init()
             kacpi_processtable(h);
         }
     
-        kmem_unpage((uintptr_t)xsdt & 0xFFFFF000, xsdt_len);
-        kmem_unpage((uintptr_t)table & 0xFFFFF000, rsdp_len);
+        kmem_unpage(xsdt, xsdt_len);
+        kmem_unpage(table, rsdp_len);
     }
     else if (k_boottable.acpi_ver == 1)
     {
@@ -119,8 +92,7 @@ void kacpi_init()
         if (rsdp_checksum & 0x1)
             kacpi_fail(__LINE__);
 
-        acpi_rsdt *rsdt = (acpi_rsdt *)(uintptr_t)table->rsdt_addr;
-        kmem_page((uintptr_t)rsdt & 0xFFFFF000, (uintptr_t)rsdt & 0xFFFFF000, 0x1000, 0b11);
+        acpi_rsdt *rsdt = kmem_page((uintptr_t)table->rsdt_addr, 0x1000, 0b11);
 
         if (kacpi_sdtchecksum((acpi_sdt_header *)rsdt) != 0)
             kacpi_fail(__LINE__);
@@ -128,8 +100,8 @@ void kacpi_init()
         size_t rsdt_len = rsdt->h.length;
         int rsdt_entries = (rsdt->h.length - sizeof(rsdt->h)) / 4;
 
-        kmem_unpage((uintptr_t)rsdt & 0xFFFFF000, 0x1000);
-        kmem_page((uintptr_t)rsdt & 0xFFFFF000, (uintptr_t)rsdt & 0xFFFFF000, rsdt_len, 0b11);
+        kmem_unpage(rsdt, 0x1000);
+        rsdt = kmem_page((uintptr_t)table->rsdt_addr, rsdt_len, 0b11);
 
         for (int i = 0; i < rsdt_entries; i++)
         {
@@ -137,8 +109,8 @@ void kacpi_init()
             kacpi_processtable(h);
         }
 
-        kmem_unpage((uintptr_t)rsdt & 0xFFFFF000, rsdt_len);
-        kmem_unpage((uintptr_t)table & 0xFFFFF000, 0x1000);
+        kmem_unpage(rsdt, rsdt_len);
+        kmem_unpage(table, 0x1000);
     }
 }
 

@@ -89,6 +89,18 @@ int str_cmp(const char* a, const char* b)
     return *a - *b;
 }
 
+char *str_tolower(char* s)
+{
+    size_t len = str_len(s);
+    char *s1 = s;
+    while (len--)
+    {
+        if (s1[len] >= 'A' && s1[len] <= 'Z')
+            s1[len] |= 32;
+    }
+    return s1;
+}
+
 unsigned int is_split(char c, char *split)
 {
     while (*split != '\0')

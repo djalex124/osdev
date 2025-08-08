@@ -161,7 +161,7 @@ void kfs_addpartition(kfs_partition* partition)
         if (k_infotable.kfs_partitions[i] == 0)
         {
             k_infotable.kfs_partitions[i] = partition;
-            break;
+            return;
         }
     }
 
@@ -178,7 +178,7 @@ void kfs_removepartition(kfs_partition* partition)
         if ((uintptr_t)partition == (uintptr_t)ptr)
         {
             k_infotable.kfs_partitions[i] = 0;
-            break;
+            return;
         }
     }
     

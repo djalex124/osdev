@@ -171,9 +171,6 @@ char* kpci_getclassname(uint8_t class)
         return kpci_classname[class];
 }
 
-size_t kpci_tablesize = 0;
-kpci_device *kpci_table = NULL;
-
 void kpci_checkbus(uint8_t bus);
 
 uint32_t kpci_configread(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off)
@@ -239,19 +236,14 @@ void kpci_confirmedfunction(uint8_t bus, uint8_t device, uint8_t func)
     kdebug_outf("\r\nkpci_i: PCI(B%xD%x) F%x V%x CLASS %2x:%2x", bus, device, func, ven, base, sub);
 #endif
 
-    kpci_table = kmem_kalloc(sizeof(kpci_device));
+    k_infotable.kpci_table[k_infotable.kpci_tablesize].bus = bus;
+    k_infotable.kpci_table[k_infotable.kpci_tablesize].device = device;
+    k_infotable.kpci_table[k_infotable.kpci_tablesize].function = func;
+    k_infotable.kpci_table[k_infotable.kpci_tablesize].class = base;
+    k_infotable.kpci_table[k_infotable.kpci_tablesize].subclass = sub;
+    k_infotable.kpci_table[k_infotable.kpci_tablesize].vendorid = ven;
 
-    if ((uint64_t)k_infotable.kpci_table == 0)
-        k_infotable.kpci_table = kpci_table;
-
-    kpci_table->bus = bus;
-    kpci_table->device = device;
-    kpci_table->function = func;
-    kpci_table->class = base;
-    kpci_table->subclass = sub;
-    kpci_table->vendorid = ven;
-
-    kpci_tablesize++;
+    k_infotable.kpci_tablesize++;
 }
 
 void kpci_checkfunction(uint8_t bus, uint8_t device, uint8_t func)
@@ -323,7 +315,7 @@ void kpci_checkall()
 void kpci_init()
 {
     kdebug_outf("\r\nkpci_i: start iterate pci devices");
-    kpci_checkall();
 
-    k_infotable.kpci_tablesize = kpci_tablesize;
+    k_infotable.kpci_table = kmem_alloc(1);
+    kpci_checkall();
 }
