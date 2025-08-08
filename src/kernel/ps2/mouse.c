@@ -111,8 +111,8 @@ void kmouse_cmd(uint8_t cmd)
     outb(0x60, cmd);
 
     kmouse_wait(0);
-    unsigned char check = inb(0x60);
-    if (check == 0xFE)
+    unsigned char check_resend = inb(0x60);
+    if (check_resend == 0xFE)
         kmouse_cmd(cmd);
 }
 
