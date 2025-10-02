@@ -266,11 +266,13 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {
         kscreen_putf("\ntest output of the commands!!");
-        uint16_t* test = kmem_alloc(1);
-        kscreen_putf("\ntest %x", (uint64_t)test);
-        test[32] = 0xCA;
-        kscreen_putf("\ntest[32] %x %d", test[32], 10);
-        kmem_free(test, 1);
+        uint16_t* test = kmem_palloc(2);
+        uint16_t* test2 = kmem_page((uint64_t)&test[15], 0x1000, 0b11);
+        kscreen_putf("\ntest %x", (uint64_t)test2);
+        test2[32] = 0xCA;
+        kscreen_putf("\ntest2[32] %x", test2[32]);
+        kmem_unpage(test2, 0x1000);
+        kmem_pfree(test, 2);
         kscreen_putf("\nwait a few second :) -");
         for (uint16_t i = 1; i <= 5; i++)
         {

@@ -23,7 +23,7 @@ const char* kdesc_ints[] =
 void kwrapper_isr(kframe_int *k)
 {   
 #ifdef AQUA_DEBUG
-    kdebug_outf("\r\n --- exception --- ");
+    kdebug_outf("\r\n --- exception [%2x]--- ", k->int_no);
     kdebug_outf("\r\nkisr: rax 0x%16x rbx 0x%16x rcx 0x%16x rdx 0x%16x",
         k->rax, k->rbx, k->rcx, k->rdx);
     kdebug_outf("\r\nkisr: rsp 0x%16x rbp 0x%16x rsi 0x%16x rdi 0x%16x",

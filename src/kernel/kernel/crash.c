@@ -254,8 +254,20 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
                 else if (block->data[index] == 0x21)
                     index += 2;
 
+                if (block->data[index] == 0x90)
+                {
+                    size += 1;
+                    continue;
+                }
+                else if (block->data[index] == 0x91)
+                {
+                    size += 4;
+                    continue;
+                }
+
                 //if (abbrev_check == block->type)
-                //    kdebug_outf("\r\nkdbg:   <%x>  %s", (uint64_t)pointer + size - debug_info, kdbg_ats[block->data[index]]);
+                //    kdebug_outf("\r\nkdbg:   <%x>  %s : %s", (uint64_t)pointer + size - debug_info, 
+                //        kdbg_ats[block->data[index]], kdbg_forms[block->data[index + 1]]);
                 
                 uint8_t type = block->data[index + 1];
                 switch (type)
@@ -377,6 +389,17 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
                             high = uleb_num;
                         break;
                     case 0xD:
+                        leb_size = kcrash_sleb128(&block->data[index + 2], &sleb_num);
+                        index -= 1;
+                        size += leb_size;
+                        if (abbrev_check == block->type &&
+                            block->tag == 0x2E)
+                        {
+                            if (block->data[index] == 0x3B)
+                                line = (uint64_t)sleb_num;
+                            else if (block->data[index] == 0x39)
+                                column = (uint64_t)sleb_num;
+                        }
                     case 0x21:
                         leb_size = kcrash_sleb128(&block->data[index + 2], &sleb_num);
                         index += leb_size;
@@ -478,12 +501,15 @@ void kcrash_debug(uint64_t rip)
 
 #endif
 
+uint8_t already_crashing = 0;
+
 void kcrash(char *message)
 {
     uint64_t rbp;
     __asm__ ("movq %%rbp, %0" : "=r"(rbp));
 
     screen = cw && ch;
+    already_crashing++;
 
     if (screen)
         kscreen_putf("\n%n%m\n AQUA has crashed! \n Reason: [%s] \n", 0xFF0000, 0x0, message);
@@ -497,7 +523,8 @@ void kcrash(char *message)
             kscreen_putf("\nkcrash: [0x%x]", stack->rip);
         kdebug_outf("\nkcrash: [0x%x]", stack->rip);
 #ifdef AQUA_DEBUG
-        kcrash_debug(stack->rip);
+        if (already_crashing < 2)
+            kcrash_debug(stack->rip);
 #endif
 
         stack = stack->rbp;

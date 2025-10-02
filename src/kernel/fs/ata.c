@@ -100,8 +100,17 @@ void kfs_atainterrupt2()
     kfs_ataint[1] = 1;
 }
 
+uint8_t *kfs_atadmabuffer = 0;
+uint64_t *kfs_prdt = 0;
+
 void kfs_patainit(kpci_device *ide_device)
 {
+    kfs_atadmabuffer = kmem_palloc(1);
+    kmem_pageentry((uint64_t)kfs_atadmabuffer, (uint64_t)kfs_atadmabuffer, 0x1000, 0b11);
+
+    kfs_prdt = kmem_palloc(1);
+    kmem_pageentry((uint64_t)kfs_prdt, (uint64_t)kfs_prdt, 0x1000, 0b11);
+    
     uint8_t progif = kpci_configread(ide_device->bus, ide_device->device, ide_device->function, PCI_OFFSET_PROGIF) & 0xFF;
 
 #ifdef AQUA_DEBUG
@@ -287,10 +296,9 @@ void kfs_patainit(kpci_device *ide_device)
     kdesc_setinterruptfunc(15, *kfs_atainterrupt2);
 }
 
-int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, uint32_t addr)
+int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr)
 {
-    uint64_t *prdt = kmem_alloc(1);
-    prdt[0] = (1UL << 63) | (sec_count * drive->sector_size << 32) | addr;
+    kfs_prdt[0] = (1UL << 63) | (sec_count * drive->sector_size << 32) | (uint32_t)((uintptr_t)kfs_atadmabuffer & 0xFFFFFFFF);
 
     //set direction of data with rw in bm command reg
     outb(kfs_channel[drive->channel].bmide, inb(kfs_channel[drive->channel].bmide) | (read << 3));
@@ -299,7 +307,7 @@ int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read,
     outb(kfs_channel[drive->channel].bmide + 2, inb(kfs_channel[drive->channel].bmide + 2) | 0x4 | 0x2);
 
     //send prdt phys addr to bm prdt reg
-    outl(kfs_channel[drive->channel].bmide + 4, (uint32_t)((uintptr_t)prdt) & 0xFFFFFFFF);
+    outl(kfs_channel[drive->channel].bmide + 4, (uint32_t)((uintptr_t)kfs_prdt) & 0xFFFFFFFF);
 
     while (kfs_ataread(drive->channel, PATA_REG_STATUS) & PATA_STATUS_BUSY);
 
@@ -339,13 +347,14 @@ int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read,
 
     kfs_atawrite(drive->channel, PATA_REG_CONTROL, 2);
 
-    kmem_free(prdt, 1);
-
     if (dstatus & 0x1)
     {
         kdebug_outf("\r\nkfs_ata: error reading!");
         return -1;
     }
+
+    memcpy(addr, kfs_atadmabuffer, drive->sector_size);
+
     return 0;
 }
 
@@ -361,10 +370,11 @@ kfs_drive* kfs_patatest(kfs_patadrive *drive)
         kfs_channel[drive->channel].bmide, drive->sector_size);
     
     uint8_t *addr = kmem_alloc(1);
-    int result = kfs_atadma(drive, 0, 1, 1, (uint32_t)((uintptr_t)addr & 0xFFFFFFFF));
+    int result = kfs_atadma(drive, 0, 1, 1, addr);
 
     if (!result)
     {
+        kdebug_outf("\nkfs_test: %2x %2x", addr[510], addr[511]);
         if (addr[510] == 0x55 && addr[511] == 0xaa)
         {
             kdebug_outf("\r\nkfs_test: successfully found MBR signature!");

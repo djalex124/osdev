@@ -71,7 +71,7 @@ void kmouse_test()
     kmouse_print();
     stay = kscreen_getpos();
     stay.y -= 3;
-    while (kkeyboard_keymapUSqwerty[check->scancode] != '\e')
+    while (check == NULL || kkeyboard_keymapUSqwerty[check->scancode] != '\e')
     {
         kscreen_setpos(stay);
         kmouse_print();

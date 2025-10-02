@@ -107,8 +107,6 @@ void kacpi_processapic(acpi_madt *madt)
                     entry0->acpi_processor_id, entry0->apic_id, entry0->flags);
                 if ((uint64_t)lapic_ids == 0)
                     lapic_ids = kmem_kalloc(1);
-                else
-                    kmem_kalloc(1);
                 lapic_ids[total_processors] = entry0->apic_id;
                 total_processors++;
                 break;
@@ -160,6 +158,7 @@ void kacpi_processapic(acpi_madt *madt)
     kdebug_outf("\r\nkacpi: smp startup code at 0x%x", (uint64_t)kacpi_apstartup);
 
     //first 2mb should be identity mapped
+    kmem_pageentry(0x8000, 0x8000, 0x4000, 0b11);
     memcpy(kacpi_apstartup, &ap_trampoline, 0x1000);
     memset((void *)0x9000, 0, 0x3000);
 
@@ -173,10 +172,10 @@ void kacpi_processapic(acpi_madt *madt)
     pt2[0] = 0x83;
 
     //1 page of stack per processor to start
-    kacpi_apstacks = (uint64_t)kmem_alloc(total_processors - 1);
+    kacpi_apstacks = (uint64_t)kmem_palloc(total_processors - 1);
 
     kdebug_outf("\r\nkacpi: lapic base at 0x%x", lapic_base);
-    kmem_pageinternal(lapic_base, lapic_base, 0x1000, 0b11);
+    kmem_pageentry(lapic_base, lapic_base, 0x1000, 0b11);
 
     for (int i = 0; i < total_processors; i++)
     {
@@ -210,7 +209,7 @@ void kacpi_processapic(acpi_madt *madt)
         }
     }
 
-    kmem_unpageinternal(lapic_base, 0x1000);
+    kmem_unpageentry(lapic_base, 0x1000);
 
     //kmem_free((void *)kacpi_apstacks, total_processors);
 

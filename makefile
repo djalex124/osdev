@@ -1,11 +1,13 @@
 build_speed = -O2
 
 gcc = x86_64-elf-gcc
+objcopy = x86_64-elf-objcopy
 
 kernel_build = $$(cat build.txt)
+kernel_headers = /home/alex/opt/cross/x86_64-elf/include
 
-kernel_flags = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$(kernel_build) -gdwarf-5 -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
-kernel_link  = -ffreestanding -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf-5 -fno-pie -T bin/link.ld
+kernel_flags = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$(kernel_build) -gdwarf -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
+kernel_link  = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf -fno-pie -T bin/link.ld
 
 debug_flag =
 
@@ -23,14 +25,14 @@ bin/link.ld:
 drive/kernel.bin: $(obj) bin/link.ld
 	@echo $$(($$(cat build.txt) + 1)) > build.txt
 	@$(gcc) $(kernel_link) $(obj) -o drive/kernel.bin -nostdlib -lgcc
-	@objcopy --only-keep-debug drive/kernel.bin bin/kernel.map
-	@objcopy --strip-debug drive/kernel.bin
+	@$(objcopy) --only-keep-debug drive/kernel.bin bin/kernel.map
+	@$(objcopy) --strip-debug drive/kernel.bin
 
 drive/dbg_kernel.bin: $(obj) bin/link.ld
 	@echo $$(($$(cat build.txt) + 1)) > build.txt
 	@$(gcc) $(kernel_link) $(obj) -o drive/kernel.bin -nostdlib -lgcc
-	@objcopy --only-keep-debug drive/kernel.bin bin/kernel.map
-	@objcopy --strip-debug drive/kernel.bin
+	@$(objcopy) --only-keep-debug drive/kernel.bin bin/kernel.map
+	@$(objcopy) --strip-debug drive/kernel.bin
 	@cp bin/kernel.map drive/kernel.map
 
 obj/%.o: src/%.c 
@@ -41,35 +43,34 @@ obj/%.o: src/%.S
 	@mkdir -p $(@D)
 	@$(gcc) $(debug_flag) $(kernel_flags) -c -DASSEMBLY -MMD -MP $< -o $@ -lgcc
 
-efi_cc := /usr/bin/gcc
+efi_cc := x86_64-linux-gnu-gcc
 
-gnu_efi_inc := /usr/include/efi
-
-ifneq (,$(wildcard /usr/lib/crt0-efi-x86_64.o))
-gnu_efi_lib := /usr/lib
-else ifneq (,$(wildcard /usr/lib64/crt0-efi-x86_64.o))
-gnu_efi_lib := /usr/lib64
-endif
+gnu_efi_inc := /usr/local/include/efi
+gnu_efi_lib := /usr/local/lib
 
 drive/boot.efi:
-	gcc $(debug_flag) -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o src/boot/uefiboot.o
-	ld -shared -Bsymbolic -L$(gnu_efi_lib) -T$(gnu_efi_lib)/elf_x86_64_efi.lds $(gnu_efi_lib)/crt0-efi-x86_64.o src/boot/uefiboot.o -o src/boot/boot.so -lgnuefi -lefi
-	objcopy -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym  -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc --target efi-app-x86_64 --subsystem=10 src/boot/boot.so drive/boot.efi
+	x86_64-linux-gnu-gcc $(debug_flag) -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o src/boot/uefiboot.o
+	x86_64-linux-gnu-ld -shared -Bsymbolic -L$(gnu_efi_lib) -T$(gnu_efi_lib)/elf_x86_64_efi.lds $(gnu_efi_lib)/crt0-efi-x86_64.o src/boot/uefiboot.o -o src/boot/boot.so -lgnuefi -lefi
+	x86_64-linux-gnu-objcopy -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym  -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc --target efi-app-x86_64 --subsystem=10 src/boot/boot.so drive/boot.efi
 
 # super user is required for mouse movement due to current QEMU quirkiness
 # - first movement packet is sent, but none after
 # - currently works natively on QEMU for windows and under su for linux
 
-run: drive/boot.efi drive/kernel.bin
-	@sudo qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
-					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
-					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -smp 2
+build_run: drive/boot.efi drive/kernel.bin
 
-debug: debug_flag += -DAQUA_DEBUG
-debug: drive/boot.efi drive/dbg_kernel.bin
+run: build_run
 	@sudo qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
-					    -drive file=fat:rw:drive/,format=raw,media=disk -m 2048 -s -serial stdio -smp 2
+					    -drive file=fat:rw:drive/,format=raw,media=disk -m 512 -smp 2
+
+build_debug: debug_flag += -DAQUA_DEBUG
+build_debug: drive/boot.efi drive/dbg_kernel.bin
+
+debug: build_debug
+	@sudo qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
+					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
+					    -drive file=fat:rw:drive/,format=raw,media=disk -m 512 -s -serial stdio -smp 2
 
 image_run: drive/boot.efi drive/kernel.bin
 	dd if=/dev/zero of=bin/dev.img count=10 bs=1M

@@ -69,7 +69,7 @@ void kfs_printread(uint8_t drive, size_t sector, size_t length)
     for (size_t t = sector; t < (sector + length); t++)
     {
         kscreen_putf("\nkfs attempting read of drive %d sector %d...", drive, t);
-        int error = kfs_atadma(&kfs_patadrives[drive], t, 1, 1, (uint32_t)((uintptr_t)buffer & 0xFFFFFFFF));
+        int error = kfs_atadma(&kfs_patadrives[drive], t, 1, 1, buffer);
         if (error < 0)
         {
             kscreen_putf("\nerror during read!");
@@ -125,7 +125,7 @@ void kfs_printinfo()
     }
 }
 
-int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, uint32_t addr)
+int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr)
 {
     int result = 0;
     if (drive->drive_type == 1)
@@ -133,7 +133,7 @@ int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read,
     return result;
 }
 
-int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, uint32_t addr)
+int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, void *addr)
 {
     int result = 0;
     if (partition->drive->drive_type == 1)

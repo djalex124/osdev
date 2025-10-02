@@ -34,10 +34,10 @@ typedef struct {
 extern kfs_patadrive kfs_patadrives[4];
 #endif
 
-int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, uint32_t addr);
+int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr);
 
-int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, uint32_t addr);
-int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, uint32_t addr);
+int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr);
+int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, void *addr);
 
 void kfs_detectfat(kfs_drive *drive);
 void kfs_readfat(kfs_partition *partition);

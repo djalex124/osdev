@@ -30,13 +30,15 @@ void kmain(boot_table *table)
 {
 #ifdef AQUA_DEBUG
     kserial_init();
-    kcrash_initsym();
 #endif
 
     kdesc_install();
     kpit_init(1000); //sets pit to ~1ms per interrupt
 
     kmem_init(table);
+#ifdef AQUA_DEBUG
+    kcrash_initsym();
+#endif
 
     kscreen_init();
     kscreen_clr(default_color);

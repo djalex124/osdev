@@ -1,7 +1,45 @@
 #include <efi.h>
 #include <efilib.h>
 
-#include <elf.h>
+typedef uint64_t Elf64_Addr;
+
+#define SELFMAG     4
+#define EI_CLASS    4       /* File class byte index */
+#define ELFCLASS64  2       /* 64-bit objects */
+#define EI_DATA     5       /* Data encoding byte index */
+#define ELFDATA2LSB 1       /* 2's complement, little endian */
+#define ET_EXEC     2       /* Executable file */
+#define PT_LOAD     1       /* Loadable program segment */
+
+typedef struct
+{
+    uint8_t  e_ident[16];   /* Magic number and other info */
+    uint16_t e_type;        /* Object file type */
+    uint16_t e_machine;     /* Architecture */
+    uint32_t e_version;     /* Object file version */
+    uint64_t e_entry;       /* Entry point virtual address */
+    uint64_t e_phoff;       /* Program header table file offset */
+    uint64_t e_shoff;       /* Section header table file offset */
+    uint32_t e_flags;       /* Processor-specific flags */
+    uint16_t e_ehsize;      /* ELF header size in bytes */
+    uint16_t e_phentsize;   /* Program header table entry size */
+    uint16_t e_phnum;       /* Program header table entry count */
+    uint16_t e_shentsize;   /* Section header table entry size */
+    uint16_t e_shnum;       /* Section header table entry count */
+    uint16_t e_shstrndx;    /* Section header string table index */
+} Elf64_Ehdr;
+
+typedef struct
+{
+    uint32_t p_type;        /* Segment type */
+    uint32_t p_flags;       /* Segment flags */
+    uint64_t p_offset;      /* Segment file offset */
+    uint64_t p_vaddr;       /* Segment virtual address */
+    uint64_t p_paddr;       /* Segment physical address */
+    uint64_t p_filesz;      /* Segment size in file */
+    uint64_t p_memsz;       /* Segment size in memory */
+    uint64_t p_align;       /* Segment alignment */
+} Elf64_Phdr;
 
 #define EFI_BOOT
 
@@ -100,15 +138,14 @@ EFI_STATUS load_kernel(EFI_HANDLE image_handle)
 
     Print(L"[OK]: Read kernel.bin\r\n");
 
-    if (elf_header->e_ident[EI_MAG0] != ELFMAG0 ||
-        elf_header->e_ident[EI_MAG1] != ELFMAG1 ||
-        elf_header->e_ident[EI_MAG2] != ELFMAG2 ||
-        elf_header->e_ident[EI_MAG3] != ELFMAG3 ||
+    if (elf_header->e_ident[0] != 0x7F ||
+        elf_header->e_ident[1] != 'E' ||
+        elf_header->e_ident[2] != 'L' ||
+        elf_header->e_ident[3] != 'F' ||
         elf_header->e_ident[EI_CLASS] != ELFCLASS64 ||
         elf_header->e_ident[EI_DATA] != ELFDATA2LSB ||
         elf_header->e_type != ET_EXEC ||
-        elf_header->e_machine != EM_X86_64 ||
-        elf_header->e_version != EV_CURRENT)
+        elf_header->e_machine != 62)
         assert(EFI_LOAD_ERROR);
 
     header_size = elf_header->e_phnum * elf_header->e_phentsize;
@@ -226,8 +263,6 @@ EFI_STATUS create_tables_and_exit(EFI_HANDLE image_handle)
     EFI_STATUS s;
     
     UINTN start_addr = 0x100000 + kernel_size;
-    uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, EfiLoaderCode, 4, (EFI_PHYSICAL_ADDRESS)start_addr);
-
     UINTN *pt4 = (UINTN *)start_addr;
     UINTN *pt3 = (UINTN *)(start_addr + 0x1000);
     UINTN *pt2 = (UINTN *)(start_addr + 0x2000);
@@ -237,7 +272,10 @@ EFI_STATUS create_tables_and_exit(EFI_HANDLE image_handle)
     pt4[0] = (UINTN)pt3 + 0x3;
     pt4[511] = (UINTN)pt3 + 0x3;
     pt3[0] = (UINTN)pt2 + 0x3;
-    pt2[0] = 0x83; // page of first 2mb?
+    pt2[0] = 0x83; // page first 8mb for pt space
+    pt2[1] = 0x200083;
+    pt2[2] = 0x400083;
+    pt2[3] = 0x600083;
 
     table = (boot_table *)(start_addr);
     start_addr += sizeof(boot_table);

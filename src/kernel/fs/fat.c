@@ -76,7 +76,7 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
     fat16_info *info = (fat16_info *)partition->fs_data;
 
     uint32_t lba_root_dir = info->startlba + info->fatoffset + (info->fatentrycount * info->fatsize);
-    kfs_readsector(partition->drive, lba_root_dir, 1, 1, (uint32_t)((uintptr_t)fat & 0xFFFFFFFF));
+    kfs_readsector(partition->drive, lba_root_dir, 1, 1, fat);
 
     uint32_t index = 0;
     char* tmp_string = 0;
@@ -97,8 +97,10 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
             //kscreen_putf(" index %x ", lfn->order);
             if (tmp_string)
             {
-                kmem_kalloc(13);
-                memcpy(tmp_string + 13, tmp_string, 13);
+                char* new = kmem_kalloc(13 + str_len(tmp_string));
+                memcpy(new + 13, tmp_string, str_len(tmp_string));
+                kmem_kfree(tmp_string);
+                tmp_string = new;
             }
             else
                 tmp_string = kmem_kalloc(13);
@@ -127,7 +129,7 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
                     kscreen_putf("\nfound file %s", tmp_string);
                     check = 1;
                 }
-                kmem_kfree(((str_len(tmp_string) + 12) / 13) * 13);
+                kmem_kfree(tmp_string);
                 tmp_string = 0;
             }
             else
@@ -155,7 +157,7 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
                     *file_length = file->size;
                     findfile = kmem_alloc((file->size + 0x1000 - 1) / 0x1000);
 
-                    kfs_read(partition, lba, file->size, 1, (uint32_t)((uintptr_t)findfile & 0xFFFFFFFF));
+                    kfs_read(partition, lba, file->size, 1, findfile);
                 }
                 else
                     kscreen_putf("\nempty file");
@@ -184,7 +186,7 @@ void kfs_readfat(kfs_partition *partition)
     //kdebug_outf("\r\n - sectors_per_cluster = 0x%x", info->sectorspercluster);
     kscreen_putf("\nFAT16:");
 
-    kfs_readsector(partition->drive, lba_root_dir, 1, 1, (uint32_t)((uintptr_t)buffer & 0xFFFFFFFF));
+    kfs_readsector(partition->drive, lba_root_dir, 1, 1, buffer);
 
     uint32_t index = 0;
     char* tmp_string = 0;
@@ -203,8 +205,10 @@ void kfs_readfat(kfs_partition *partition)
             //kscreen_putf(" index %x ", lfn->order);
             if (tmp_string)
             {
-                kmem_kalloc(13);
-                memcpy(tmp_string + 13, tmp_string, 13);
+                char* new = kmem_kalloc(13 + str_len(tmp_string));
+                memcpy(new + 13, tmp_string, str_len(tmp_string));
+                kmem_kfree(tmp_string);
+                tmp_string = new;
             }
             else
                 tmp_string = kmem_kalloc(13);
@@ -235,7 +239,7 @@ void kfs_readfat(kfs_partition *partition)
                 if (tmp_string)
                 {
                     kscreen_putf(" LFN %s", tmp_string);
-                    kmem_kfree(((str_len(tmp_string) + 12) / 13) * 13);
+                    kmem_kfree(tmp_string);
                     tmp_string = 0;
                 }
                 else
@@ -261,9 +265,9 @@ void kfs_readfat(kfs_partition *partition)
 
 void kfs_detectfat(kfs_drive *drive)
 {
-    uint8_t *mbr = kmem_alloc(1);
+    uint8_t *mbr = kmem_alloc(2);
 
-    kfs_readsector(drive, 0, 1, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
+    kfs_readsector(drive, 0, 1, 1, mbr);
 
     size_t entry = 0;
     if (mbr[0x1be] == 0x80)
@@ -285,7 +289,7 @@ void kfs_detectfat(kfs_drive *drive)
     else
         kdebug_outf("\r\nkfs_testfat: no valid mbr, trying zero lba");
 
-    kfs_readsector(drive, start, 2, 1, (uint32_t)((uintptr_t)mbr & 0xFFFFFFFF));
+    kfs_readsector(drive, start, 2, 1, mbr);
     bpb *esp = (bpb *)mbr;
 
     //read sector count to discern type of FAT
@@ -319,12 +323,12 @@ void kfs_detectfat(kfs_drive *drive)
     //}
     else
     {
-        kmem_kfree(sizeof(kfs_partition));
-        kmem_free(mbr, 1);
+        kmem_kfree(fat_partition);
+        kmem_free(mbr, 2);
         return;
     }
 
-    kmem_free(mbr, 1);
+    kmem_free(mbr, 2);
 
     kfs_addpartition(fat_partition);
 }
