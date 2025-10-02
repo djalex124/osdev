@@ -314,13 +314,16 @@ void kmem_vmminit(uint64_t phys_low, uint64_t phys_hi)
 
 	kmem_pageentry(0, 0, phys_low * 0x1000, 0b11);
 	kmem_pageentry(0, kernel_virtual, phys_low * 0x1000, 0b11);
+	if (phys_hi)
+	{
+		kmem_pageentry(0x100000000, 0x100000000, (phys_hi * 0x1000) - 0x100000000, 0b11);
+		kmem_pageentry(0x100000000, kernel_virtual + 0x100000000, (phys_hi * 0x1000) - 0x100000000, 0b11);
+	}
 	void *current = kmem_palloc(1);
 	kmem_pageentry((uint64_t)pt4, (uint64_t)pt4, 
 		(uint64_t)current - (uint64_t)pt4, 0b11);
 	kmem_pfree(current, 1);
 
-	kdebug_outf("\nkm_iv: --- TO-DO add high memory to paging");
-	
 	//when paging permissions set up, mark both as protected
 	
 	asm volatile("mov %0, %%cr3" ::"r"((uintptr_t)pt4));
@@ -336,4 +339,10 @@ void kmem_vmminit(uint64_t phys_low, uint64_t phys_hi)
     kernel_vmmap_start[0].current = 0;
 
     (void)kmem_virtmapalloc(phys_low * 0x1000);
+	if (phys_hi)
+	{
+		void* temp = kmem_virtmapalloc(0x100000000 - (phys_low * 0x1000));
+		(void)kmem_virtmapalloc((phys_hi * 0x1000) - 0x100000000);
+		kmem_virtmapfree((uint64_t)temp);
+	}
 }

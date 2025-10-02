@@ -279,7 +279,7 @@ void kscreen_init()
     cw = kgraphics.horizontal_res / ((psf_font *)&_binary____font_psf_start)->width;
     ch = kgraphics.vertical_res / ((psf_font *)&_binary____font_psf_start)->height;
     
-    kscreen_buffer = kmem_alloc((kgraphics.horizontal_res * kgraphics.vertical_res * 4)/0x1000 + 1);
+    kscreen_buffer = kmem_alloc((kgraphics.horizontal_res * kgraphics.vertical_res * 4)/0x1000);
 
 #ifdef AQUA_DEBUG
     kdebug_outf("\r\nkscr: buffer [0x%x]", (uintptr_t)kscreen_buffer);

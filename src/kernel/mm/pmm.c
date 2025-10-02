@@ -59,17 +59,21 @@ void kmem_printpmminfo()
 void kmem_pmapset(uint64_t page, uint64_t length, uint8_t used, uint8_t low)
 {
 	uint64_t *bitmap = 0;
+	uint64_t index = page;
 	if (low == 0)
 		bitmap = kmem_bitmap_low;
 	else
+	{
 		bitmap = kmem_bitmap_hi;
+		index -= 0x100000000 / 0x1000;
+	}
 
 	for (size_t b = 0; b < length; b++)
 	{
 		if (used)
-			bitmap[(page + b) / 64] |= ((uint64_t)1 << ((page + b) % 64));
+			bitmap[(index + b) / 64] |= ((uint64_t)1 << ((index + b) % 64));
 		else
-			bitmap[(page + b) / 64] &= ~((uint64_t)1 << ((page + b) % 64));
+			bitmap[(index + b) / 64] &= ~((uint64_t)1 << ((index + b) % 64));
 	}
 }
 
@@ -90,10 +94,10 @@ void kmem_pmminit(uint64_t low_size, uint64_t high_size)
 
     if (high_size)
     {
-        uint64_t bitmap_pages_hi = ((high_size / 8) + 0xFFF) & ~0xFFF;
+        uint64_t bitmap_pages_hi = (((high_size - 0x100000000 / 0x1000) / 8) + 0xFFF) & ~0xFFF;
 
         kmem_bitmap_hi = (uint64_t *)k_boottable.safe_mem;
-        kmem_bitmap_hi_max = high_size / 64;
+        kmem_bitmap_hi_max = (high_size - 0x100000000 / 0x1000) / 64;
         k_boottable.safe_mem += bitmap_pages_hi;
 		memset((void *)kmem_bitmap_hi, 0xFF, bitmap_pages_hi);
 #ifdef AQUA_DEBUG_MEM

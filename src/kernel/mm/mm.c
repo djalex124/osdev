@@ -79,7 +79,7 @@ void kmem_heapinit()
 }
 
 //gets pages in kernel space
-void* kmem_alloc(uint64_t pages)
+void* kmem_alloc(size_t pages)
 {
     uint64_t *phys = kmem_palloc(pages);
     void *addr = kmem_page((uint64_t)phys, pages * 0x1000, 0b11);
@@ -90,7 +90,7 @@ void* kmem_alloc(uint64_t pages)
 }
 
 //frees pages in kernel space
-void kmem_free(void *addr, uint64_t pages)
+void kmem_free(void *addr, size_t pages)
 {
     void *phys = kmem_getphysical(addr);
     kmem_pfree(phys, pages);
@@ -156,7 +156,7 @@ void kmem_init(boot_table *table)
 #ifdef AQUA_DEBUG_MEM
     kdebug_outf("\nkm_i: bitmaps will address low:0x0-0x%x", bitmap_low * 0x1000);
     if (bitmap_hi)
-        kdebug_outf(" high:0x%x-0x%x", 0x100000000, bitmap_hi);
+        kdebug_outf(" high:0x%x-0x%x", 0x100000000, bitmap_hi * 0x1000);
 
     kdebug_outf("\nkm_i: bitmaps size low:0x%x", bitmap_low / 8);
     if (bitmap_hi)

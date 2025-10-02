@@ -272,10 +272,10 @@ EFI_STATUS create_tables_and_exit(EFI_HANDLE image_handle)
     pt4[0] = (UINTN)pt3 + 0x3;
     pt4[511] = (UINTN)pt3 + 0x3;
     pt3[0] = (UINTN)pt2 + 0x3;
-    pt2[0] = 0x83; // page first 8mb for pt space
-    pt2[1] = 0x200083;
-    pt2[2] = 0x400083;
-    pt2[3] = 0x600083;
+
+    for (UINTN addr = 0; addr < 64; addr++)
+        pt2[addr] = (addr * 0x200000) | 0x83;
+    //page first 128mb
 
     table = (boot_table *)(start_addr);
     start_addr += sizeof(boot_table);

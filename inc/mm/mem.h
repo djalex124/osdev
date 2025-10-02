@@ -12,7 +12,7 @@ void kmem_pmminit(uint64_t low_size, uint64_t high_size);
 void kmem_heapinit();
 void kmem_vmminit(uint64_t low_size, uint64_t high_size);
 
-//#define AQUA_DEBUG_MEM
+#define AQUA_DEBUG_MEM
 
 #include <kernel/kernel.h>
 void kmem_init(boot_table *table);
