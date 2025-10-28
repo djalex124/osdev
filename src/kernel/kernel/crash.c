@@ -450,7 +450,7 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
                     kcrash_string, line, column);
                 if (screen)
                 {
-                    kscreen_putf(" (function:%s line:%d column:%d)", 
+                    kterm_putf(" (function:%s line:%d column:%d)", 
                         kcrash_string, line, column);
                 }
                 high = 0;
@@ -465,7 +465,7 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
         {
             kdebug_outf(" file:%s", kcrash_file);
             if (screen)
-                kscreen_putf(" file:%s", kcrash_file);
+                kterm_putf(" file:%s", kcrash_file);
             high = 0;
             low = 0;
         }
@@ -491,7 +491,7 @@ void kcrash_debug(uint64_t rip)
     if (!debug_info || !debug_info_len || !debug_abbrev || !debug_str || !debug_line_str)
     {
         if (screen)
-            kscreen_putf(" (no debug info found)");
+            kterm_putf(" (no debug info found)");
         kdebug_outf(" (no debug info found)");
         return;
     }
@@ -512,7 +512,7 @@ void kcrash(char *message)
     already_crashing++;
 
     if (screen)
-        kscreen_putf("\n%n%m\n AQUA has crashed! \n Reason: [%s] \n", 0xFF0000, 0x0, message);
+        kterm_putf("\n%n%m\n AQUA has crashed! \n Reason: [%s] \n", 0xFF0000, 0x0, message);
     kdebug_outf("\n\n AQUA has crashed! \n Reason: [%s] \n", message);
 
     struct kstackframe* stack = (struct kstackframe*)rbp;
@@ -520,7 +520,7 @@ void kcrash(char *message)
     for (unsigned frame = 0; stack && frame < 8; ++frame)
     {
         if (screen)
-            kscreen_putf("\nkcrash: [0x%x]", stack->rip);
+            kterm_putf("\nkcrash: [0x%x]", stack->rip);
         kdebug_outf("\nkcrash: [0x%x]", stack->rip);
 #ifdef AQUA_DEBUG
         if (already_crashing < 2)

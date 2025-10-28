@@ -1,4 +1,4 @@
-#include <output/screen.h>
+#include <output/kterm.h>
 
 #include <kernel/kstring.h>
 #include <kernel/kernel.h>
@@ -52,7 +52,7 @@ void kmem_printpmminfo()
 		}
 	}
 
-	kscreen_putf("\npmm stats: %d/%d frames used", used_pages,
+	kterm_putf("\npmm stats: %d/%d frames used", used_pages,
 		kmem_bitmap_low_max * 64 + kmem_bitmap_hi_max * 64);
 }
 
@@ -212,7 +212,8 @@ void* kmem_palloc(size_t pages)
 		else
 			kmem_pmapset(continuous_start, continuous_open, 1, 0);
 
-		return (void *)(phys_addr);
+		memset((void *)phys_addr, 0, pages * 0x1000);
+		return (void *)phys_addr;
 	}
 	
 	kdebug_outf("\nkm_p: unable to gather 0x%x pages, returning null", pages);

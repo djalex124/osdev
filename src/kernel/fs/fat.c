@@ -3,7 +3,7 @@
 #include <kernel/kstring.h>
 #include <kernel/debug.h>
 
-#include <output/screen.h>
+#include <output/kterm.h>
 
 #include <x86_64/pci.h>
 
@@ -93,8 +93,8 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
         if (fat[index + 11] == 0x0F)
         {
             formatLFN *lfn = (formatLFN *)&fat[index];
-            //kscreen_putf("\n LFN entry -");
-            //kscreen_putf(" index %x ", lfn->order);
+            //kterm_putf("\n LFN entry -");
+            //kterm_putf(" index %x ", lfn->order);
             if (tmp_string)
             {
                 char* new = kmem_kalloc(13 + str_len(tmp_string));
@@ -126,7 +126,7 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
             {
                 if (strn_cmp(filename, tmp_string, str_len(tmp_string)) == 0)
                 {
-                    kscreen_putf("\nfound file %s", tmp_string);
+                    kterm_putf("\nfound file %s", tmp_string);
                     check = 1;
                 }
                 kmem_kfree(tmp_string);
@@ -142,7 +142,7 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
                 if (strn_cmp(str_tolower(filename), str_tolower(first), length) == 0
                     && strn_cmp(str_tolower(filename + length + 1), str_tolower(last), 3) == 0)
                 {
-                    kscreen_putf("\nfound file %s", filename);
+                    kterm_putf("\nfound file %s", filename);
                     check = 1; //non lfn should be non case sensitive
                 }
             }
@@ -160,7 +160,7 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
                     kfs_read(partition, lba, file->size, 1, findfile);
                 }
                 else
-                    kscreen_putf("\nempty file");
+                    kterm_putf("\nempty file");
 
                 break;
             }
@@ -184,7 +184,7 @@ void kfs_readfat(kfs_partition *partition)
     uint32_t lba_root_dir = info->startlba + info->fatoffset + (info->fatentrycount * info->fatsize);
     //kdebug_outf("\r\n - lba_root_dir = 0x%x", lba_root_dir);
     //kdebug_outf("\r\n - sectors_per_cluster = 0x%x", info->sectorspercluster);
-    kscreen_putf("\nFAT16:");
+    kterm_putf("\nFAT16:");
 
     kfs_readsector(partition->drive, lba_root_dir, 1, 1, buffer);
 
@@ -201,8 +201,8 @@ void kfs_readfat(kfs_partition *partition)
         if (buffer[index + 11] == 0x0F)
         {
             formatLFN *lfn = (formatLFN *)&buffer[index];
-            //kscreen_putf("\n LFN entry -");
-            //kscreen_putf(" index %x ", lfn->order);
+            //kterm_putf("\n LFN entry -");
+            //kterm_putf(" index %x ", lfn->order);
             if (tmp_string)
             {
                 char* new = kmem_kalloc(13 + str_len(tmp_string));
@@ -222,15 +222,15 @@ void kfs_readfat(kfs_partition *partition)
         else
         {
             format83 *file = (format83 *)&buffer[index];
-            kscreen_putf("\n");
+            kterm_putf("\n");
             uint8_t isfile = 0;
             if (file->attributes & 0x8)
-                kscreen_putf(" VOLUME_ID:");
+                kterm_putf(" VOLUME_ID:");
             else if (file->attributes & 0x10)
-                kscreen_putf(" DIRECTORY:");
+                kterm_putf(" DIRECTORY:");
             else
             {
-                kscreen_putf(" FILE:");
+                kterm_putf(" FILE:");
                 isfile = 1;
             }
 
@@ -238,24 +238,24 @@ void kfs_readfat(kfs_partition *partition)
             {
                 if (tmp_string)
                 {
-                    kscreen_putf(" LFN %s", tmp_string);
+                    kterm_putf(" LFN %s", tmp_string);
                     kmem_kfree(tmp_string);
                     tmp_string = 0;
                 }
                 else
                 {
                     char *first = str_tok((char *)file->name, " ");
-                    kscreen_putf(" %8s.%3s", first, (char *)&file->name[8]);
+                    kterm_putf(" %8s.%3s", first, (char *)&file->name[8]);
                 }
                 if (file->size)
-                    kscreen_putf(" SIZE: 0x%x bytes", file->size);
+                    kterm_putf(" SIZE: 0x%x bytes", file->size);
             }
             else
-                kscreen_putf(" %11s", file->name);
+                kterm_putf(" %11s", file->name);
             
             uint32_t lba = (((file->first_cluster_higher << 16) + file->first_cluster_lower - 2) * info->sectorspercluster)
                 + info->rootsize + lba_root_dir;
-            kscreen_putf(" LBA: %d", lba);
+            kterm_putf(" LBA: %d", lba);
         }
         index += 32;
     }

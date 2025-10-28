@@ -1,11 +1,14 @@
 #include <limits.h>
 #include <cpuid.h>
+#include <stdarg.h>
 
 #include <kernel/kstring.h>
 #include <kernel/kernel.h>
 #include <kernel/crash.h>
+#include <kernel/debug.h>
 
 #include <output/screen.h>
+#include <output/kterm.h>
 
 #include <x86_64/acpi/acpi.h>
 #include <x86_64/pci.h>
@@ -36,9 +39,255 @@ uint32_t kterm_bg = default_color;
 kkeyboard_state *kterm_next;
 uint8_t kterm_changed = 0;
 
+extern graphics_info kgraphics;
+uint32_t *kterm_gbuffer;
+
 int kterm_currentpartition = -1;
 
 extern uint8_t kacpi_apsrunning;
+
+extern char _binary____font_psf_start[];
+uint32_t fg, bg;
+unsigned int cx = 0, cy = 0, cw = 0, ch = 0;
+psf_font *font;
+
+static inline void kterm_putp(int x, int y, uint32_t color)
+{
+    if (x >= kgraphics.horizontal_res || x < 0)
+        return;
+    else if (y >= kgraphics.vertical_res || y < 0)
+        return;
+    
+    unsigned where = x*4 + y*kgraphics.ppsl*4;
+    ((unsigned char*)kterm_gbuffer)[where] = color & 0xFF;
+    ((unsigned char*)kterm_gbuffer)[where + 1] = (color >> 8) & 0xFF;
+    ((unsigned char*)kterm_gbuffer)[where + 2] = (color >> 16) & 0xFF;
+}
+
+void kterm_drawrect(int x, int y, int w, int h, uint32_t color)
+{
+    for (int i = 0; i < h; i++)
+        for (int j = 0; j < w; j++)
+            kterm_putp(x + j, y + i, color);
+}
+
+void kterm_clr(uint32_t color)
+{
+    kterm_drawrect(0, 0, kgraphics.horizontal_res, kgraphics.vertical_res, color);
+}
+
+void kterm_putc(uint16_t c)
+{
+    font = (psf_font *)&_binary____font_psf_start;
+    int sx = cx * font->width;
+    int sy = cy * font->height;
+    int bp_line = (font->width + 7) / 8;
+    unsigned char* glyph =
+        (unsigned char*)&_binary____font_psf_start +
+        font->header_size +
+        (c > 0 && c < font->num_glyph ? c : 0)*font->bp_glyph;
+    int x, y, mask;
+    for (y = 0; y < font->height; y++)
+    {
+        sx = cx * font->width;
+        mask = 1 << (font->width - 1);
+        for (x = 0; x < font->width; x++)
+        {
+            kterm_putp(sx, sy, *((unsigned int *)glyph) & mask ? fg : bg);
+            mask >>= 1;
+            sx++;
+        }
+        //kscreen_putp(sx, sy, bg);
+        glyph += bp_line;
+        sy++;
+    }
+}
+
+void kterm_scroll()
+{
+    memcpy_ssealign(kterm_gbuffer + (font->height * kgraphics.ppsl),
+        kterm_gbuffer + 2 * (font->height * kgraphics.ppsl),
+        (ch - 2) * kgraphics.ppsl * font->height * 4);
+    kterm_drawrect(0, (cy - 1) * font->height, kgraphics.horizontal_res, font->height, bg);
+    
+    cy--;
+}
+
+inline void kterm_nextline()
+{
+    if (++cx == cw)
+    {
+        cx = 0;
+        if (++cy == ch)
+            kterm_scroll();
+    }
+}
+
+void kterm_printc(uint16_t c)
+{
+    if (c == '\r')
+    {
+        cx = 0;
+        return;
+    }
+    else if (c == '\n')
+    {
+        cx = 0;
+        if (++cy == ch)
+            kterm_scroll();
+        return;
+    }
+    else if (c == '\0')
+        kterm_putc(' ');
+    else
+        kterm_putc(c);
+    
+    kterm_nextline();
+}
+
+void kterm_prints(char* s)
+{
+    for (size_t i = 0; i < str_len(s); i++)
+        kterm_printc(s[i]);
+}
+
+// kterm_putf - options %n for fg color and %m for bg color
+void kterm_putf(const char *fmt, ...)
+{
+    va_list arg;
+    va_start(arg, fmt);
+
+    uint64_t unsign;
+    int64_t sign;
+    char *s;
+    char c;
+    int length;
+    int len;
+    int j;
+    
+    for (int count = 0; count < str_len(fmt); count++)
+    {
+        if (fmt[count] != '%')
+        {
+            kterm_printc(fmt[count]);
+            continue;
+        }
+
+        count++;
+
+        length = 0;
+        len = 0;
+        j = 0;
+
+        if (fmt[count] >= '0' && fmt[count] <= '9')
+        {
+            while (fmt[count] >= '0' && fmt[count] <= '9')
+            {
+                length = 10 * length + fmt[count] - '0';
+                count++;
+            }
+        }
+        else if (fmt[count] == '*')
+        {
+            length = va_arg(arg, int);
+            count++;
+        }
+
+        switch (fmt[count])
+        {
+            case 'n':
+                unsign = va_arg(arg, uint64_t);
+                fg = unsign;
+                break;
+            case 'm':
+                unsign = va_arg(arg, uint64_t);
+                bg = unsign;
+                break;
+            case 's':
+                s = va_arg(arg, char *);
+                if (length == 0)
+                {
+                    kterm_prints(s);
+                    break;
+                }
+                len = str_len(s);
+                j = 0;
+                while (j < length)
+                {
+                    if (j > len)
+                        kterm_printc(' ');
+                    else
+                        kterm_printc(s[j]);
+                    j++;
+                }
+                break;
+            case 'c':
+                c = va_arg(arg, int);
+                if (c == 0)
+                    break;
+                kterm_putc(c);
+                kterm_nextline();
+                break;
+            case 'b':
+                unsign = va_arg(arg, uint64_t);
+                s = str_utoa(unsign, 2);
+                if (length == 0)
+                {
+                    kterm_prints(s);
+                    break;
+                }
+                for (len = str_len(s); length > len; length--)
+                    kterm_printc('0');
+                kterm_prints(s);
+                break;
+            case 'd':
+                sign = va_arg(arg, int64_t);
+                s = str_itoa(sign, 10);
+                if (length == 0)
+                {
+                    kterm_prints(s);
+                    break;
+                }
+                for (len = str_len(s); length > len; length--)
+                    kterm_printc('0');
+                kterm_prints(s);
+                break;
+            case 'x':
+                unsign = va_arg(arg, uint64_t);
+                s = str_utoa(unsign, 16);
+                if (length == 0)
+                {
+                    kterm_prints(s);
+                    break;
+                }
+                for (len = str_len(s); length > len; length--)
+                    kterm_printc('0');
+                kterm_prints(s);
+                break;
+            default:
+                kterm_printc(fmt[count]);
+                break;
+        }
+    }
+
+    va_end(arg);
+
+    kscreen_copy();
+}
+
+kscreen_pos kterm_getpos()
+{
+    kscreen_pos out;
+    out.x = cx;
+    out.y = cy;
+    return out;
+}
+
+void kterm_setpos(kscreen_pos pos)
+{
+    cx = pos.x;
+    cy = pos.y;
+}
 
 void kterm_input(kkeyboard_state *k)
 {
@@ -50,8 +299,8 @@ void kterm_header()
 {
     kterm_pos.x = 0;
     kterm_pos.y = 0;
-    kscreen_setpos(kterm_pos);
-    kscreen_putf("%m%n%s%n%m", 0xA9A9A9, 0, kterm_titletext, kterm_fg, kterm_bg);
+    kterm_setpos(kterm_pos);
+    kterm_putf("%m%n%s%n%m", 0xA9A9A9, 0, kterm_titletext, kterm_fg, kterm_bg);
 }
 
 void kterm_run()
@@ -66,13 +315,13 @@ void kterm_run()
 
     if (str_cmp(kterm_argv[0], "clear") == 0)
     {
-        kscreen_clr(default_color);
+        kterm_clr(default_color);
         kterm_header();
     }
     else if (str_cmp(kterm_argv[0], "compare") == 0)
     {
         if (kterm_argc < 3)
-            kscreen_putf("\nNot enough arguments.");
+            kterm_putf("\nNot enough arguments.");
         else
         {
             long a = 0, b = 0;
@@ -80,13 +329,13 @@ void kterm_run()
                 a = str_atoi(kterm_argv[1]);
             if (kterm_argv[2])
                 b = str_atoi(kterm_argv[2]);
-            kscreen_putf("\nlarger number is: ");
+            kterm_putf("\nlarger number is: ");
             if (a == b)
-                kscreen_putf("both numbers (%d) (%d)", a, b);
+                kterm_putf("both numbers (%d) (%d)", a, b);
             else if (a > b)
-                kscreen_putf("number 1 (%d)", a);
+                kterm_putf("number 1 (%d)", a);
             else
-                kscreen_putf("number 2 (%d)", b);
+                kterm_putf("number 2 (%d)", b);
         }
     }
     else if (str_cmp(kterm_argv[0], "cpu_info") == 0)
@@ -94,7 +343,7 @@ void kterm_run()
         unsigned int ax, bx, cx, dx;
         __cpuid(0, ax, bx, cx, dx);
 
-        kscreen_putf("\n - Vendor [%4s%4s%4s]", &bx, &dx, &cx);
+        kterm_putf("\n - Vendor [%4s%4s%4s]", &bx, &dx, &cx);
 
         __cpuid(0x80000000, ax, bx, cx, dx);
         if (ax >= 0x80000004)
@@ -106,38 +355,38 @@ void kterm_run()
             name[12] = 0;
             
             str_trim((char *)name);
-            kscreen_putf(" Brand [%s]", name);
+            kterm_putf(" Brand [%s]", name);
             kmem_free(name, 1);
         }
 
         __cpuid(1, ax, bx, cx, dx);
-        kscreen_putf("\n - Features Tracked:");
+        kterm_putf("\n - Features Tracked:");
         if (dx & (1 << 25))
-            kscreen_putf(" SSE");
+            kterm_putf(" SSE");
         if (dx & (1 << 26))
-            kscreen_putf(" SSE2");
+            kterm_putf(" SSE2");
         if (cx & (1 << 0))
-            kscreen_putf(" SSE3");
+            kterm_putf(" SSE3");
         if (cx & (1 << 9))
-            kscreen_putf(" SSSE3");
+            kterm_putf(" SSSE3");
         if (cx & (1 << 19))
-            kscreen_putf(" SSE4.1");
+            kterm_putf(" SSE4.1");
         if (cx & (1 << 20))
-            kscreen_putf(" SSE4.2");
+            kterm_putf(" SSE4.2");
         if (cx & (1 << 28))
-            kscreen_putf(" AVX");
+            kterm_putf(" AVX");
 
-        kscreen_putf("\n - Total APs Running: %d", kacpi_apsrunning);
+        kterm_putf("\n - Total APs Running: %d", kacpi_apsrunning);
     }
     else if (str_cmp(kterm_argv[0], "crash") == 0)
     {
-        kscreen_putf("\nInitiating crash...");
+        kterm_putf("\nInitiating crash...");
         kcrash("User Requested");
     }
     else if (str_cmp(kterm_argv[0], "fs") == 0)
     {
         if (kterm_argc < 2)
-            kscreen_putf("\nNot enough arguments.");
+            kterm_putf("\nNot enough arguments.");
         else
         {
             long part = 0;
@@ -146,17 +395,17 @@ void kterm_run()
             
             if (part < 0 || part > 15)
             {
-                kscreen_putf("\nInvalid partition selection.");
+                kterm_putf("\nInvalid partition selection.");
                 kterm_currentpartition = -1;
             }
             else if ((uint64_t)k_infotable.kfs_partitions[part] == 0)
             {
-                kscreen_putf("\nPartition does not exist.");
+                kterm_putf("\nPartition does not exist.");
                 kterm_currentpartition = -1;
             }
             else
             {
-                kscreen_putf("\nPartition set to %d.", part);
+                kterm_putf("\nPartition set to %d.", part);
                 kterm_currentpartition = part;
             }
         }
@@ -164,42 +413,42 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "fs_info") == 0)
     {
         kfs_printinfo();
-        kscreen_putf("\nmounted partitions:");
+        kterm_putf("\nmounted partitions:");
         for (int i = 0; i < 15; i++)
         {
             if ((uint64_t)k_infotable.kfs_partitions[i])
             {
-                kscreen_putf("\n partition %d:", i);
+                kterm_putf("\n partition %d:", i);
                 kfs_printpartition(k_infotable.kfs_partitions[i]);
             }
         }
     }
     else if (str_cmp(kterm_argv[0], "font") == 0)
     {
-        kscreen_putf("\n");
+        kterm_putf("\n");
         uint8_t c = 0;
         for (; c < 255; c++)
-            kscreen_putf("%c", c);
+            kterm_putf("%c", c);
     }
     else if (str_cmp(kterm_argv[0], "help") == 0)
     {
-        kscreen_putf("\nList of currently available commands:");
-        kscreen_putf("\n clear - clears the screen");
-        kscreen_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
-        kscreen_putf("\n cpu_info - lists CPU model and capabilities");
-        kscreen_putf("\n crash - crashes the AQUA kernel");
-        kscreen_putf("\n fs - sets the currently selected partition for file operations");
-        kscreen_putf("\n fs_info - lists detected disks and drives");
-        kscreen_putf("\n font - prints all characters in boot font");
-        kscreen_putf("\n help - lists available commands");
-        kscreen_putf("\n mem_info - prints current memory usage");
-        kscreen_putf("\n pci_info - prints pci busses and devices");
-        kscreen_putf("\n read [drive] [starting sector] [sectors] - attempt read of given number of sectors on selected drive");
-        kscreen_putf("\n read_file [filename] - attempt read of file on selected partition");
-        kscreen_putf("\n shutdown - attempts acpi shutdown");
-        kscreen_putf("\n test - test random features");
-        kscreen_putf("\n test_mouse - tests ps2 mouse input");
-        kscreen_putf("\n wait [num1] - wait given number of seconds");
+        kterm_putf("\nList of currently available commands:");
+        kterm_putf("\n clear - clears the screen");
+        kterm_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
+        kterm_putf("\n cpu_info - lists CPU model and capabilities");
+        kterm_putf("\n crash - crashes the AQUA kernel");
+        kterm_putf("\n fs - sets the currently selected partition for file operations");
+        kterm_putf("\n fs_info - lists detected disks and drives");
+        kterm_putf("\n font - prints all characters in boot font");
+        kterm_putf("\n help - lists available commands");
+        kterm_putf("\n mem_info - prints current memory usage");
+        kterm_putf("\n pci_info - prints pci busses and devices");
+        kterm_putf("\n read [drive] [starting sector] [sectors] - attempt read of given number of sectors on selected drive");
+        kterm_putf("\n read_file [filename] - attempt read of file on selected partition");
+        kterm_putf("\n shutdown - attempts acpi shutdown");
+        kterm_putf("\n test - test random features");
+        kterm_putf("\n test_mouse - tests ps2 mouse input");
+        kterm_putf("\n wait [num1] - wait given number of seconds");
     }
     else if (str_cmp(kterm_argv[0], "mem_info") == 0)
     {
@@ -207,14 +456,14 @@ void kterm_run()
     }
     else if (str_cmp(kterm_argv[0], "pci_info") == 0)
     {
-        kscreen_putf("\nkpci_info: current pci device table");
+        kterm_putf("\nkpci_info: current pci device table");
         kpci_device* kpci_table = k_infotable.kpci_table;
         uint32_t dev_id;
         for (int i = 0; i < k_infotable.kpci_tablesize; i++)
         {
             dev_id = kpci_configread(kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function, PCI_OFFSET_DEVICEID);
-            kscreen_putf("\n - %2x:%2x:%2x ", kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
-            kscreen_putf("VendorID %4x DeviceID %4x [%s]/[%s]",
+            kterm_putf("\n - %2x:%2x:%2x ", kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
+            kterm_putf("VendorID %4x DeviceID %4x [%s]/[%s]",
                 kpci_table[i].vendorid, dev_id,
                 kpci_getclassname(kpci_table[i].class),
                 kpci_getsubclassname(kpci_table[i].class, kpci_table[i].subclass));
@@ -223,7 +472,7 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "read") == 0)
     {
         if (kterm_argc < 4)
-            kscreen_putf("\nNot enough arguments.");
+            kterm_putf("\nNot enough arguments.");
         else
         {
             uint64_t a = 0, b = 0, c = 0;
@@ -239,15 +488,15 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "read_file") == 0)
     {
         if (kterm_argc < 2)
-            kscreen_putf("\nNot enough arguments.");
+            kterm_putf("\nNot enough arguments.");
         else if (kterm_currentpartition < 0 || kterm_currentpartition > 15)
         {
-            kscreen_putf("\nInvalid partition selection.");
+            kterm_putf("\nInvalid partition selection.");
             kterm_currentpartition = -1;
         }
         else if ((uint64_t)k_infotable.kfs_partitions[kterm_currentpartition] == 0)
         {
-            kscreen_putf("\nPartition does not exist.");
+            kterm_putf("\nPartition does not exist.");
             kterm_currentpartition = -1;
         }
         else
@@ -260,24 +509,24 @@ void kterm_run()
     }
     else if (str_cmp(kterm_argv[0], "shutdown") == 0)
     {
-        kscreen_putf("\nTrying to shutdown from ACPI...");
+        kterm_putf("\nTrying to shutdown from ACPI...");
         kacpi_shutdown();
     }
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {
-        kscreen_putf("\ntest output of the commands!!");
+        kterm_putf("\ntest output of the commands!!");
         uint16_t* test = kmem_palloc(2);
         uint16_t* test2 = kmem_page((uint64_t)&test[15], 0x1000, 0b11);
-        kscreen_putf("\ntest %x", (uint64_t)test2);
+        kterm_putf("\ntest %x", (uint64_t)test2);
         test2[32] = 0xCA;
-        kscreen_putf("\ntest2[32] %x", test2[32]);
+        kterm_putf("\ntest2[32] %x", test2[32]);
         kmem_unpage(test2, 0x1000);
         kmem_pfree(test, 2);
-        kscreen_putf("\nwait a few second :) -");
+        kterm_putf("\nwait a few second :) -");
         for (uint16_t i = 1; i <= 5; i++)
         {
             ksleep(1000);
-            kscreen_putf(" %d", i);
+            kterm_putf(" %d", i);
         }
     }
     else if (str_cmp(kterm_argv[0], "test_mouse") == 0)
@@ -288,7 +537,7 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "wait") == 0)
     {
         if (kterm_argc < 2)
-            kscreen_putf("\nNot enough arguments.");
+            kterm_putf("\nNot enough arguments.");
         else
         {
             int64_t input = 0;
@@ -296,18 +545,18 @@ void kterm_run()
                 input = str_atoi(kterm_argv[1]);
             if (input >= 0)
             {    
-                kscreen_putf("\nWaiting %d seconds...", input);
+                kterm_putf("\nWaiting %d seconds...", input);
                 ksleep(input * 1000);
             }
             else
-                kscreen_putf("\nInvalid number.");
+                kterm_putf("\nInvalid number.");
         }
     }
     else if (kterm_argv[0] == NULL)
         return;
     else
     {
-        kscreen_putf("\nCommand \'%s\' not found.\nUse the command \'help\' to list available commands.", kterm_argv[0]);
+        kterm_putf("\nCommand \'%s\' not found.\nUse the command \'help\' to list available commands.", kterm_argv[0]);
     }
 }
 
@@ -343,35 +592,35 @@ void kterm_processinput()
                 kterm_prevtermpos();
                 kscreen_pos p = kterm_pos;
                 kterm_prevtermpos();
-                kscreen_setpos(kterm_pos);
-                kscreen_putf("%c ", 128);
-                kscreen_setpos(p);
+                kterm_setpos(kterm_pos);
+                kterm_putf("%c ", 128);
+                kterm_setpos(p);
                 kterm_bufferindex--;
                 kterm_buffer[kterm_bufferindex] = 0;
             }
             break;
         case '\r':
             kterm_prevtermpos();
-            kscreen_setpos(kterm_pos);
-            kscreen_putf(" ");
-            kscreen_setpos(kterm_pos);
+            kterm_setpos(kterm_pos);
+            kterm_putf(" ");
+            kterm_setpos(kterm_pos);
             kterm_run();
             memset(kterm_argv, 0, sizeof(kterm_argv));
             kterm_argc = 0;
             memset(kterm_buffer, 0, sizeof(kterm_buffer));
             kterm_bufferindex = 0;
-            kterm_pos = kscreen_getpos();
+            kterm_pos = kterm_getpos();
             if (kterm_pos.x != 0 && kterm_pos.y != ch)
-                kscreen_putf("\n");
+                kterm_putf("\n");
             if (kterm_currentpartition != -1)
-                kscreen_putf("(%d) ", kterm_currentpartition);
-            kscreen_putf("%s%c", kterm_prompt, 128);
+                kterm_putf("(%d) ", kterm_currentpartition);
+            kterm_putf("%s%c", kterm_prompt, 128);
             break;
         default:
             if (kterm_bufferindex == kterm_buffersize - 1)
                 break;
             kterm_prevtermpos();
-            kscreen_setpos(kterm_pos);
+            kterm_setpos(kterm_pos);
             uint8_t upper = 0;
             if (key >= 'a' && key <= 'z')
             {
@@ -382,13 +631,13 @@ void kterm_processinput()
                 upper = 1;
             if (upper)
                 key = kkeyboard_keymapUSqwerty_upper[kterm_next->scancode];
-            kscreen_putf("%c%c", key, 128);
+            kterm_putf("%c%c", key, 128);
             kterm_buffer[kterm_bufferindex] = key;
             kterm_bufferindex++;
             break;
     }
 
-    kterm_pos = kscreen_getpos();
+    kterm_pos = kterm_getpos();
 }
 
 void kterm_loop()
@@ -405,13 +654,24 @@ void kterm_loop()
     }
 }
 
+uint8_t kterm_draw = 0;
+
 void kterm_init()
 {
+    cw = kgraphics.horizontal_res / ((psf_font *)&_binary____font_psf_start)->width;
+    ch = kgraphics.vertical_res / ((psf_font *)&_binary____font_psf_start)->height;
+    
+    kterm_gbuffer = kscreen_setterm();
+    kdebug_outf("\nkterm: kterm_gbuffer %x", (uintptr_t)kterm_gbuffer);
+
+    kterm_clr(kterm_bg);
     kterm_header();
     kkeyboard_setinput(*kterm_input);
-    kscreen_putf("\nWelcome to ConcatenOS!");
-    kscreen_putf("\nTo get started, run 'help' for a list of commands.");
-    kscreen_putf("\n%s%c", kterm_prompt, 128);
-    kterm_pos = kscreen_getpos();
+    kterm_putf("\nWelcome to ConcatenOS!");
+    kterm_putf("\nTo get started, run 'help' for a list of commands.");
+    kterm_putf("\n%s%c", kterm_prompt, 128);
+    kterm_pos = kterm_getpos();
+    
+    kterm_draw = 1;
     kscreen_copy();
 }

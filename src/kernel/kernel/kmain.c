@@ -42,6 +42,7 @@ void kmain(boot_table *table)
 
     kscreen_init();
     kscreen_clr(default_color);
+    kscreen_copy();
 
     asm("sti");
 
@@ -71,6 +72,8 @@ void kmain(boot_table *table)
         - Mutexes, Semaphores, etc
         - Threads
         - Processes
+    - IPC / Messaging
+        - Real messaging system for interrupts
     - ELF Support
     - Syscalls
         - Memory management

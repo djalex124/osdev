@@ -5,7 +5,7 @@
 #include <kernel/debug.h>
 #include <kernel/crash.h>
 
-#include <output/screen.h>
+#include <output/kterm.h>
 
 #include <x86_64/pci.h>
 #include <x86_64/pit.h>
@@ -20,12 +20,12 @@ void kfs_printreadfile(uint8_t partition, char *filename)
 {
     if ((uint64_t)k_infotable.kfs_partitions[partition] == 0)
     {
-        kscreen_putf("\ninvalid partition number!");
+        kterm_putf("\ninvalid partition number!");
         return;
     }
     if ((uint64_t)filename == 0)
     {
-        kscreen_putf("\nunable to parse file name!");
+        kterm_putf("\nunable to parse file name!");
         return;
     }
     
@@ -39,44 +39,44 @@ void kfs_printreadfile(uint8_t partition, char *filename)
 
     if ((uint64_t)file)
     {
-        kscreen_putf("\nhex output 0x%x bytes:\n", file_length);
+        kterm_putf("\nhex output 0x%x bytes:\n", file_length);
         int i;
         for (i = 0; i < (file_length - 7); i += 8)
-            kscreen_putf("%2x%2x%2x%2x%2x%2x%2x%2x", 
+            kterm_putf("%2x%2x%2x%2x%2x%2x%2x%2x", 
                 file[i], file[i + 1], file[i + 2], file[i + 3], 
                 file[i + 4], file[i + 5], file[i + 6], file[i + 7]);
         for (; i < file_length; i++)
-            kscreen_putf("%2x", file[i]);
+            kterm_putf("%2x", file[i]);
         kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
     }
     else
-        kscreen_putf("\nfile not found!");
+        kterm_putf("\nfile not found!");
 }
 
 void kfs_printread(uint8_t drive, size_t sector, size_t length)
 {
     if (!kfs_patadrives[drive].exists)
     {
-        kscreen_putf("\ndrive does not exist!");
+        kterm_putf("\ndrive does not exist!");
         return;
     }
     if (sector < 0 || (sector + length) > kfs_patadrives[drive].sectors)
     {
-        kscreen_putf("\nout of sector bounds! (0 - 0x%x)", kfs_patadrives[drive].sectors);
+        kterm_putf("\nout of sector bounds! (0 - 0x%x)", kfs_patadrives[drive].sectors);
         return;
     }
     uint8_t *buffer = kmem_alloc(1);
     for (size_t t = sector; t < (sector + length); t++)
     {
-        kscreen_putf("\nkfs attempting read of drive %d sector %d...", drive, t);
+        kterm_putf("\nkfs attempting read of drive %d sector %d...", drive, t);
         int error = kfs_atadma(&kfs_patadrives[drive], t, 1, 1, buffer);
         if (error < 0)
         {
-            kscreen_putf("\nerror during read!");
+            kterm_putf("\nerror during read!");
             kmem_free(buffer, 1);
             return;
         }
-        kscreen_putf("\nsuccessful read! dumping data to screen...\n");
+        kterm_putf("\nsuccessful read! dumping data to screen...\n");
         size_t not_empty = 0;
         for (int i = 0; i < kfs_patadrives[drive].sector_size; i++)
         {
@@ -89,11 +89,11 @@ void kfs_printread(uint8_t drive, size_t sector, size_t length)
         if (not_empty)
         {
             for (int i = 0; i < kfs_patadrives[drive].sector_size; i++)
-                kscreen_putf("%2x", buffer[i]);
+                kterm_putf("%2x", buffer[i]);
         }
         else
         {
-            kscreen_putf("empty sector");
+            kterm_putf("empty sector");
             ksleep(500);
         }
     }
@@ -105,7 +105,7 @@ void kfs_printpartition(kfs_partition *part)
     if (part->drive->drive_type == 1)
     {
         kfs_patadrive *drive = (kfs_patadrive *)part->drive->drive_data;
-        kscreen_putf("\n  PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
+        kterm_putf("\n  PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
     }
 
     if (part->fs == 1)
@@ -114,13 +114,13 @@ void kfs_printpartition(kfs_partition *part)
 
 void kfs_printinfo()
 {
-    kscreen_putf("\nkfs devices currently detected\npata devices:");
+    kterm_putf("\nkfs devices currently detected\npata devices:");
     for (int i = 0; i < 4; i++)
     {
         if (kfs_patadrives[i].exists)
         {
             uint64_t size = kfs_patadrives[i].sectors * kfs_patadrives[i].sector_size;
-            kscreen_putf("\n - device %d [%s] %d MB", i, kfs_patadrives[i].model, size / 1024 / 1024);
+            kterm_putf("\n - device %d [%s] %d MB", i, kfs_patadrives[i].model, size / 1024 / 1024);
         }
     }
 }
@@ -140,7 +140,7 @@ int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, 
     {
         size_t sector_size = ((kfs_patadrive *)partition->drive->drive_data)->sector_size;
         size_t sectors = (length + sector_size - 1) / sector_size;
-        kscreen_putf("\n%d sectors", sectors);
+        kterm_putf("\n%d sectors", sectors);
         for (size_t sector = 0; sector < sectors; sector++)
         {
             result = kfs_readsector(partition->drive, lba + sector, 1, read, addr + (sector_size * sector));

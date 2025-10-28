@@ -1,4 +1,4 @@
-#include <output/screen.h>
+#include <output/kterm.h>
 
 #include <kernel/kstring.h>
 #include <kernel/kernel.h>
@@ -107,7 +107,7 @@ void kmem_printinfo()
             total_free += ptr->size;
         ptr = ptr->next;
     }
-    kscreen_putf("\nkheap stats: 0x%6x/0x100000 free", total_free);
+    kterm_putf("\nkheap stats: 0x%6x/0x100000 free", total_free);
 
     kmem_printpmminfo();
 }
@@ -137,8 +137,8 @@ void kmem_init(boot_table *table)
     {
         uint64_t end_addr = mmap_entries->physical_start + 0x1000 * mmap_entries->num_pages;
 
-        //kdebug_outf("\nkm_i: mmap type %2d range 0x%8x-0x%8x", mmap_entries->type,
-        //    mmap_entries->physical_start, end_addr);
+        kdebug_outf("\nkm_i: mmap type %2d range 0x%8x-0x%8x", mmap_entries->type,
+            mmap_entries->physical_start, end_addr);
         total_pages += mmap_entries->num_pages;
 
         if (mmap_entries->type == 11 || mmap_entries->type == 0) // if mmio or unusable, skip

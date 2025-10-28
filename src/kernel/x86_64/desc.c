@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#include <output/screen.h>
+#include <output/kterm.h>
 
 #include <kernel/crash.h>
 #include <kernel/debug.h>
@@ -80,8 +80,8 @@ void kwrapper_isr(kframe_int *k)
             kdebug_outf("sgx violation|");
     }
 #endif
-    kscreen_putf("\r\n%n%m --- exception --- ", 0xFF0000, 0x0);
-    kscreen_putf("\r\nkisr: isr 0x%d #%s code 0b%b", k->int_no, kdesc_ints[k->int_no], k->err_code);
+    kterm_putf("\n%n%m --- exception --- ", 0xFF0000, 0x0);
+    kterm_putf("\nkisr: isr 0x%d #%s code 0b%b", k->int_no, kdesc_ints[k->int_no], k->err_code);
 
     //should attempt fix or ret if non crashing isr before stack trace and hlt
 

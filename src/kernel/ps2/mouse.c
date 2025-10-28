@@ -1,4 +1,5 @@
 #include <output/screen.h>
+#include <output/kterm.h>
 
 #include <kernel/debug.h>
 
@@ -59,23 +60,27 @@ void kmouse_testinput(kkeyboard_state *k)
 
 void kmouse_print()
 {
-    kscreen_putf("\nkmouse_test: mb0 %8b mb1 %8b mb2 %8b", mbyte[0], mbyte[1], mbyte[2]);
-    kscreen_putf("\nkmouse_test: left %b right %b middle %b", mbyte[0] & 1, (mbyte[0] >> 1) & 1, (mbyte[0] >> 2) & 1);
-    kscreen_putf("\nkmouse_test: cursor x %4d cursor y %4d", mx, my);
+    kterm_putf("\nkmouse_test: mb0 %8b mb1 %8b mb2 %8b", mbyte[0], mbyte[1], mbyte[2]);
+    kterm_putf("\nkmouse_test: left %b right %b middle %b", mbyte[0] & 1, (mbyte[0] >> 1) & 1, (mbyte[0] >> 2) & 1);
+    kterm_putf("\nkmouse_test: cursor x %4d cursor y %4d", mx, my);
 }
+
+uint8_t kmouse_draw = 0;
 
 void kmouse_test()
 {
     kkeyboard_setinput(kmouse_testinput);
-    kscreen_putf("\nkmouse_test: graphics x%4d y%4d ", kgraphics.horizontal_res, kgraphics.vertical_res);
+    kterm_putf("\nkmouse_test: graphics x%4d y%4d ", kgraphics.horizontal_res, kgraphics.vertical_res);
     kmouse_print();
-    stay = kscreen_getpos();
+    stay = kterm_getpos();
     stay.y -= 3;
+    kmouse_draw = 1;
     while (check == NULL || kkeyboard_keymapUSqwerty[check->scancode] != '\e')
     {
-        kscreen_setpos(stay);
+        kterm_setpos(stay);
         kmouse_print();
     }
+    kmouse_draw = 0;
 }
 
 

@@ -91,9 +91,9 @@ void kacpi_init()
     }
 }
 
-#include <output/screen.h>
+#include <output/kterm.h>
 
 void kacpi_shutdown()
 {
-    kscreen_putf("\nacpi not yet implemented!");
+    kterm_putf("\nacpi not yet implemented!");
 }
