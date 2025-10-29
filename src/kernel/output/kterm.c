@@ -157,6 +157,8 @@ void kterm_putf(const char *fmt, ...)
     va_list arg;
     va_start(arg, fmt);
 
+    uint32_t oldfg = fg, oldbg = bg;
+
     uint64_t unsign;
     int64_t sign;
     char *s;
@@ -272,6 +274,8 @@ void kterm_putf(const char *fmt, ...)
 
     va_end(arg);
 
+    fg = oldfg;
+    bg = oldbg;
     kscreen_copy();
 }
 
@@ -300,7 +304,7 @@ void kterm_header()
     kterm_pos.x = 0;
     kterm_pos.y = 0;
     kterm_setpos(kterm_pos);
-    kterm_putf("%m%n%s%n%m", 0xA9A9A9, 0, kterm_titletext, kterm_fg, kterm_bg);
+    kterm_putf("%m%n%s", 0xA9A9A9, 0, kterm_titletext);
 }
 
 void kterm_run()
@@ -665,6 +669,8 @@ void kterm_init()
     kdebug_outf("\nkterm: kterm_gbuffer %x", (uintptr_t)kterm_gbuffer);
 
     kterm_clr(kterm_bg);
+    fg = kterm_fg;
+    bg = kterm_bg;
     kterm_header();
     kkeyboard_setinput(*kterm_input);
     kterm_putf("\nWelcome to ConcatenOS!");

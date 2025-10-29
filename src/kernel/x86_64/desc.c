@@ -2,6 +2,7 @@
 
 #include <output/kterm.h>
 
+#include <kernel/kstring.h>
 #include <kernel/crash.h>
 #include <kernel/debug.h>
 
@@ -19,6 +20,8 @@ const char* kdesc_ints[] =
     "XX", "XX", "XX", "XX",
     "HV", "VC", "SX", "XX"
 };
+
+char error_message[48];
 
 void kwrapper_isr(kframe_int *k)
 {   
@@ -80,12 +83,21 @@ void kwrapper_isr(kframe_int *k)
             kdebug_outf("sgx violation|");
     }
 #endif
-    kterm_putf("\n%n%m --- exception --- ", 0xFF0000, 0x0);
-    kterm_putf("\nkisr: isr 0x%d #%s code 0b%b", k->int_no, kdesc_ints[k->int_no], k->err_code);
 
     //should attempt fix or ret if non crashing isr before stack trace and hlt
 
-    kcrash("Exception");
+    memcpy(error_message, "Exception 0x# [", 15);
+
+    char *int_num = str_utoa(k->int_no, 16);
+    memcpy(error_message + 12, int_num, 1);
+
+    memcpy(error_message + 15, kdesc_ints[k->int_no], 2);
+    memcpy(error_message + 17, "] Code 0x", 9);
+
+    char *err_code = str_utoa(k->err_code, 16);
+    memcpy(error_message + 26, err_code, str_len(err_code));
+
+    kcrash(error_message);
 }
 
 typedef void (*kdesc_irqfunc)(void);
