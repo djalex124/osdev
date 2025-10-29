@@ -7,6 +7,7 @@
 void kterm_loop();
 void kterm_init();
 
+void kterm_nhputf(const char *fmt, ...);
 void kterm_putf(const char *fmt, ...);
 void kterm_clr(uint32_t color);
 
@@ -18,6 +19,10 @@ typedef struct
 
 kscreen_pos kterm_getpos();
 void kterm_setpos(kscreen_pos pos);
+
+uint32_t kterm_getfg();
+uint32_t kterm_getbg();
+void kterm_setcolor(uint32_t foreground, uint32_t background);
 
 #define default_color 0x34568B
 

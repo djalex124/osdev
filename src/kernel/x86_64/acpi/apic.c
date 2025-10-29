@@ -106,7 +106,7 @@ void kacpi_processapic(acpi_madt *madt)
                 kdebug_outf("\r\n - processor local apic: processor_id %d id %d flags %2b", 
                     entry0->acpi_processor_id, entry0->apic_id, entry0->flags);
                 if ((uint64_t)lapic_ids == 0)
-                    lapic_ids = kmem_kalloc(1);
+                    lapic_ids = kmem_kalloc(64);
                 lapic_ids[total_processors] = entry0->apic_id;
                 total_processors++;
                 break;
@@ -208,8 +208,6 @@ void kacpi_processapic(acpi_madt *madt)
             while (*((volatile uint32_t *)(lapic_base + 0x300)) & (1 << 12));
         }
     }
-
-    kmem_unpageentry(lapic_base, 0x1000);
 
     //kmem_free((void *)kacpi_apstacks, total_processors);
 

@@ -24,7 +24,10 @@
 #define kterm_buffersize 100
 #define kterm_maxargs 16
 
-#define kterm_titletext "[AQUA Kernel (" AQUA_VER_STRING ")] - [Built " __TIME__" "__DATE__ " Central Time]"
+#define kterm_titletext1 "[AQUA Kernel]"
+#define kterm_titletext2 "Build: (" AQUA_VER_STRING ")"
+
+#define kterm_infotext "[AQUA Kernel (" AQUA_VER_STRING ")]\n[Built " __TIME__" "__DATE__ " Central Time]\n[Quote: Never back down, never give up!]"
 
 kscreen_pos kterm_pos;
 char kterm_buffer[kterm_buffersize];
@@ -32,9 +35,7 @@ uint8_t kterm_bufferindex = 0;
 
 char *kterm_argv[kterm_maxargs];
 unsigned int kterm_argc;
-
-uint32_t kterm_fg = 0xC5C5C5;
-uint32_t kterm_bg = default_color;
+char *kterm_prompt = "aqua >";
 
 kkeyboard_state *kterm_next;
 uint8_t kterm_changed = 0;
@@ -47,9 +48,11 @@ int kterm_currentpartition = -1;
 extern uint8_t kacpi_apsrunning;
 
 extern char _binary____font_psf_start[];
-uint32_t fg, bg;
+uint32_t fg = 0xC5C5C5, bg = default_color;
 unsigned int cx = 0, cy = 0, cw = 0, ch = 0;
 psf_font *font;
+
+kscreen_pos update_header;
 
 static inline void kterm_putp(int x, int y, uint32_t color)
 {
@@ -74,6 +77,8 @@ void kterm_drawrect(int x, int y, int w, int h, uint32_t color)
 void kterm_clr(uint32_t color)
 {
     kterm_drawrect(0, 0, kgraphics.horizontal_res, kgraphics.vertical_res, color);
+    cx = 0;
+    cy = 1;
 }
 
 void kterm_putc(uint16_t c)
@@ -151,12 +156,34 @@ void kterm_prints(char* s)
         kterm_printc(s[i]);
 }
 
-// kterm_putf - options %n for fg color and %m for bg color
-void kterm_putf(const char *fmt, ...)
+void kterm_update()
 {
-    va_list arg;
-    va_start(arg, fmt);
+    kscreen_pos old_pos = kterm_getpos();
+    uint32_t old_fg = fg, old_bg = bg;
 
+    fg = 0;
+    bg = 0xA9A9A9;
+
+    cx = 0;
+    cy = 0;
+
+    kterm_drawrect(0, 0, kgraphics.horizontal_res, font->height, bg);
+
+    kterm_prints(kterm_titletext1);
+
+    kterm_setpos(update_header);
+    kterm_prints(kterm_titletext2);
+
+    kterm_setpos(old_pos);
+
+    fg = old_fg;
+    bg = old_bg;
+
+    kscreen_copy();
+}
+
+void kterm_vputf(const char *fmt, va_list arg)
+{
     uint32_t oldfg = fg, oldbg = bg;
 
     uint64_t unsign;
@@ -272,11 +299,35 @@ void kterm_putf(const char *fmt, ...)
         }
     }
 
-    va_end(arg);
-
     fg = oldfg;
     bg = oldbg;
+}
+
+// kterm_nhputf - options %n for fg color and %m for bg color
+// print without header updating
+void kterm_nhputf(const char *fmt, ...)
+{
+    va_list arg;
+    va_start(arg, fmt);
+
+    kterm_vputf(fmt, arg);
+
+    va_end(arg);
+
     kscreen_copy();
+}
+
+// kterm_putf - options %n for fg color and %m for bg color
+void kterm_putf(const char *fmt, ...)
+{
+    va_list arg;
+    va_start(arg, fmt);
+
+    kterm_vputf(fmt, arg);
+
+    va_end(arg);
+    
+    kterm_update();
 }
 
 kscreen_pos kterm_getpos()
@@ -293,18 +344,26 @@ void kterm_setpos(kscreen_pos pos)
     cy = pos.y;
 }
 
+uint32_t kterm_getfg()
+{
+    return fg;
+}
+
+uint32_t kterm_getbg()
+{
+    return bg;
+}
+
+void kterm_setcolor(uint32_t foreground, uint32_t background)
+{
+    fg = foreground;
+    bg = background;
+}
+
 void kterm_input(kkeyboard_state *k)
 {
     kterm_next = k;
     kterm_changed = 1;
-}
-
-void kterm_header()
-{
-    kterm_pos.x = 0;
-    kterm_pos.y = 0;
-    kterm_setpos(kterm_pos);
-    kterm_putf("%m%n%s", 0xA9A9A9, 0, kterm_titletext);
 }
 
 void kterm_run()
@@ -319,8 +378,25 @@ void kterm_run()
 
     if (str_cmp(kterm_argv[0], "clear") == 0)
     {
-        kterm_clr(default_color);
-        kterm_header();
+        kterm_clr(bg);
+    }
+    else if (str_cmp(kterm_argv[0], "color") == 0)
+    {
+        if (kterm_argc == 1)
+            kterm_setcolor(0xC5C5C5, default_color);
+        else if (kterm_argc == 3)
+        {
+            int64_t new_fg, new_bg;
+            new_fg = str_atoi(kterm_argv[1]);
+            new_bg = str_atoi(kterm_argv[2]);
+            if (new_fg > 0xFFFFFFFF || new_fg < 0 ||
+                new_bg > 0xFFFFFFFF || new_bg < 0)
+                kterm_putf("\nInvalid colors.");
+            else
+                kterm_setcolor(new_fg, new_bg);
+        }
+        else
+            kterm_putf("\nInvalid argument count.");
     }
     else if (str_cmp(kterm_argv[0], "compare") == 0)
     {
@@ -438,6 +514,7 @@ void kterm_run()
     {
         kterm_putf("\nList of currently available commands:");
         kterm_putf("\n clear - clears the screen");
+        kterm_putf("\n color [fg] [bg] - set terminal colors in hex, no values to reset");
         kterm_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
         kterm_putf("\n cpu_info - lists CPU model and capabilities");
         kterm_putf("\n crash - crashes the AQUA kernel");
@@ -445,6 +522,7 @@ void kterm_run()
         kterm_putf("\n fs_info - lists detected disks and drives");
         kterm_putf("\n font - prints all characters in boot font");
         kterm_putf("\n help - lists available commands");
+        kterm_putf("\n info - prints current AQUA build information");
         kterm_putf("\n mem_info - prints current memory usage");
         kterm_putf("\n pci_info - prints pci busses and devices");
         kterm_putf("\n read [drive] [starting sector] [sectors] - attempt read of given number of sectors on selected drive");
@@ -453,6 +531,10 @@ void kterm_run()
         kterm_putf("\n test - test random features");
         kterm_putf("\n test_mouse - tests ps2 mouse input");
         kterm_putf("\n wait [num1] - wait given number of seconds");
+    }
+    else if (str_cmp(kterm_argv[0], "info") == 0)
+    {
+        kterm_putf("\n%s", kterm_infotext);
     }
     else if (str_cmp(kterm_argv[0], "mem_info") == 0)
     {
@@ -564,10 +646,6 @@ void kterm_run()
     }
 }
 
-char *kterm_prompt = "aqua >";
-extern unsigned int cw;
-extern unsigned int ch;
-
 inline void kterm_prevtermpos()
 {
     if (kterm_pos.x == 0)
@@ -664,20 +742,21 @@ void kterm_init()
 {
     cw = kgraphics.horizontal_res / ((psf_font *)&_binary____font_psf_start)->width;
     ch = kgraphics.vertical_res / ((psf_font *)&_binary____font_psf_start)->height;
+
+    update_header.x = cw - str_len(kterm_titletext2);
+    update_header.y = 0;
     
     kterm_gbuffer = kscreen_setterm();
     kdebug_outf("\nkterm: kterm_gbuffer %x", (uintptr_t)kterm_gbuffer);
 
-    kterm_clr(kterm_bg);
-    fg = kterm_fg;
-    bg = kterm_bg;
-    kterm_header();
+    kterm_clr(bg);
     kkeyboard_setinput(*kterm_input);
-    kterm_putf("\nWelcome to ConcatenOS!");
+    
+    kterm_putf("Welcome to ConcatenOS!");
     kterm_putf("\nTo get started, run 'help' for a list of commands.");
     kterm_putf("\n%s%c", kterm_prompt, 128);
     kterm_pos = kterm_getpos();
     
     kterm_draw = 1;
-    kscreen_copy();
+    kterm_update();
 }

@@ -452,7 +452,7 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
                     kcrash_string, line, column);
                 if (screen && already_crashing <= 1)
                 {
-                    kterm_putf("%n%m (function:%s line:%d column:%d)", 
+                    kterm_nhputf("%n%m (function:%s line:%d column:%d)", 
                         0xFF0000, 0x0, kcrash_string, line, column);
                 }
                 high = 0;
@@ -467,7 +467,7 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
         {
             kdebug_outf(" file:%s", kcrash_file);
             if (screen && already_crashing <= 1)
-                kterm_putf("%n%m file:%s", 0xFF0000, 0x0, kcrash_file);
+                kterm_nhputf("%n%m file:%s", 0xFF0000, 0x0, kcrash_file);
             high = 0;
             low = 0;
         }
@@ -493,7 +493,7 @@ void kcrash_debug(uint64_t rip)
     if (!debug_info || !debug_info_len || !debug_abbrev || !debug_str || !debug_line_str)
     {
         if (screen && already_crashing <= 1)
-            kterm_putf("%n%m (no debug info found)", 0xFF0000, 0x0);
+            kterm_nhputf("%n%m (no debug info found)", 0xFF0000, 0x0);
         kdebug_outf(" (no debug info found)");
         return;
     }
@@ -516,17 +516,16 @@ void kcrash(char *message)
     if (screen && already_crashing <= 1)
     {
         kterm_setpos(offset);
-        kterm_putf("%n%m --------------------- ", 0xFF0000, 0x0);
+        kterm_nhputf("%n%m --------------------- ", 0xFF0000, 0x0);
         offset.y++;
         kterm_setpos(offset);
-        kterm_putf("%n%m | AQUA has crashed! | ", 0xFF0000, 0x0);
+        kterm_nhputf("%n%m | AQUA has crashed! | ", 0xFF0000, 0x0);
         offset.y++;
         kterm_setpos(offset);
-        kterm_putf("%n%m --------------------- ", 0xFF0000, 0x0);
+        kterm_nhputf("%n%m --------------------- ", 0xFF0000, 0x0);
         offset.y++;
         kterm_setpos(offset);
-        kterm_putf("%n%m- Message: [%s]", 0xFF0000, 0x0, message);
-        offset.y++;
+        kterm_nhputf("%n%m- Message: [%s]", 0xFF0000, 0x0, message);
     }
     kdebug_outf("\n\n AQUA has crashed! \n Reason: [%s] \n", message);
 
@@ -538,7 +537,7 @@ void kcrash(char *message)
         {
             offset.y++;
             kterm_setpos(offset);
-            kterm_putf("%n%mkcrash_trace: [0x%x]", 0xFF0000, 0x0, stack->rip);
+            kterm_nhputf("%n%mkcrash_trace: [0x%x]", 0xFF0000, 0x0, stack->rip);
         }
         kdebug_outf("\nkcrash_trace: [0x%x]", stack->rip);
 #ifdef AQUA_DEBUG
