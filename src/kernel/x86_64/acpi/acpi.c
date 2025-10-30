@@ -3,14 +3,20 @@
 #include <x86_64/port.h>
 
 #include <kernel/kstring.h>
+#include <kernel/crash.h>
 #include <kernel/debug.h>
 
 #include <mm/mem.h>
 
+char kacpi_crashmessage[35];
+
 void kacpi_fail(int line)
 {
-    kdebug_outf("\r\nkacpi: failed to read ACPI tables! aborting [L:%d]", line);
-    for(;;);
+    memcpy(kacpi_crashmessage, "Failed to read ACPI tables! L:", 30);
+    char *linestr = str_itoa(line, 10);
+    memcpy(kacpi_crashmessage + 30, linestr, str_len(linestr));
+
+    kcrash(kacpi_crashmessage);
 }
 
 int kacpi_sdtchecksum(acpi_sdt_header *h)

@@ -724,6 +724,13 @@ void kterm_processinput()
 
 void kterm_loop()
 {
+    kkeyboard_setinput(*kterm_input);
+    
+    kterm_putf("Welcome to ConcatenOS!");
+    kterm_putf("\nTo get started, run 'help' for a list of commands.");
+    kterm_putf("\n%s%c", kterm_prompt, 128);
+    kterm_pos = kterm_getpos();
+
     for (;;)
     {
         while (kterm_changed == 0)
@@ -750,13 +757,7 @@ void kterm_init()
     kdebug_outf("\nkterm: kterm_gbuffer %x", (uintptr_t)kterm_gbuffer);
 
     kterm_clr(bg);
-    kkeyboard_setinput(*kterm_input);
-    
-    kterm_putf("Welcome to ConcatenOS!");
-    kterm_putf("\nTo get started, run 'help' for a list of commands.");
-    kterm_putf("\n%s%c", kterm_prompt, 128);
-    kterm_pos = kterm_getpos();
     
     kterm_draw = 1;
-    kterm_update();
+    kscreen_copy();
 }

@@ -29,7 +29,7 @@ typedef struct
     uint32_t oem_revision;
     uint32_t creator_id;
     uint32_t creator_revision;
-}acpi_sdt_header;
+}__attribute__((packed)) acpi_sdt_header;
 
 typedef struct
 {
@@ -148,7 +148,7 @@ typedef struct
     uint32_t local_apic_addr;
     uint32_t flags;
     uint8_t enteries[];
-}acpi_madt;
+}__attribute__((packed)) acpi_madt;
 
 void kacpi_processapic(acpi_madt *madt);
 void kacpi_processdsdt(acpi_dsdt *dsdt);

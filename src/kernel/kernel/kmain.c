@@ -41,8 +41,7 @@ void kmain(boot_table *table)
 #endif
 
     kscreen_init();
-    kscreen_clr(default_color);
-    kscreen_copy();
+    kterm_init();
 
     asm("sti");
 
@@ -50,8 +49,6 @@ void kmain(boot_table *table)
     kpci_init();
 
     kfs_init();
-
-    kterm_init();
 
     kmouse_init();
     kkeyboard_init();
