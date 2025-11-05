@@ -7,6 +7,7 @@
 #ifndef ASSEMBLY
 
 #include <stddef.h>
+#include <stdint.h>
 
 void kmem_pmminit(uint64_t low_size, uint64_t high_size);
 void kmem_heapinit();

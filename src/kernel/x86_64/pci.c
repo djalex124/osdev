@@ -1,12 +1,16 @@
+#include <kernel/kstring.h>
 #include <kernel/kernel.h>
 #include <kernel/debug.h>
 
 #include <output/screen.h>
 
+#include <x86_64/acpi/acpi.h>
 #include <x86_64/port.h>
 #include <x86_64/pci.h>
 
 #include <mm/mem.h>
+
+uint8_t kpci_pcie = 0;
 
 char* kpci_classname[] =
 {
@@ -171,14 +175,51 @@ char* kpci_getclassname(uint8_t class)
         return kpci_classname[class];
 }
 
-void kpci_checkbus(uint8_t bus);
+void kpci_checkbus(uint16_t section, uint8_t bus);
 
-uint32_t kpci_configread(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off)
+//different function based on pcie existance
+//using pointer set in init
+
+uint16_t kpci_sectionheaderscount = 0;
+acpi_mcfg_baa_header *kpci_sectionheaders = 0;
+
+uint32_t (*kpci_configread)(kpci_device *, uint8_t);
+void (*kpci_configwrite16)(kpci_device *, uint8_t, uint16_t);
+
+uint32_t kpci_configreaddma(kpci_device *device, uint8_t off)
+{
+    uint64_t device_offset = ((device->bus * 256) + (device->device * 8) + device->function) * 4096;
+    uint64_t bar_offset = 0;
+    for (int i = 0; i < kpci_sectionheaderscount; i++)
+    {
+        if (kpci_sectionheaders[i].pci_grpsegnum == device->section)
+            bar_offset = kpci_sectionheaders[i].ecm_baseaddr;
+    }
+    if (bar_offset == 0)
+        kdebug_outf("\nkpci: unable to find section %d?", device->section);
+    return *(uint32_t *)(bar_offset + device_offset + off);
+}
+
+void kpci_configwrite16dma(kpci_device *device, uint8_t off, uint16_t val)
+{
+    uint64_t device_offset = ((device->bus * 256) + (device->device * 8) + device->function) * 4096;
+    uint64_t bar_offset = 0;
+    for (int i = 0; i < kpci_sectionheaderscount; i++)
+    {
+        if (kpci_sectionheaders[i].pci_grpsegnum == device->section)
+            bar_offset = kpci_sectionheaders[i].ecm_baseaddr;
+    }
+    if (bar_offset == 0)
+        kdebug_outf("\nkpci: unable to find section %d?", device->section);
+    *(uint16_t *)(bar_offset + device_offset + off) = val;
+}
+
+uint32_t kpci_configreadport(kpci_device *device, uint8_t off)
 {
     uint32_t addr;
-    uint32_t lbus = (uint32_t)bus;
-    uint32_t lslot = (uint32_t)slot;
-    uint32_t lfunc = (uint32_t)func;
+    uint32_t lbus = (uint32_t)device->bus;
+    uint32_t lslot = (uint32_t)device->device;
+    uint32_t lfunc = (uint32_t)device->function;
     uint32_t tmp = 0;
 
     addr = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) | (off & 0xFC) | ((uint32_t)0x80000000));
@@ -188,12 +229,12 @@ uint32_t kpci_configread(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off)
     return tmp;
 }
 
-void kpci_configwrite16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off, uint8_t val)
+void kpci_configwrite16port(kpci_device *device, uint8_t off, uint16_t val)
 {
     uint32_t addr;
-    uint32_t lbus = (uint32_t)bus;
-    uint32_t lslot = (uint32_t)slot;
-    uint32_t lfunc = (uint32_t)func;
+    uint32_t lbus = (uint32_t)device->bus;
+    uint32_t lslot = (uint32_t)device->device;
+    uint32_t lfunc = (uint32_t)device->function;
 
     addr = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) | (off & 0xFC) | ((uint32_t)0x80000000));
     outl(0xCF8, addr);
@@ -201,113 +242,137 @@ void kpci_configwrite16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off, ui
     outw(0xCFC, val);
 }
 
-uint16_t kpci_getvendorid(uint8_t bus, uint8_t device, uint8_t func)
+uint16_t kpci_getdeviceid(kpci_device *device)
 {
-    return kpci_configread(bus, device, func, PCI_OFFSET_VENDORID) & 0xFFFF;
+    return kpci_configread(device, PCI_OFFSET_DEVICEID) & 0xFFFF;
 }
 
-uint8_t kpci_getbaseclass(uint8_t bus, uint8_t device, uint8_t func)
+uint16_t kpci_getvendorid(kpci_device *device)
 {
-    return kpci_configread(bus, device, func, PCI_OFFSET_CLASS) & 0xFF;
+    return kpci_configread(device, PCI_OFFSET_VENDORID) & 0xFFFF;
 }
 
-uint8_t kpci_getsubclass(uint8_t bus, uint8_t device, uint8_t func)
+uint8_t kpci_getbaseclass(kpci_device *device)
 {
-    return kpci_configread(bus, device, func, PCI_OFFSET_SUBCLASS) & 0xFF;
+    return kpci_configread(device, PCI_OFFSET_CLASS) & 0xFF;
 }
 
-uint8_t kpci_getheadertype(uint8_t bus, uint8_t device, uint8_t func)
+uint8_t kpci_getsubclass(kpci_device *device)
 {
-    return kpci_configread(bus, device, func, PCI_OFFSET_HDRTYPE) & 0xFF;
+    return kpci_configread(device, PCI_OFFSET_SUBCLASS) & 0xFF;
 }
 
-uint8_t kpci_getsecondarybus(uint8_t bus, uint8_t device, uint8_t func)
+uint8_t kpci_getheadertype(kpci_device *device)
 {
-    return kpci_configread(bus, device, func, 0x19) & 0xFF;
+    return kpci_configread(device, PCI_OFFSET_HDRTYPE) & 0xFF;
 }
 
-void kpci_confirmedfunction(uint8_t bus, uint8_t device, uint8_t func)
+uint8_t kpci_getsecondarybus(kpci_device *device)
 {
-    uint8_t base = kpci_getbaseclass(bus, device, func);
-    uint8_t sub  = kpci_getsubclass(bus, device, func);
-    uint16_t ven = kpci_getvendorid(bus, device, func);
+    return kpci_configread(device, 0x19) & 0xFF;
+}
+
+void kpci_confirmedfunction(uint16_t section, uint8_t bus, uint8_t device, uint8_t func)
+{
+    kpci_device *new_device = &k_infotable.kpci_table[k_infotable.kpci_tablesize];
+
+    new_device->section = section;
+    new_device->bus = bus;
+    new_device->device = device;
+    new_device->function = func;
 
 #ifdef AQUA_IDE_DEBUG
-    kdebug_outf("\r\nkpci_i: PCI(B%xD%x) F%x V%x CLASS %2x:%2x", bus, device, func, ven, base, sub);
+    uint8_t base = kpci_getbaseclass(new_device);
+    uint8_t sub  = kpci_getsubclass(new_device);
+    uint16_t ven = kpci_getvendorid(new_device);
+    kdebug_outf("\r\nkpci_i: PCI(S%xB%xD%x) F%x V%x CLASS %2x:%2x", section, bus, device, func, ven, base, sub);
 #endif
-
-    k_infotable.kpci_table[k_infotable.kpci_tablesize].bus = bus;
-    k_infotable.kpci_table[k_infotable.kpci_tablesize].device = device;
-    k_infotable.kpci_table[k_infotable.kpci_tablesize].function = func;
-    k_infotable.kpci_table[k_infotable.kpci_tablesize].class = base;
-    k_infotable.kpci_table[k_infotable.kpci_tablesize].subclass = sub;
-    k_infotable.kpci_table[k_infotable.kpci_tablesize].vendorid = ven;
 
     k_infotable.kpci_tablesize++;
 }
 
-void kpci_checkfunction(uint8_t bus, uint8_t device, uint8_t func)
+void kpci_checkfunction(kpci_device *device)
 {
     uint8_t base;
     uint8_t sub;
     uint8_t secondary = 0;
 
-    base = kpci_getbaseclass(bus, device, func);
-    sub = kpci_getsubclass(bus, device, func);
+    base = kpci_getbaseclass(device);
+    sub = kpci_getsubclass(device);
     if ((base == 0x6) && (sub == 0x4))
     {
-        secondary = kpci_getsecondarybus(bus, device, func);
-        kpci_checkbus(secondary);
+        secondary = kpci_getsecondarybus(device);
+        kpci_checkbus(device->section, secondary);
     }
 
-    kpci_confirmedfunction(bus, device, func);
+    kpci_confirmedfunction(device->section, device->bus, device->device, device->function);
 }
 
-void kpci_checkdevice(uint8_t bus, uint8_t device)
+void kpci_checkdevice(uint16_t section, uint8_t bus, uint8_t device)
 {
-    uint8_t function = 0;
+    kpci_device test_device = {.section = section, .bus = bus, .device = device, .function = 0};
 
     uint16_t vendorid;
-    vendorid = kpci_getvendorid(bus, device, function);
+    vendorid = kpci_getvendorid(&test_device);
     if (vendorid == 0xFFFF) return;
-    kpci_checkfunction(bus, device, function);
+    kpci_checkfunction(&test_device);
     uint8_t headertype;
-    headertype = kpci_getheadertype(bus, device, function);
+    headertype = kpci_getheadertype(&test_device);
     if ((headertype & 0x80) != 0)
     {
-        for (function = 1; function < 8; function++)
+        for (test_device.function = 1; test_device.function < 8; test_device.function++)
         {
-            if (kpci_getvendorid(bus, device, function) != 0xFFFF)
-                kpci_checkfunction(bus, device, function);
+            if (kpci_getvendorid(&test_device) != 0xFFFF)
+                kpci_checkfunction(&test_device);
         }
     }
 }
 
-void kpci_checkbus(uint8_t bus)
+void kpci_checkbus(uint16_t section, uint8_t bus)
 {
     uint8_t device;
 
     for (device = 0; device < 32; device++)
-        kpci_checkdevice(bus, device);
+        kpci_checkdevice(section, bus, device);
 }
 
 void kpci_checkall()
 {
-    uint8_t function;
-    uint8_t bus;
-
+    kpci_device test_device = {.section = 0, .bus = 0, .device = 0, .function = 0};
     uint8_t headertype;
-    headertype = kpci_getheadertype(0, 0, 0);
-    if ((headertype & 0x80) == 0)
-        kpci_checkbus(0);
+
+    if (kpci_pcie == 1)
+    {
+        for (int s = 0; s < kpci_sectionheaderscount; s++)
+        {
+            test_device.section = kpci_sectionheaders[s].pci_grpsegnum;
+            headertype = kpci_getheadertype(&test_device);
+            if ((headertype & 0x80) == 0)
+                kpci_checkbus(test_device.section, 0);
+            else
+            {
+                for (test_device.function = 0; test_device.function < 8; test_device.function++)
+                {
+                    if (kpci_getvendorid(&test_device) != 0xFFFF)
+                        break;
+                    kpci_checkbus(test_device.section, test_device.function);
+                }
+            }
+        }
+    }
     else
     {
-        for (function = 0; function < 8; function++)
+        headertype = kpci_getheadertype(&test_device);
+        if ((headertype & 0x80) == 0)
+            kpci_checkbus(0, 0);
+        else
         {
-            if (kpci_getvendorid(0, 0, function) != 0xFFFF)
-                break;
-            bus = function;
-            kpci_checkbus(bus);
+            for (test_device.function = 0; test_device.function < 8; test_device.function++)
+            {
+                if (kpci_getvendorid(&test_device) != 0xFFFF)
+                    break;
+                kpci_checkbus(0, test_device.function);
+            }
         }
     }
 }
@@ -316,6 +381,40 @@ void kpci_init()
 {
     kdebug_outf("\r\nkpci_i: start iterate pci devices");
 
-    k_infotable.kpci_table = kmem_alloc(1);
+    if ((uint64_t)k_infotable.mcfg_table != 0)
+    {
+        kdebug_outf("\nkpci_i: PCIe detected");
+        
+        acpi_mcfg *mcfg = (acpi_mcfg *)k_infotable.mcfg_table;
+        acpi_mcfg_baa_header *baa = &mcfg->pci_baa[0];
+
+        uint64_t end_addr = (uint64_t)mcfg + mcfg->h.length - 1;
+        int i = 0;
+        
+        for (; (uint64_t)baa < end_addr; i++, baa = &mcfg->pci_baa[i])
+        {
+            kdebug_outf("\nkpci_i: baa header section %d", baa->pci_grpsegnum);
+            kdebug_outf("\nkpci_i:   base addr %x", baa->ecm_baseaddr);
+            kdebug_outf("\nkpci_i:   busses %d-%d", baa->pci_busnum, baa->pci_busnumend);
+
+            kmem_pageentry(baa->ecm_baseaddr, baa->ecm_baseaddr, (baa->pci_busnumend + 1) * 0x1000, 0b11);
+        }
+
+        kpci_sectionheaders = kmem_kalloc(sizeof(acpi_mcfg_baa_header) * i);
+        memcpy(kpci_sectionheaders, &mcfg->pci_baa[0], sizeof(acpi_mcfg_baa_header) * i);
+        kpci_sectionheaderscount = i;
+
+        kpci_configread = kpci_configreaddma;
+        kpci_configwrite16 = kpci_configwrite16dma;
+
+        kpci_pcie = 1;
+    }
+    else
+    {
+        kpci_configread = kpci_configreadport;
+        kpci_configwrite16 = kpci_configwrite16port;
+    }
+
+    k_infotable.kpci_table = kmem_alloc(4);
     kpci_checkall();
 }

@@ -25,19 +25,22 @@
 #define PCI_OFFSET_HDR0_BAR5  0x24
 #define PCI_OFFSET_HDR0_REGF  0x3C
 
-uint32_t kpci_configread(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off);
-void kpci_configwrite16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t off, uint8_t val);
-void kpci_init();
-
 char* kpci_getsubclassname(uint8_t class, uint8_t subclass);
 char* kpci_getclassname(uint8_t class);
 
 typedef struct
 {
+    uint16_t section;
     uint8_t bus;
     uint8_t device;
     uint8_t function;
-    uint16_t vendorid;
-    uint8_t subclass;
-    uint8_t class;
 }kpci_device;
+
+uint16_t kpci_getdeviceid(kpci_device *device);
+uint16_t kpci_getvendorid(kpci_device *device);
+uint8_t kpci_getbaseclass(kpci_device *device);
+uint8_t kpci_getsubclass(kpci_device *device);
+
+extern uint32_t (*kpci_configread)(kpci_device *device, uint8_t off);
+extern void (*kpci_configwrite16)(kpci_device* device, uint8_t off, uint16_t val);
+void kpci_init();

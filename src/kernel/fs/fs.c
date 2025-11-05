@@ -53,59 +53,12 @@ void kfs_printreadfile(uint8_t partition, char *filename)
         kterm_putf("\nfile not found!");
 }
 
-void kfs_printread(uint8_t drive, size_t sector, size_t length)
-{
-    if (!kfs_patadrives[drive].exists)
-    {
-        kterm_putf("\ndrive does not exist!");
-        return;
-    }
-    if (sector < 0 || (sector + length) > kfs_patadrives[drive].sectors)
-    {
-        kterm_putf("\nout of sector bounds! (0 - 0x%x)", kfs_patadrives[drive].sectors);
-        return;
-    }
-    uint8_t *buffer = kmem_alloc(1);
-    for (size_t t = sector; t < (sector + length); t++)
-    {
-        kterm_putf("\nkfs attempting read of drive %d sector %d...", drive, t);
-        int error = kfs_atadma(&kfs_patadrives[drive], t, 1, 1, buffer);
-        if (error < 0)
-        {
-            kterm_putf("\nerror during read!");
-            kmem_free(buffer, 1);
-            return;
-        }
-        kterm_putf("\nsuccessful read! dumping data to screen...\n");
-        size_t not_empty = 0;
-        for (int i = 0; i < kfs_patadrives[drive].sector_size; i++)
-        {
-            if (buffer[i])
-            {
-                not_empty = 1;
-                break;
-            }
-        }
-        if (not_empty)
-        {
-            for (int i = 0; i < kfs_patadrives[drive].sector_size; i++)
-                kterm_putf("%2x", buffer[i]);
-        }
-        else
-        {
-            kterm_putf("empty sector");
-            ksleep(500);
-        }
-    }
-    kmem_free(buffer, 1);
-}
-
 void kfs_printpartition(kfs_partition *part)
 {
     if (part->drive->drive_type == 1)
     {
         kfs_patadrive *drive = (kfs_patadrive *)part->drive->drive_data;
-        kterm_putf("\n  PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
+        kterm_putf(" PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
     }
 
     if (part->fs == 1)
@@ -114,22 +67,28 @@ void kfs_printpartition(kfs_partition *part)
 
 void kfs_printinfo()
 {
-    kterm_putf("\nkfs devices currently detected\npata devices:");
+    kterm_putf("\nkfs drives detected:");
+    int drives = 0;
+
     for (int i = 0; i < 4; i++)
     {
         if (kfs_patadrives[i].exists)
         {
             uint64_t size = kfs_patadrives[i].sectors * kfs_patadrives[i].sector_size;
-            kterm_putf("\n - device %d [%s] %d MB", i, kfs_patadrives[i].model, size / 1024 / 1024);
+            kterm_putf("\n - PATA device %d [%s] %d MB", i, kfs_patadrives[i].model, size / 1024 / 1024);
+            drives = 1;
         }
     }
+
+    if (drives == 0)
+        kterm_putf("\n - No drives currently detected");
 }
 
 int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr)
 {
     int result = 0;
     if (drive->drive_type == 1)
-        result = kfs_atadma((kfs_patadrive *)drive->drive_data, lba, sec_count, read, addr);
+        result = kfs_patadma((kfs_patadrive *)drive->drive_data, lba, sec_count, read, addr);
     return result;
 }
 
@@ -191,9 +150,9 @@ void kfs_init()
     
     for (i = 0; i < k_infotable.kpci_tablesize; i++)
     {
-        if (k_infotable.kpci_table[i].class == 0x1 && k_infotable.kpci_table[i].subclass == 0x1)
+        if (kpci_getbaseclass(&k_infotable.kpci_table[i]) == 0x1 && kpci_getsubclass(&k_infotable.kpci_table[i]) == 0x1)
             kfs_patainit(&k_infotable.kpci_table[i]);
-        else if (k_infotable.kpci_table[i].class == 0x1 && k_infotable.kpci_table[i].subclass == 0x6)
+        else if (kpci_getbaseclass(&k_infotable.kpci_table[i]) && kpci_getsubclass(&k_infotable.kpci_table[i]) == 0x6)
             kfs_satainit(&k_infotable.kpci_table[i]);
     }
 

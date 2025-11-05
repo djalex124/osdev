@@ -494,14 +494,20 @@ void kterm_run()
     {
         kfs_printinfo();
         kterm_putf("\nmounted partitions:");
+
+        int partitions = 0;
         for (int i = 0; i < 15; i++)
         {
             if ((uint64_t)k_infotable.kfs_partitions[i])
             {
-                kterm_putf("\n partition %d:", i);
+                kterm_putf("\n - partition %d:", i);
                 kfs_printpartition(k_infotable.kfs_partitions[i]);
+                partitions = 1;
             }
         }
+
+        if (partitions == 0)
+            kterm_putf("\n - No partitions mounted");
     }
     else if (str_cmp(kterm_argv[0], "font") == 0)
     {
@@ -525,7 +531,6 @@ void kterm_run()
         kterm_putf("\n info - prints current AQUA build information");
         kterm_putf("\n mem_info - prints current memory usage");
         kterm_putf("\n pci_info - prints pci busses and devices");
-        kterm_putf("\n read [drive] [starting sector] [sectors] - attempt read of given number of sectors on selected drive");
         kterm_putf("\n read_file [filename] - attempt read of file on selected partition");
         kterm_putf("\n shutdown - attempts acpi shutdown");
         kterm_putf("\n test - test random features");
@@ -544,31 +549,13 @@ void kterm_run()
     {
         kterm_putf("\nkpci_info: current pci device table");
         kpci_device* kpci_table = k_infotable.kpci_table;
-        uint32_t dev_id;
         for (int i = 0; i < k_infotable.kpci_tablesize; i++)
         {
-            dev_id = kpci_configread(kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function, PCI_OFFSET_DEVICEID);
-            kterm_putf("\n - %2x:%2x:%2x ", kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
+            kterm_putf("\n - %2x:%2x:%2x:%2x ", kpci_table[i].section, kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
             kterm_putf("VendorID %4x DeviceID %4x [%s]/[%s]",
-                kpci_table[i].vendorid, dev_id,
-                kpci_getclassname(kpci_table[i].class),
-                kpci_getsubclassname(kpci_table[i].class, kpci_table[i].subclass));
-        }
-    }
-    else if (str_cmp(kterm_argv[0], "read") == 0)
-    {
-        if (kterm_argc < 4)
-            kterm_putf("\nNot enough arguments.");
-        else
-        {
-            uint64_t a = 0, b = 0, c = 0;
-            if (kterm_argv[1])
-                a = str_atoi(kterm_argv[1]);
-            if (kterm_argv[2])
-                b = str_atoi(kterm_argv[2]);
-            if (kterm_argv[3])
-                c = str_atoi(kterm_argv[3]);
-            kfs_printread(a, b, c);
+                kpci_getvendorid(&kpci_table[i]), kpci_getdeviceid(&kpci_table[i]),
+                kpci_getclassname(kpci_getbaseclass(&kpci_table[i])),
+                kpci_getsubclassname(kpci_getbaseclass(&kpci_table[i]), kpci_getsubclass(&kpci_table[i])));
         }
     }
     else if (str_cmp(kterm_argv[0], "read_file") == 0)

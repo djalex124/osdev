@@ -127,14 +127,14 @@ typedef struct
     uint8_t  pci_busnum;
     uint8_t  pci_busnumend;
     uint32_t reserved;
-}acpi_mcfg_baa_header;
+}__attribute__((packed)) acpi_mcfg_baa_header;
 
 typedef struct
 {
     acpi_sdt_header h;
     uint64_t reserved;
     acpi_mcfg_baa_header pci_baa[];
-}acpi_mcfg;
+}__attribute__((packed)) acpi_mcfg;
 
 typedef struct
 {

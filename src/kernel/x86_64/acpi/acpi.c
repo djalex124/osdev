@@ -3,6 +3,7 @@
 #include <x86_64/port.h>
 
 #include <kernel/kstring.h>
+#include <kernel/kernel.h>
 #include <kernel/crash.h>
 #include <kernel/debug.h>
 
@@ -39,6 +40,15 @@ void kacpi_processtable(acpi_sdt_header *h)
             kacpi_fail(__LINE__);
 
         kacpi_processapic(madt);
+    }
+    else if (strn_cmp("MCFG", header->signature, 4) == 0)
+    {
+        acpi_mcfg *mcfg = (acpi_mcfg *)header;
+
+        if (kacpi_sdtchecksum((acpi_sdt_header *)header) != 0)
+            kacpi_fail(__LINE__);
+
+        k_infotable.mcfg_table = (uint64_t *)mcfg;
     }
 }
 

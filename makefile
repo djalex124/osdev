@@ -62,7 +62,7 @@ build_run: drive/boot.efi drive/kernel.bin
 run: build_run
 	@sudo qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
-					    -drive file=fat:rw:drive/,format=raw,media=disk -m 512 -smp 2
+					    -drive file=fat:rw:drive/,format=raw,media=disk -m 512 -smp 2 -machine q35
 
 build_debug: debug_flag += -DAQUA_DEBUG
 build_debug: drive/boot.efi drive/dbg_kernel.bin
@@ -70,7 +70,7 @@ build_debug: drive/boot.efi drive/dbg_kernel.bin
 debug: build_debug
 	@sudo qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
-					    -drive file=fat:rw:drive/,format=raw,media=disk -m 512 -s -serial stdio -smp 2
+					    -drive file=fat:rw:drive/,format=raw,media=disk -m 512 -s -serial stdio -smp 2 -machine q35
 
 image_run: drive/boot.efi drive/kernel.bin
 	dd if=/dev/zero of=bin/dev.img count=10 bs=1M

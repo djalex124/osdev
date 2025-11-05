@@ -1,4 +1,6 @@
 #pragma once
+
+#include <stddef.h>
 #include <x86_64/pci.h>
 
 typedef struct {
@@ -30,11 +32,11 @@ typedef struct {
     uint8_t *fs_data;
 }__attribute__((packed)) kfs_partition;
 
-#ifndef ata_file
+#ifndef pata_file
 extern kfs_patadrive kfs_patadrives[4];
 #endif
 
-int kfs_atadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr);
+int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr);
 
 int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr);
 int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, void *addr);
@@ -50,7 +52,6 @@ void kfs_satainit(kpci_device *ide_device);
 
 void kfs_printpartition(kfs_partition *part);
 void kfs_printreadfile(uint8_t drive, char *filename);
-void kfs_printread(uint8_t drive, size_t sector, size_t sector_end);
 void kfs_printinfo();
 
 void kfs_addpartition(kfs_partition* partition);
