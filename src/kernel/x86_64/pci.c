@@ -281,7 +281,7 @@ void kpci_confirmedfunction(uint16_t section, uint8_t bus, uint8_t device, uint8
     new_device->device = device;
     new_device->function = func;
 
-#ifdef AQUA_IDE_DEBUG
+#ifdef AQUA_DEBUG
     uint8_t base = kpci_getbaseclass(new_device);
     uint8_t sub  = kpci_getsubclass(new_device);
     uint16_t ven = kpci_getvendorid(new_device);
@@ -397,7 +397,8 @@ void kpci_init()
             kdebug_outf("\nkpci_i:   base addr %x", baa->ecm_baseaddr);
             kdebug_outf("\nkpci_i:   busses %d-%d", baa->pci_busnum, baa->pci_busnumend);
 
-            kmem_pageentry(baa->ecm_baseaddr, baa->ecm_baseaddr, (baa->pci_busnumend + 1) * 0x1000, 0b11);
+            // identity map every pci bus in config range
+            kmem_pageentry(baa->ecm_baseaddr, baa->ecm_baseaddr, (baa->pci_busnumend + 1) * 32 * 0x1000, 0b11);
         }
 
         kpci_sectionheaders = kmem_kalloc(sizeof(acpi_mcfg_baa_header) * i);

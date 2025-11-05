@@ -4,6 +4,7 @@ firmware/
 *.o
 *.so
 *.efi
+*.EFI
 *.d
 *.bin
 *.dsl

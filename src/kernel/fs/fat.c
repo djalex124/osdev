@@ -227,7 +227,7 @@ void kfs_readfat(kfs_partition *partition)
             if (file->attributes & 0x8)
                 kterm_putf(" VOLUME_ID:");
             else if (file->attributes & 0x10)
-                kterm_putf(" DIRECTORY:");
+                kterm_putf(" DIR :");
             else
             {
                 kterm_putf(" FILE:");
@@ -238,24 +238,24 @@ void kfs_readfat(kfs_partition *partition)
             {
                 if (tmp_string)
                 {
-                    kterm_putf(" LFN %s", tmp_string);
+                    kterm_putf(" LFN [%s] ", tmp_string);
                     kmem_kfree(tmp_string);
                     tmp_string = 0;
                 }
                 else
                 {
                     char *first = str_tok((char *)file->name, " ");
-                    kterm_putf(" %8s.%3s", first, (char *)&file->name[8]);
+                    kterm_putf(" [%s.%3s] ", first, (char *)&file->name[8]);
                 }
                 if (file->size)
-                    kterm_putf(" SIZE: 0x%x bytes", file->size);
+                    kterm_putf("SIZE: 0x%x bytes ", file->size);
             }
             else
-                kterm_putf(" %11s", file->name);
+                kterm_putf(" [%s] ", str_tok((char *)file->name, " "));
             
-            uint32_t lba = (((file->first_cluster_higher << 16) + file->first_cluster_lower - 2) * info->sectorspercluster)
-                + info->rootsize + lba_root_dir;
-            kterm_putf(" LBA: %d", lba);
+            //uint32_t lba = (((file->first_cluster_higher << 16) + file->first_cluster_lower - 2) * info->sectorspercluster)
+            //    + info->rootsize + lba_root_dir;
+            //kterm_putf("LBA: %d", lba);
         }
         index += 32;
     }
