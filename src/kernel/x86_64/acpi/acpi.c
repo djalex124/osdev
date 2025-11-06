@@ -30,7 +30,7 @@ int kacpi_sdtchecksum(acpi_sdt_header *h)
 
 void kacpi_processtable(acpi_sdt_header *h)
 {
-    acpi_sdt_header *header = (acpi_sdt_header *)virt_from_phys((uintptr_t)h);
+    acpi_sdt_header *header = (acpi_sdt_header *)((uintptr_t)h);
     kdebug_outf("\r\nkacpi: table %04s", header->signature);
     if (strn_cmp("APIC", header->signature, 4) == 0)
     {
@@ -54,9 +54,8 @@ void kacpi_processtable(acpi_sdt_header *h)
 
 void kacpi_init()
 {
-    acpi_rsdp *table = (acpi_rsdp *)virt_from_phys(k_boottable.rsdp);
+    acpi_rsdp *table = (acpi_rsdp *)(k_boottable.rsdp);
 
-    kdebug_outf("\nkacpi_i: mapped table %x", table);
     kdebug_outf("\nkacpi_i: signature [%8s]", table->signature);
     if (!str_cmp(table->signature, "RSD PTR "))
         kacpi_fail(__LINE__);
@@ -70,7 +69,7 @@ void kacpi_init()
         if (rsdp_checksum & 0x1)
             kacpi_fail(__LINE__);
 
-        acpi_xsdt *xsdt = (acpi_xsdt *)virt_from_phys((uintptr_t)table->xsdt_addr);
+        acpi_xsdt *xsdt = (acpi_xsdt *)((uintptr_t)table->xsdt_addr);
 
         if (kacpi_sdtchecksum((acpi_sdt_header *)xsdt) != 0)
             kacpi_fail(__LINE__);
@@ -92,7 +91,7 @@ void kacpi_init()
         if (rsdp_checksum & 0x1)
             kacpi_fail(__LINE__);
 
-        acpi_rsdt *rsdt = (acpi_rsdt *)virt_from_phys((uintptr_t)table->rsdt_addr);
+        acpi_rsdt *rsdt = (acpi_rsdt *)((uintptr_t)table->rsdt_addr);
 
         if (kacpi_sdtchecksum((acpi_sdt_header *)rsdt) != 0)
             kacpi_fail(__LINE__);

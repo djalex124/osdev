@@ -8,9 +8,9 @@ objcopy = x86_64-elf-objcopy
 kernel_build = $$(cat build.txt)
 
 ifeq ($(build_uname), x86_64)
-kernel_headers = /usr/include
+kernel_headers := /usr/include
 else
-kernel_headers = /home/alex/opt/cross/x86_64-elf/include
+kernel_headers := /home/alex/opt/cross/x86_64-elf/include
 endif
 
 kernel_flags = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$(kernel_build) -gdwarf -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
@@ -90,11 +90,11 @@ image_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin
 	@dd if=/dev/zero of=bin/dev.img count=10 bs=1M
 	@mkfs.vfat -F 16 bin/dev.img
 
+	@mcopy -i bin/dev.img drive/kernel.bin ::/
+	@mcopy -i bin/dev.img drive/startup.nsh ::/
 	@mmd -i bin/dev.img ::EFI
 	@mmd -i bin/dev.img ::EFI/BOOT
 	@mcopy -i bin/dev.img drive/EFI/BOOT/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI
-	@mcopy -i bin/dev.img drive/kernel.bin ::/
-	@mcopy -i bin/dev.img drive/startup.nsh ::/
 
 	@qemu-img convert -f raw -O qcow2 bin/dev.img bin/dev.qcow2
 	@rm bin/dev.img
@@ -104,12 +104,12 @@ image_debug: drive/EFI/BOOT/BOOTX64.EFI drive/dbg_kernel.bin
 	@dd if=/dev/zero of=bin/dev.img count=10 bs=1M
 	@mkfs.vfat -F 16 bin/dev.img
 
-	@mmd -i bin/dev.img ::EFI
-	@mmd -i bin/dev.img ::EFI/BOOT
-	@mcopy -i bin/dev.img drive/EFI/BOOT/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI
 	@mcopy -i bin/dev.img drive/kernel.bin ::/
 	@mcopy -i bin/dev.img drive/kernel.map ::/
 	@mcopy -i bin/dev.img drive/startup.nsh ::/
+	@mmd -i bin/dev.img ::EFI
+	@mmd -i bin/dev.img ::EFI/BOOT
+	@mcopy -i bin/dev.img drive/EFI/BOOT/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI
 
 	@qemu-img convert -f raw -O qcow2 bin/dev.img bin/dev.qcow2
 	@rm bin/dev.img

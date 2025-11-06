@@ -16,6 +16,7 @@ typedef struct kmem_heapblock
     struct kmem_heapblock *prev;
 }__attribute__((packed)) kmem_heapblock;
 
+#define kmem_heapsize 0x80
 kmem_heapblock *heap_start = 0;
 
 //heap alloc
@@ -69,10 +70,10 @@ void kmem_kfree(void *addr)
 
 void kmem_heapinit()
 {
-    heap_start = (kmem_heapblock *)kmem_alloc(0x100);
-    // 1mb in total size
+    heap_start = (kmem_heapblock *)kmem_alloc(kmem_heapsize);
+    // 512kb in total size
     
-    heap_start->size = 0x100000 - sizeof(kmem_heapblock);
+    heap_start->size = (kmem_heapsize * 0x1000) - sizeof(kmem_heapblock);
     heap_start->used = 0;
     heap_start->next = 0;
     heap_start->prev = 0;
@@ -93,6 +94,9 @@ void* kmem_alloc(size_t pages)
 void kmem_free(void *addr, size_t pages)
 {
     void *phys = kmem_getphysical(addr);
+#ifdef AQUA_DEBUG_MEM
+    kdebug_outf("\nkm_f: freeing %x", phys);
+#endif
     kmem_pfree(phys, pages);
     kmem_unpage(addr, pages * 0x1000);
 }
@@ -107,7 +111,7 @@ void kmem_printinfo()
             total_free += ptr->size;
         ptr = ptr->next;
     }
-    kterm_putf("\nkheap stats: 0x%6x/0x100000 free", total_free);
+    kterm_putf("\nkheap stats: 0x%x/0x%x free", total_free, (kmem_heapsize * 0x1000));
 
     kmem_printpmminfo();
 }
@@ -137,8 +141,11 @@ void kmem_init(boot_table *table)
     {
         uint64_t end_addr = mmap_entries->physical_start + 0x1000 * mmap_entries->num_pages;
 
+#ifdef AQUA_DEBUG_MEM
         kdebug_outf("\nkm_i: mmap type %2d range 0x%8x-0x%8x", mmap_entries->type,
             mmap_entries->physical_start, end_addr);
+#endif
+
         total_pages += mmap_entries->num_pages;
 
         if (mmap_entries->type == 11 || mmap_entries->type == 0) // if mmio or unusable, skip

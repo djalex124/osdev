@@ -145,7 +145,7 @@ void kfs_patainit(kpci_device *ide_device)
     
     if (!(progif & 0x80))
     {
-        kdebug_outf("\r\nkfs_i: only working with DMA enabled for ATA currently");
+        kdebug_outf("\nkfs_i: only using DMA enabled PATA drives, skipping...");
         return;
     }
 
@@ -286,8 +286,10 @@ void kfs_patainit(kpci_device *ide_device)
         kfs_channel[i].pci = ide_device;
     }
 
-    //uint32_t ints = kpci_configread(ide_device->bus, ide_device->subclass, ide_device->function, PCI_OFFSET_HDR0_REGF);
-    //kdebug_outf("\r\nkfs_i: int pin: %x int line: %x", (ints & 0xFF00) >> 8, ints & 0xFF);
+#ifdef AQUA_DEBUG
+    uint32_t ints = kpci_configread(ide_device, PCI_OFFSET_HDR0_REGF);
+    kdebug_outf("\r\nkfs_i: int pin: %x int line: %x", (ints & 0xFF00) >> 8, ints & 0xFF);
+#endif
 
     uint16_t command = kpci_configread(ide_device, PCI_OFFSET_COMMAND);
     kpci_configwrite16(ide_device, PCI_OFFSET_COMMAND, command | 7);

@@ -52,8 +52,9 @@ void kmem_printpmminfo()
 		}
 	}
 
-	kterm_putf("\npmm stats: %d/%d frames used", used_pages,
-		kmem_bitmap_low_max * 64 + kmem_bitmap_hi_max * 64);
+	kterm_putf("\npmm stats: %d/%d (%d%%) frames used", used_pages,
+		kmem_bitmap_low_max * 64 + kmem_bitmap_hi_max * 64,
+		used_pages / (kmem_bitmap_low_max * 64 + kmem_bitmap_hi_max * 64));
 }
 
 void kmem_pmapset(uint64_t page, uint64_t length, uint8_t used, uint8_t low)
@@ -226,14 +227,14 @@ void kmem_pfree(void* addr, size_t pages)
 	uint64_t phys_addr = (uint64_t)addr;
 	if (phys_addr >= 0x100000000)
 	{
-		if ((phys_addr / 0x1000) + pages >= kmem_bitmap_hi_max)
+		if ((phys_addr / 0x1000) + pages >= kmem_bitmap_hi_max * 64)
 			kcrash("km_p: free above range");
 
 		kmem_pmapset(phys_addr / 0x1000, pages, 0, 1);
 	}
 	else
 	{
-		if ((phys_addr / 0x1000) + pages >= kmem_bitmap_low_max)
+		if ((phys_addr / 0x1000) + pages >= kmem_bitmap_low_max * 64)
 			kcrash("km_p: free above range");
 
 		kmem_pmapset(phys_addr / 0x1000, pages, 0, 0);

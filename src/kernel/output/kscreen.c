@@ -63,7 +63,7 @@ void kscreen_init()
     memcpy(&kgraphics, &k_boottable.graphics, sizeof(kgraphics));
     //assume 32 bpp as is standard from UEFI's GOP
     
-    kgraphics.framebuffer_base = kmem_page((uint64_t)kgraphics.framebuffer_base, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b11);
+    kgraphics.framebuffer_base = kmem_page((uint64_t)kgraphics.framebuffer_base, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b10011);
     kscreen_buffer = kmem_alloc((kgraphics.horizontal_res * kgraphics.vertical_res * 4)/0x1000);
     kscreen_termbuffer = kmem_alloc((kgraphics.horizontal_res * kgraphics.vertical_res * 4)/0x1000);
 

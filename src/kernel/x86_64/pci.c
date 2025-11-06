@@ -398,7 +398,7 @@ void kpci_init()
             kdebug_outf("\nkpci_i:   busses %d-%d", baa->pci_busnum, baa->pci_busnumend);
 
             // identity map every pci bus in config range
-            kmem_pageentry(baa->ecm_baseaddr, baa->ecm_baseaddr, (baa->pci_busnumend + 1) * 32 * 0x1000, 0b11);
+            kmem_pageentry(baa->ecm_baseaddr, baa->ecm_baseaddr, (baa->pci_busnumend + 1) * 32 * 0x1000, 0b10011);
         }
 
         kpci_sectionheaders = kmem_kalloc(sizeof(acpi_mcfg_baa_header) * i);
