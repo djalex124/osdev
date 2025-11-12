@@ -14,7 +14,7 @@
 
 #include <fs/fs.h>
 
-extern kfs_patadrive kfs_patadrives[4];
+kfs_drive *kfs_drives[32];
 
 void kfs_printreadfile(uint8_t partition, char *filename)
 {
@@ -70,12 +70,31 @@ void kfs_printinfo()
     kterm_putf("\nkfs drives detected:");
     int drives = 0;
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 32; i++)
     {
-        if (kfs_patadrives[i].exists)
+        if (kfs_drives[i])
         {
-            uint64_t size = kfs_patadrives[i].sectors * kfs_patadrives[i].sector_size;
-            kterm_putf("\n - PATA device %d [%s] %d MB", i, kfs_patadrives[i].model, size / 1024 / 1024);
+            kfs_drive *drive = kfs_drives[i];
+            if (drive->drive_type == KFS_PATA)
+            {
+                kfs_patadrive *patadrive = (kfs_patadrive *)drive->drive_data;
+                uint64_t size = patadrive->sectors * patadrive->sector_size;
+                kterm_putf("\n %2d - PATA device [%s]", i, patadrive->model);
+                kterm_putf("\n    - %d MB", size / 1024 / 1024);
+            }
+            else if (drive->drive_type == KFS_SATA)
+            {
+                kfs_satadrive *satadrive = (kfs_satadrive *)drive->drive_data;
+                kterm_putf("\n %2d - SATA device (Slot %d) ", i, satadrive->drive);
+                if (satadrive->type == AHCI_ATA)
+                    kterm_putf("ATA");
+                else if (satadrive->type == AHCI_ATAPI)
+                    kterm_putf("ATAPI");
+                else
+                    kterm_putf("Other(%d)", satadrive->type);
+            }
+            else
+                kterm_putf("\n %d - Drive detected, unknown", i);
             drives = 1;
         }
     }
@@ -87,15 +106,17 @@ void kfs_printinfo()
 int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr)
 {
     int result = 0;
-    if (drive->drive_type == 1)
+    if (drive->drive_type == KFS_PATA)
         result = kfs_patadma((kfs_patadrive *)drive->drive_data, lba, sec_count, read, addr);
+    else if (drive->drive_type == KFS_SATA)
+        kdebug_outf("\nkfs_readsector: sata not impl yet");
     return result;
 }
 
 int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, void *addr)
 {
     int result = 0;
-    if (partition->drive->drive_type == 1)
+    if (partition->drive->drive_type == KFS_PATA)
     {
         size_t sector_size = ((kfs_patadrive *)partition->drive->drive_data)->sector_size;
         size_t sectors = (length + sector_size - 1) / sector_size;
@@ -115,7 +136,7 @@ void kfs_addpartition(kfs_partition* partition)
 {
     kdebug_outf("\nkfs_addp: adding");
 
-    for (int i = 0; i < 15; i++)
+    for (int i = 0; i < 16; i++)
     {
         if (k_infotable.kfs_partitions[i] == 0)
         {
@@ -131,7 +152,7 @@ void kfs_removepartition(kfs_partition* partition)
 {
     kdebug_outf("\nkfs_remp: removing");
 
-    for (int i = 0; i < 15; i++)
+    for (int i = 0; i < 16; i++)
     {
         kfs_partition* ptr = k_infotable.kfs_partitions[i];
         if ((uintptr_t)partition == (uintptr_t)ptr)
@@ -142,6 +163,38 @@ void kfs_removepartition(kfs_partition* partition)
     }
     
     kdebug_outf("\nkfs: failed to removed partition!");
+}
+
+void kfs_adddrive(kfs_drive *drive)
+{
+    int i = 0;
+    for (; i < 32; i++)
+    {
+        if (kfs_drives[i] == 0)
+        {
+            kfs_drives[i] = drive;
+            break;
+        }
+    }
+
+    if (i == 32)
+        kdebug_outf("\nkfs: too many drives! not adding...");
+}
+
+void kfs_removedrive(kfs_drive *drive)
+{
+    int i = 0;
+    for (; i < 32; i++)
+    {
+        if (kfs_drives[i] == drive)
+        {
+            kfs_drives[i] = 0;
+            break;
+        }
+    }
+
+    if (i == 32)
+        kdebug_outf("\nkfs: attempting to remove unmapped drive!");
 }
 
 void kfs_init()
@@ -156,13 +209,18 @@ void kfs_init()
             kfs_satainit(&k_infotable.kpci_table[i]);
     }
 
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < 32; i++)
     {
-        if (kfs_patadrives[i].exists)
+        if (kfs_drives[i])
         {
-            kfs_drive *patadrive = kfs_patatest(&kfs_patadrives[i]);
-            if ((uintptr_t)patadrive)
-                kfs_detectfat(patadrive);
+            kfs_drive *drive = kfs_drives[i];
+            int working = 0;
+            if (drive->drive_type == KFS_PATA)
+            {
+                working = kfs_patatest((kfs_patadrive *)drive->drive_data);
+                if (working > 0)
+                    kfs_detectfat(drive);
+            }
         }
     }
 }

@@ -496,7 +496,7 @@ void kterm_run()
         kterm_putf("\nmounted partitions:");
 
         int partitions = 0;
-        for (int i = 0; i < 15; i++)
+        for (int i = 0; i < 16; i++)
         {
             if ((uint64_t)k_infotable.kfs_partitions[i])
             {

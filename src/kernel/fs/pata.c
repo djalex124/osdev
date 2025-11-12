@@ -280,6 +280,12 @@ void kfs_patainit(kpci_device *ide_device)
             kdebug_outf("\r\nkfs_i: mdma %16b", kfs_patadrives[count].mdma);
             kdebug_outf("\r\nkfs_i: udma %16b", kfs_patadrives[count].udma);*/
 
+            kfs_drive *d = kmem_kalloc(sizeof(kfs_drive));
+            d->drive_data = &kfs_patadrives[count];
+            d->drive_type = KFS_PATA;
+
+            kfs_adddrive(d);
+
             count++;
         }
 
@@ -360,7 +366,7 @@ int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read
     return 0;
 }
 
-kfs_drive* kfs_patatest(kfs_patadrive *drive)
+int kfs_patatest(kfs_patadrive *drive)
 {
 #ifdef AQUA_DEBUG
     uint64_t size = drive->sectors * drive->sector_size;
@@ -374,30 +380,20 @@ kfs_drive* kfs_patatest(kfs_patadrive *drive)
     uint8_t *addr = kmem_alloc(1);
     int result = kfs_patadma(drive, 0, 1, 1, addr);
 
-    if (!result)
+    if (result != -1)
     {
         kdebug_outf("\nkfs_test: %2x %2x", addr[510], addr[511]);
         if (addr[510] == 0x55 && addr[511] == 0xaa)
-        {
             kdebug_outf("\r\nkfs_test: successfully found MBR signature!");
-            result = 1;
-        }
         else
             kdebug_outf("\r\nkfs_test: no read error - unknown format");
+
+        result = 1;
     }
     else
         kdebug_outf("\r\nkfs_test: unable to read");
 
     kmem_free(addr, 1);
 
-    if (result == 1)
-    {
-        kfs_drive *d = kmem_kalloc(sizeof(kfs_drive));
-        d->drive_data = (uint8_t *)drive;
-        d->drive_type = 1;
-
-        return d;
-    }
-    else
-        return NULL;
+    return result;
 }

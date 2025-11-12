@@ -18,11 +18,28 @@ typedef struct {
     char model[41];
 } kfs_patadrive;
 
+typedef enum {
+    AHCI_ATA = 0,
+    AHCI_ATAPI = 1,
+    AHCI_PM = 2,
+    AHCI_SEMB = 3,
+} kfs_satatypes;
+
 typedef struct {
-    uint8_t drive_type;
-    // 1 = pata
-    // 2 = sata
-    uint8_t *drive_data;
+    uint32_t drive;
+    kfs_satatypes type;
+    kpci_device *ahci_controller;
+} kfs_satadrive;
+
+typedef enum {
+    KFS_NODRIVE = 0,
+    KFS_PATA = 1,
+    KFS_SATA = 2,
+} kfs_drivetypes;
+
+typedef struct {
+    kfs_drivetypes drive_type;
+    void *drive_data;
 } kfs_drive;
 
 typedef struct {
@@ -32,9 +49,7 @@ typedef struct {
     uint8_t *fs_data;
 }__attribute__((packed)) kfs_partition;
 
-#ifndef pata_file
-extern kfs_patadrive kfs_patadrives[4];
-#endif
+extern kfs_drive *kfs_drives[32];
 
 int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr);
 
@@ -45,7 +60,7 @@ void kfs_detectfat(kfs_drive *drive);
 void kfs_readfat(kfs_partition *partition);
 uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_length);
 
-kfs_drive* kfs_patatest(kfs_patadrive *drive);
+int kfs_patatest(kfs_patadrive *drive);
 
 void kfs_patainit(kpci_device *ide_device);
 void kfs_satainit(kpci_device *ide_device);
@@ -56,5 +71,8 @@ void kfs_printinfo();
 
 void kfs_addpartition(kfs_partition* partition);
 void kfs_removepartition(kfs_partition* partition);
+
+void kfs_adddrive(kfs_drive *drive);
+void kfs_removedrive(kfs_drive *drive);
 
 void kfs_init();
