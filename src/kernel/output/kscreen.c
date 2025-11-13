@@ -43,7 +43,7 @@ void kscreen_copy()
         memcpy_ssealign(kscreen_buffer, kscreen_termbuffer,
             kgraphics.horizontal_res * kgraphics.vertical_res * 4);
     if (kmouse_draw)
-        kscreen_directdrawrect(mx, kgraphics.vertical_res - my, 5, 5, 0xFF00FF);
+        kscreen_directdrawrect(mx, my, 5, 5, 0xFF00FF);
     memcpy_ssealign(kgraphics.framebuffer_base, kscreen_buffer,
         kgraphics.horizontal_res * kgraphics.vertical_res * 4);
 }

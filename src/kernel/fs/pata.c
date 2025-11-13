@@ -105,8 +105,8 @@ uint64_t *kfs_prdt = 0;
 
 void kfs_patainit(kpci_device *ide_device)
 {
-    kfs_patadmabuffer = kmem_palloc(1);
-    kmem_pageentry((uint64_t)kfs_patadmabuffer, (uint64_t)kfs_patadmabuffer, 0x1000, 0b11);
+    kfs_patadmabuffer = kmem_palloc(8);
+    kmem_pageentry((uint64_t)kfs_patadmabuffer, (uint64_t)kfs_patadmabuffer, 0x8000, 0b11);
 
     kfs_prdt = kmem_palloc(1);
     kmem_pageentry((uint64_t)kfs_prdt, (uint64_t)kfs_prdt, 0x1000, 0b11);
@@ -361,7 +361,7 @@ int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read
         return -1;
     }
 
-    memcpy(addr, kfs_patadmabuffer, drive->sector_size);
+    memcpy(addr, kfs_patadmabuffer, drive->sector_size * sec_count);
 
     return 0;
 }

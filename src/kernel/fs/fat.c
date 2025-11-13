@@ -80,6 +80,7 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
 
     uint32_t index = 0;
     char* tmp_string = 0;
+    size_t tmp_string_len = 0;
 
     uint8_t *findfile = 0;
     while (fat[index] && index < 512)
@@ -95,21 +96,39 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
             formatLFN *lfn = (formatLFN *)&fat[index];
             //kterm_putf("\n LFN entry -");
             //kterm_putf(" index %x ", lfn->order);
-            if (tmp_string)
+            if ((uint64_t)tmp_string)
             {
-                char* new = kmem_kalloc(13 + str_len(tmp_string));
-                memcpy(new + 13, tmp_string, str_len(tmp_string));
+                char* new = kmem_kalloc(13 + tmp_string_len);
+                memcpy(new + 13, tmp_string, tmp_string_len);
                 kmem_kfree(tmp_string);
                 tmp_string = new;
+                tmp_string_len += 13;
             }
             else
-                tmp_string = kmem_kalloc(13);
-            for (int i = 0; i < 5; i++)
+            {
+                tmp_string = kmem_kalloc(14);
+                tmp_string_len = 14;
+            }
+                
+            int continuename = 1;
+            for (int i = 0; (i < 5) && continuename; i++)
+            {
                 tmp_string[i] = lfn->name[2 * i];
-            for (int i = 0; i < 6; i++)
+                if (lfn->name[2 * i] == 0)
+                    continuename = 0;
+            }
+            for (int i = 0; (i < 6) && continuename; i++)
+            {
                 tmp_string[i + 5] = lfn->name2[2 * i];
-            for (int i = 0; i < 2; i++)
+                if (lfn->name2[2 * i] == 0)
+                    continuename = 0;
+            }
+            for (int i = 0; (i < 2) && continuename; i++)
+            {
                 tmp_string[i + 11] = lfn->name3[2 * i];
+                if (lfn->name3[2 * i] == 0)
+                    continuename = 0;
+            }
         }
         else
         {
@@ -190,6 +209,7 @@ void kfs_readfat(kfs_partition *partition)
 
     uint32_t index = 0;
     char* tmp_string = 0;
+    size_t tmp_string_len = 0;
     while (buffer[index] && index < 512)
     {
         if (buffer[index] == 0xE5)
@@ -203,21 +223,39 @@ void kfs_readfat(kfs_partition *partition)
             formatLFN *lfn = (formatLFN *)&buffer[index];
             //kterm_putf("\n LFN entry -");
             //kterm_putf(" index %x ", lfn->order);
-            if (tmp_string)
+            if ((uint64_t)tmp_string)
             {
-                char* new = kmem_kalloc(13 + str_len(tmp_string));
-                memcpy(new + 13, tmp_string, str_len(tmp_string));
+                char* new = kmem_kalloc(13 + tmp_string_len);
+                memcpy(new + 13, tmp_string, tmp_string_len);
                 kmem_kfree(tmp_string);
                 tmp_string = new;
+                tmp_string_len += 13;
             }
             else
-                tmp_string = kmem_kalloc(13);
-            for (int i = 0; i < 5; i++)
+            {
+                tmp_string = kmem_kalloc(14);
+                tmp_string_len = 14;
+            }
+                
+            int continuename = 1;
+            for (int i = 0; (i < 5) && continuename; i++)
+            {
                 tmp_string[i] = lfn->name[2 * i];
-            for (int i = 0; i < 6; i++)
+                if (lfn->name[2 * i] == 0)
+                    continuename = 0;
+            }
+            for (int i = 0; (i < 6) && continuename; i++)
+            {
                 tmp_string[i + 5] = lfn->name2[2 * i];
-            for (int i = 0; i < 2; i++)
+                if (lfn->name2[2 * i] == 0)
+                    continuename = 0;
+            }
+            for (int i = 0; (i < 2) && continuename; i++)
+            {
                 tmp_string[i + 11] = lfn->name3[2 * i];
+                if (lfn->name3[2 * i] == 0)
+                    continuename = 0;
+            }
         }
         else
         {

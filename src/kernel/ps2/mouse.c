@@ -17,7 +17,7 @@ extern graphics_info kgraphics;
 void kmouse_calc()
 {
     mx += (mbyte[1] - ((mbyte[0] << 4) & 0x100));
-    my += (mbyte[2] - ((mbyte[0] << 3) & 0x100));
+    my -= (mbyte[2] - ((mbyte[0] << 3) & 0x100));
 
     if (mx < 0)
         mx = 0;

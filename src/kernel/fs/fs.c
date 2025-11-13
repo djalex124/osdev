@@ -121,7 +121,15 @@ int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, 
         size_t sector_size = ((kfs_patadrive *)partition->drive->drive_data)->sector_size;
         size_t sectors = (length + sector_size - 1) / sector_size;
         kterm_putf("\n%d sectors", sectors);
-        for (size_t sector = 0; sector < sectors; sector++)
+        size_t sector;
+        for (sector = 0; sectors - sector > 64; sector += 64)
+        {
+            result = kfs_readsector(partition->drive, lba + sector, 64, read, addr + (sector_size * sector));
+
+            if (result != 0)
+                return result;
+        }
+        for (; sector < sectors; sector++)
         {
             result = kfs_readsector(partition->drive, lba + sector, 1, read, addr + (sector_size * sector));
 

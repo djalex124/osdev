@@ -8,6 +8,7 @@
 #include <kernel/debug.h>
 
 #include <output/screen.h>
+#include <output/image.h>
 #include <output/kterm.h>
 
 #include <x86_64/acpi/acpi.h>
@@ -520,7 +521,7 @@ void kterm_run()
     {
         kterm_putf("\nList of currently available commands:");
         kterm_putf("\n clear - clears the screen");
-        kterm_putf("\n color [fg] [bg] - set terminal colors in hex, no values to reset");
+        kterm_putf("\n color [fg] [bg] - set terminal colors in base10 of hex code, no values to reset");
         kterm_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
         kterm_putf("\n cpu_info - lists CPU model and capabilities");
         kterm_putf("\n crash - crashes the AQUA kernel");
@@ -528,6 +529,7 @@ void kterm_run()
         kterm_putf("\n fs_info - lists detected disks and drives");
         kterm_putf("\n font - prints all characters in boot font");
         kterm_putf("\n help - lists available commands");
+        kterm_putf("\n image [filename] - attempt printing .tga image to screen from file");
         kterm_putf("\n info - prints current AQUA build information");
         kterm_putf("\n mem_info - prints current memory usage");
         kterm_putf("\n pci_info - prints pci busses and devices");
@@ -536,6 +538,56 @@ void kterm_run()
         kterm_putf("\n test - test random features");
         kterm_putf("\n test_mouse - tests ps2 mouse input");
         kterm_putf("\n wait [num1] - wait given number of seconds");
+    }
+    else if (str_cmp(kterm_argv[0], "image") == 0)
+    {
+        if (kterm_argc < 2)
+            kterm_putf("\nNot enough arguments.");
+        else if (kterm_currentpartition < 0 || kterm_currentpartition > 15)
+        {
+            kterm_putf("\nInvalid partition selection.");
+            kterm_currentpartition = -1;
+        }
+        else if ((uint64_t)k_infotable.kfs_partitions[kterm_currentpartition] == 0)
+        {
+            kterm_putf("\nPartition does not exist.");
+            kterm_currentpartition = -1;
+        }
+        else
+        {
+            char *filename = 0;
+            if (kterm_argv[1])
+                filename = kterm_argv[1];
+            
+            size_t file_length;
+            uint8_t *file = 0;
+            size_t image_pages = 0;
+    
+            kfs_partition *selected_partition = k_infotable.kfs_partitions[kterm_currentpartition];
+            if (selected_partition->fs == 1)
+                file = kfs_readfilefat(selected_partition, filename, &file_length);
+
+            if ((uint64_t)file == 0)
+            {
+                kterm_putf("\nUnable to read file.");
+                return;
+            }
+
+            if (file[0] != 0 || file[1] != 0 || file[2] != 0x0A || file[3] != 0 || file[4] != 0
+                || file[5] != 0 || file[6] != 0 || file[7] != 0 || file[8] != 0 || file[9] != 0
+                || (file[16] != 24 && file[16] != 32))
+            {
+                kterm_putf("\nInvalid tga file.");
+            }
+            else
+            {
+                uint32_t *image_pixels = kimage_getbuftga(file, (int)file_length, &image_pages);
+                kimage_termblit(image_pixels, 100, 100);
+                kmem_free(image_pixels, image_pages);
+            }
+
+            kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
+        }
     }
     else if (str_cmp(kterm_argv[0], "info") == 0)
     {
