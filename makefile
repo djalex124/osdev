@@ -1,17 +1,8 @@
-build_uname = $(shell uname -m)
+include config.mk
 
 build_speed = -O2
 
-gcc = x86_64-elf-gcc
-objcopy = x86_64-elf-objcopy
-
 kernel_build = $$(cat build.txt)
-
-ifeq ($(build_uname), x86_64)
-kernel_headers := /usr/include
-else
-kernel_headers := /home/alex/opt/cross/x86_64-elf/include
-endif
 
 kernel_flags = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$(kernel_build) -gdwarf -fno-pie -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -Wall
 kernel_link  = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf -fno-pie -T bin/link.ld
@@ -49,16 +40,6 @@ obj/%.o: src/%.c
 obj/%.o: src/%.S 
 	@mkdir -p $(@D)
 	@$(gcc) $(debug_flag) $(kernel_flags) -c -DASSEMBLY -MMD -MP $< -o $@ -lgcc
-
-efi_cc := x86_64-linux-gnu-gcc
-
-ifeq ($(build_uname), x86_64)
-gnu_efi_inc := /usr/include/efi
-gnu_efi_lib := /usr/lib
-else
-gnu_efi_inc := /usr/local/include/efi
-gnu_efi_lib := /usr/local/lib
-endif
 
 drive/EFI/BOOT/BOOTX64.EFI:
 	@x86_64-linux-gnu-gcc $(debug_flag) -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o src/boot/uefiboot.o
