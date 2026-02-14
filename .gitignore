@@ -9,4 +9,4 @@ firmware/
 *.bin
 *.dsl
 *.map
-config.mk
+*.DS_Store

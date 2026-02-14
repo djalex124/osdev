@@ -126,6 +126,17 @@ void kmouse_init()
     kmouse_cmd(0xF5); //if enabled, disable packets
 
     kmouse_wait(1);
+    outb(0x64, 0xAD); //disable 1st ps2 port
+
+    kmouse_wait(1);
+    outb(0x64, 0xA7); //disable 2nd ps2 port
+
+    inb(0x60); //flush input buffer
+
+    kmouse_wait(1);
+    outb(0x64, 0xAE); //enable 1st ps2 port
+
+    kmouse_wait(1);
     outb(0x64, 0xA8); //enable 2nd ps2 port
 
     kmouse_wait(1);

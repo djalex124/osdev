@@ -129,9 +129,9 @@ int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, 
             if (result != 0)
                 return result;
         }
-        for (; sector < sectors; sector++)
+        if (sectors - sector)
         {
-            result = kfs_readsector(partition->drive, lba + sector, 1, read, addr + (sector_size * sector));
+            result = kfs_readsector(partition->drive, lba + sector, sectors - sector, read, addr + (sector_size * sector));
 
             if (result != 0)
                 return result;

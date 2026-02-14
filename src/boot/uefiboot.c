@@ -74,6 +74,10 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 boot_table* table;
 UINTN kernel_size = 0;
 void (*kentry)(boot_table* table, UINTN* page_table);
+#ifdef AQUA_DEBUG
+UINTN debug_symbols = 0;
+#endif
+EFI_INPUT_KEY key;
 
 EFI_STATUS load_graphics()
 {
@@ -97,8 +101,6 @@ EFI_STATUS load_graphics()
 
     s = uefi_call_wrapper(gop->SetMode, 2, gop, mode_native);
     assert(s);
-
-    Print(L"\r\nWelcome to concatenOS loader!\r\n");
 
 #ifdef AQUA_DEBUG
     Print(L"[INFO]: This is a debugging enabled build!\r\n");
@@ -188,35 +190,38 @@ EFI_STATUS load_kernel(EFI_HANDLE image_handle)
     FreePool(prog_headers);
 
 #ifdef AQUA_DEBUG
-    CHAR16 *debug_name = L"kernel.map";
-    EFI_FILE_HANDLE debug_file;
-    s = uefi_call_wrapper(root->Open, 5, root, &debug_file, 
-        debug_name, EFI_FILE_MODE_READ, 
-        EFI_FILE_READ_ONLY | EFI_FILE_HIDDEN | EFI_FILE_SYSTEM);
-    assert(s);
+    if (debug_symbols)
+    {
+        CHAR16 *debug_name = L"kernel.map";
+        EFI_FILE_HANDLE debug_file;
+        s = uefi_call_wrapper(root->Open, 5, root, &debug_file, 
+            debug_name, EFI_FILE_MODE_READ, 
+            EFI_FILE_READ_ONLY | EFI_FILE_HIDDEN | EFI_FILE_SYSTEM);
+        assert(s);
 
-    Print(L"[OK]: Locate debug symbols\r\n");
+        Print(L"[OK]: Locate debug symbols\r\n");
 
-    UINTN debug_start = 0x100000 + kernel_size;
-    EFI_FILE_INFO *debug_info = LibFileInfo(debug_file);
+        UINTN debug_start = 0x100000 + kernel_size;
+        EFI_FILE_INFO *debug_info = LibFileInfo(debug_file);
 
-    UINTN debug_size = (debug_info->FileSize + 0x1000 - 1) / 0x1000;
+        UINTN debug_size = (debug_info->FileSize + 0x1000 - 1) / 0x1000;
 
-    if ((UINTN)debug_info == 0)
-        assert(EFI_LOAD_ERROR);
+        if ((UINTN)debug_info == 0)
+            assert(EFI_LOAD_ERROR);
 
-    s = uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, 
-        EfiLoaderCode, debug_size, (EFI_PHYSICAL_ADDRESS)debug_start);
-    assert(s);
+        s = uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, 
+            EfiLoaderCode, debug_size, (EFI_PHYSICAL_ADDRESS)debug_start);
+        assert(s);
 
-    s = uefi_call_wrapper(file->Read, 3, debug_file, 
-        &(debug_info->FileSize), (EFI_PHYSICAL_ADDRESS)debug_start);
-    assert(s);
+        s = uefi_call_wrapper(file->Read, 3, debug_file, 
+            &(debug_info->FileSize), (EFI_PHYSICAL_ADDRESS)debug_start);
+        assert(s);
 
-    Print(L"[OK]: Debug info loaded [0x%x - 0x%x]\r\n", 
-        debug_start, debug_start + debug_size * 0x1000);
+        Print(L"[OK]: Debug info loaded [0x%x - 0x%x]\r\n", 
+            debug_start, debug_start + debug_size * 0x1000);
 
-    kernel_size += debug_size * 0x1000;
+        kernel_size += debug_size * 0x1000;
+    }
 #endif
 
     return 0;
@@ -330,6 +335,30 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
 
     s = load_graphics();
     assert(s);
+
+    uefi_call_wrapper(ST->ConIn->Reset, 2, ST->ConIn, FALSE);
+    uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 4);
+    Print(L"Welcome to ConcatenOS pre-boot environment!"); 
+
+    do
+    {
+        uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 6);
+
+#ifdef AQUA_DEBUG
+        Print(L"Debugging symbols enabled: %x\r\n\r\nPress [1] to toggle debugging symbols.\r\n", debug_symbols);
+#endif
+        Print(L"Press [enter] to boot.");
+
+        uefi_call_wrapper(BS->WaitForEvent, 3, 1, &ST->ConIn->WaitForKey, NULL);
+        uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key);
+
+#ifdef AQUA_DEBUG
+        if (key.UnicodeChar == 0x31)
+            debug_symbols ^= 1;
+#endif
+    } while (key.UnicodeChar != 0xD);
+
+    Print(L"\r\n\r\n");
 
     s = load_kernel(image_handle);
     assert(s);
