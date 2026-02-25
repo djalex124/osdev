@@ -41,16 +41,15 @@ obj/%.o: src/%.S
 	@mkdir -p $(@D)
 	@$(gcc) $(debug_flag) $(kernel_flags) -c -DASSEMBLY -MMD -MP $< -o $@ -lgcc
 
-drive/EFI/BOOT/BOOTX64.EFI:
-	@$(efi_cc) $(debug_flag) -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o src/boot/uefiboot.o
-	@$(efi_ld) -shared -Bsymbolic -L$(gnu_efi) -T$(gnu_efi)/elf_x86_64_efi.lds $(gnu_efi)/crt0-efi-x86_64.o src/boot/uefiboot.o -o src/boot/boot.so -lgnuefi -lefi
-	@$(objcopy) -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym  -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc --target efi-app-x86_64 --subsystem=10 src/boot/boot.so drive/boot.efi
+obj/boot/uefiboot.o: src/boot/uefiboot.c
+	@mkdir -p obj/boot
+	@$(efi_cc) $(debug_flag) -MMD -MP -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o obj/boot/uefiboot.o
+
+drive/EFI/BOOT/BOOTX64.EFI: obj/boot/uefiboot.o
+	@$(efi_ld) -shared -Bsymbolic -L$(gnu_efi) -T$(gnu_efi)/elf_x86_64_efi.lds $(gnu_efi)/crt0-efi-x86_64.o obj/boot/uefiboot.o -o obj/boot/boot.so -lgnuefi -lefi
+	@$(objcopy) -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym  -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc --target efi-app-x86_64 --subsystem=10 obj/boot/boot.so drive/boot.efi
 	@mkdir -p drive/EFI/BOOT
 	@mv drive/boot.efi drive/EFI/BOOT/BOOTX64.EFI
-
-# super user is required for mouse movement due to current QEMU quirkiness
-# - first movement packet is sent, but none after
-# - currently works natively on QEMU for windows and under su for linux
 
 build_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin
 
@@ -99,7 +98,6 @@ image_debug: drive/EFI/BOOT/BOOTX64.EFI drive/dbg_kernel.bin
 
 clean:
 	@rm -f bin/link.ld bin/kernel.map
-	@rm -f boot/boot.so boot/uefiboot.o
 	@rm -r obj/
 	@rm -f drive/EFI/BOOT/BOOTX64.EFI
 	@rm -f drive/kernel.bin drive/dbg_kernel.bin drive/kernel.map
