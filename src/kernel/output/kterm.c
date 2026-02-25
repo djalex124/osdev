@@ -373,11 +373,13 @@ void kterm_run()
     while (arg && kterm_argc < kterm_maxargs - 1)
     {
         kterm_argv[kterm_argc++] = arg;
-        arg = str_tok(0, " ");
+        arg = str_tok((void *)0, " ");
     }
     kterm_argv[kterm_argc] = 0;
 
-    if (str_cmp(kterm_argv[0], "clear") == 0)
+    if (kterm_argv[0] == NULL)
+        return;
+    else if (str_cmp(kterm_argv[0], "clear") == 0)
     {
         kterm_clr(bg);
     }
@@ -640,13 +642,16 @@ void kterm_run()
     else if (str_cmp(kterm_argv[0], "test") == 0)
     {
         kterm_putf("\ntest output of the commands!!");
-        uint16_t* test = kmem_palloc(2);
-        uint16_t* test2 = kmem_page((uint64_t)&test[15], 0x1000, 0b11);
+        uint16_t* test = kmem_palloc(2, kmem_paging_1kb);
+        uint16_t* test2 = kmem_page((uint64_t)&test[15], 0x1000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
         kterm_putf("\ntest %x", (uint64_t)test2);
         test2[32] = 0xCA;
         kterm_putf("\ntest2[32] %x", test2[32]);
         kmem_unpage(test2, 0x1000);
         kmem_pfree(test, 2);
+        uint16_t* test3 = kmem_alloc(1024);
+        kterm_putf("\ntest3 %x", test3);
+        kmem_free(test3, 1024);
         kterm_putf("\nwait a few second :) -");
         for (uint16_t i = 1; i <= 5; i++)
         {
@@ -677,8 +682,6 @@ void kterm_run()
                 kterm_putf("\nInvalid number.");
         }
     }
-    else if (kterm_argv[0] == NULL)
-        return;
     else
     {
         kterm_putf("\nCommand \'%s\' not found.\nUse the command \'help\' to list available commands.", kterm_argv[0]);

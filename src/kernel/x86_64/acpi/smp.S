@@ -60,6 +60,8 @@ long_mode:
 
 .extern ptab4
     movabs ptab4, %rax
+    movabs $kernel_virtual, %rbx
+    subq %rbx, %rax
     mov %rax, %cr3
     
     mov $1, %rax

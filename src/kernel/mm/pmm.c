@@ -132,10 +132,19 @@ void kmem_pmminit(uint64_t low_size, uint64_t high_size)
 
 //eventually, add distinctions for additional requirements (isa, 32-bit, etc)
 //should only be called by kmem_alloc
-void* kmem_palloc(size_t pages)
+void* kmem_palloc(size_t pages, uint8_t align)
 {
 	int64_t continuous_start = -1;
 	uint64_t continuous_open = 0;
+	uint64_t check_align = 0;
+
+	if (align == kmem_paging_1gb)
+		check_align = 262144;
+	else if (align == kmem_paging_2mb)
+		check_align = 2048;
+	else
+		check_align = 1;
+
 	for (size_t i = 0; i < kmem_bitmap_low_max; i++)
 	{
 		if (kmem_bitmap_low[i] == UINT64_MAX - 1)
@@ -161,6 +170,13 @@ void* kmem_palloc(size_t pages)
 				continuous_start = -1;
 				continuous_open = 0;
 			}
+		}
+
+		if (continuous_start % check_align != 0)
+		{
+			continuous_start = -1;
+			continuous_open = 0;
+			continue;
 		}
 
 		if (continuous_open == pages)
@@ -196,6 +212,13 @@ void* kmem_palloc(size_t pages)
 				}
 			}
 
+			if (continuous_start % check_align != 0)
+			{
+				continuous_start = -1;
+				continuous_open = 0;
+				continue;
+			}
+
 			if (continuous_open == pages)
 				break;
 		}
@@ -213,7 +236,6 @@ void* kmem_palloc(size_t pages)
 		else
 			kmem_pmapset(continuous_start, continuous_open, 1, 0);
 
-		memset((void *)phys_addr, 0, pages * 0x1000);
 		return (void *)phys_addr;
 	}
 	

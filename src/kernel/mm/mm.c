@@ -82,11 +82,16 @@ void kmem_heapinit()
 //gets pages in kernel space
 void* kmem_alloc(size_t pages)
 {
-    uint64_t *phys = kmem_palloc(pages);
-    void *addr = kmem_page((uint64_t)phys, pages * 0x1000, 0b11);
+    uint8_t align = (pages >= 1024) ? kmem_paging_2mb : kmem_paging_1kb;
+    uint64_t *phys = kmem_palloc(pages, align);
+
+    void *addr = kmem_page((uint64_t)phys, pages * 0x1000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
 #ifdef AQUA_DEBUG_MEM
     kdebug_outf("\nkm_a: returning %x", addr);
 #endif
+
+    memset(addr, 0, pages * 0x1000);
+
     return addr;
 }
 

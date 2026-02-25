@@ -15,20 +15,29 @@ void kmem_vmminit(uint64_t low_size, uint64_t high_size);
 
 //#define AQUA_DEBUG_MEM
 
+#define kmem_paging_1gb 0x2
+#define kmem_paging_2mb 0x1
+#define kmem_paging_1kb 0x0
+
+#define kmem_paging_present  (1 << 0)
+#define kmem_paging_writable (1 << 1)
+#define kmem_paging_user     (1 << 2)
+#define kmem_paging_no_cache (1 << 4)
+
 #include <kernel/kernel.h>
 void kmem_init(boot_table *table);
 
-void kmem_pageentry(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags);
+void kmem_pageentry(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing);
 void kmem_unpageentry(uint64_t address, uint64_t size);
 
 void* kmem_getphysical(uint64_t *virt);
-void* kmem_page(uint64_t address, uint64_t size, uint16_t flags);
+void* kmem_page(uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing);
 void kmem_unpage(void *address, uint64_t size);
 
 void* kmem_kalloc(uint64_t size);
 void kmem_kfree(void *addr);
 
-void* kmem_palloc(size_t pages);
+void* kmem_palloc(size_t pages, uint8_t align);
 void kmem_pfree(void* addr, size_t pages);
 
 void* kmem_alloc(size_t pages);

@@ -26,22 +26,22 @@ char error_message[48];
 void kwrapper_isr(kframe_int *k)
 {   
 #ifdef AQUA_DEBUG
-    kdebug_outf("\r\n --- exception [%2x]--- ", k->int_no);
-    kdebug_outf("\r\nkisr: rax 0x%16x rbx 0x%16x rcx 0x%16x rdx 0x%16x",
+    kdebug_outf("\n --- exception [%2x]--- ", k->int_no);
+    kdebug_outf("\nkisr: rax 0x%16x rbx 0x%16x rcx 0x%16x rdx 0x%16x",
         k->rax, k->rbx, k->rcx, k->rdx);
-    kdebug_outf("\r\nkisr: rsp 0x%16x rbp 0x%16x rsi 0x%16x rdi 0x%16x",
+    kdebug_outf("\nkisr: rsp 0x%16x rbp 0x%16x rsi 0x%16x rdi 0x%16x",
         k->rsp, k->rbp, k->rsi, k->rdi);
-    kdebug_outf("\r\nkisr: r8  0x%16x r9  0x%16x r10 0x%16x r11 0x%16x",
+    kdebug_outf("\nkisr: r8  0x%16x r9  0x%16x r10 0x%16x r11 0x%16x",
         k->r8, k->r9, k->r10, k->r11);
-    kdebug_outf("\r\nkisr: r12 0x%16x r13 0x%16x r14 0x%16x r15 0x%16x",
+    kdebug_outf("\nkisr: r12 0x%16x r13 0x%16x r14 0x%16x r15 0x%16x",
         k->r12, k->r13, k->r14, k->r15);
-    kdebug_outf("\r\nkisr: rip 0x%16x cs  0x%x ss 0x%x",
+    kdebug_outf("\nkisr: rip 0x%16x cs  0x%x ss 0x%x",
         k->rip, k->cs, k->ss);
-    kdebug_outf("\r\nkisr: eflags 0b%b user_rsp 0x%x",
+    kdebug_outf("\nkisr: eflags 0b%b user_rsp 0x%x",
         k->eflags, k->user_rsp);
     if (k->int_no == 0xD && k->err_code != 0)
     {
-        kdebug_outf("\r\nkisr: gpf from ");
+        kdebug_outf("\nkisr: gpf from ");
         uint16_t which = (k->err_code >> 1) & 3;
         if (which == 0b00)
             kdebug_outf("gdt");
@@ -55,8 +55,8 @@ void kwrapper_isr(kframe_int *k)
     {
         uint64_t cr2;
         asm volatile ("mov %%cr2, %0" : "=r"(cr2));
-        kdebug_outf("\r\nkisr: cr2 [0x%x]", cr2);
-        kdebug_outf("\r\nkisr: pf code: |");
+        kdebug_outf("\nkisr: cr2 [0x%x]", cr2);
+        kdebug_outf("\nkisr: pf code: |");
         if (k->err_code & 1)
         {    
             kdebug_outf("present|");
@@ -111,7 +111,7 @@ void kwrapper_irq(kframe_int *k)
         function();
     }
     else
-        kdebug_outf("\r\nkdesc: irq %d fired but no handler", k->int_no);
+        kdebug_outf("\nkdesc: irq %d fired but no handler", k->int_no);
 
     if (k->int_no >= 8)
         outb(0xA0, 0x20);
@@ -293,5 +293,5 @@ void kdesc_install()
     for (int i = 0; i < 16; i++)
         kdesc_setinterruptfunc(i, (void *)0);
 
-    kdebug_outf("\r\nkdesc: interrupt descriptors set");
+    kdebug_outf("\nkdesc: interrupt descriptors set");
 }

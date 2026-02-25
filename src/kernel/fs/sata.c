@@ -123,7 +123,8 @@ void kfs_satainit(kpci_device *ahci_device)
     uint32_t *abar = (uint32_t *)(uint64_t)(kpci_configread(ahci_device, PCI_OFFSET_HDR0_BAR5));
     kdebug_outf("\nkfs_i: ABAR at 0x%x", abar);
 
-    kmem_pageentry((uint64_t)abar, (uint64_t)abar, 0x2000, 0b10011);
+    kmem_pageentry((uint64_t)abar, (uint64_t)abar, 0x2000, 
+        kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
     // largest abar is 0x1100
 
     ahci_hbareg *hba_registers = (ahci_hbareg *)abar;
@@ -142,9 +143,10 @@ void kfs_satainit(kpci_device *ahci_device)
     kdebug_outf("\r\nkfs_i: int pin: %x int line: %x", (ints & 0xFF00) >> 8, ints & 0xFF);
 #endif
 
-    ahci_base = (uint64_t)kmem_palloc(76);
+    ahci_base = (uint64_t)kmem_palloc(76, kmem_paging_1kb);
     kmem_unpageentry(ahci_base, 76 * 0x1000);
-    kmem_pageentry(ahci_base, ahci_base, 76 * 0x1000, 0b10011);
+    kmem_pageentry(ahci_base, ahci_base, 76 * 0x1000,
+        kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
 
     for (int i = 0; i < 32; i++)
     {

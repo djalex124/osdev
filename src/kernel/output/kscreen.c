@@ -63,13 +63,14 @@ void kscreen_init()
     memcpy(&kgraphics, &k_boottable.graphics, sizeof(kgraphics));
     //assume 32 bpp as is standard from UEFI's GOP
     
-    kgraphics.framebuffer_base = kmem_page((uint64_t)kgraphics.framebuffer_base, kgraphics.horizontal_res * kgraphics.vertical_res * 4, 0b10011);
+    kgraphics.framebuffer_base = kmem_page((uint64_t)kgraphics.framebuffer_base, kgraphics.horizontal_res * kgraphics.vertical_res * 4,
+        kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_2mb);
     kscreen_buffer = kmem_alloc((kgraphics.horizontal_res * kgraphics.vertical_res * 4)/0x1000);
     kscreen_termbuffer = kmem_alloc((kgraphics.horizontal_res * kgraphics.vertical_res * 4)/0x1000);
 
 #ifdef AQUA_DEBUG
-    kdebug_outf("\r\nkscr: buffer [0x%x]", (uintptr_t)kscreen_buffer);
-    kdebug_outf("\r\nkscr: [%d]x[%d] @ 32 bpp", kgraphics.horizontal_res, kgraphics.vertical_res);
-    kdebug_outf("\r\nkscr: framebuffer [0x%x]", kgraphics.framebuffer_base);
+    kdebug_outf("\nkscr: buffer [0x%x]", (uintptr_t)kscreen_buffer);
+    kdebug_outf("\nkscr: [%d]x[%d] @ 32 bpp", kgraphics.horizontal_res, kgraphics.vertical_res);
+    kdebug_outf("\nkscr: framebuffer [0x%x]", kgraphics.framebuffer_base);
 #endif
 }
