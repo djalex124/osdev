@@ -5,6 +5,8 @@
 #include <kernel/crash.h>
 #include <kernel/debug.h>
 
+#include <sched/sync.h>
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -13,6 +15,8 @@ size_t kmem_bitmap_low_max = 0;
 
 uint64_t *kmem_bitmap_hi;
 size_t kmem_bitmap_hi_max = 0;
+
+atomic_flag kmem_phys_lock;
 
 void kmem_printpmminfo()
 {
@@ -61,6 +65,7 @@ void kmem_pmapset(uint64_t page, uint64_t length, uint8_t used, uint8_t low)
 {
 	uint64_t *bitmap = 0;
 	uint64_t index = page;
+
 	if (low == 0)
 		bitmap = kmem_bitmap_low;
 	else
@@ -137,6 +142,8 @@ void* kmem_palloc(size_t pages, uint8_t align)
 	int64_t continuous_start = -1;
 	uint64_t continuous_open = 0;
 	uint64_t check_align = 0;
+
+	ksync_mutex_acq(&kmem_phys_lock);
 
 	if (align == kmem_paging_1gb)
 		check_align = 262144;
@@ -236,10 +243,12 @@ void* kmem_palloc(size_t pages, uint8_t align)
 		else
 			kmem_pmapset(continuous_start, continuous_open, 1, 0);
 
+		ksync_mutex_rel(&kmem_phys_lock);
 		return (void *)phys_addr;
 	}
 	
 	kdebug_outf("\nkm_p: unable to gather 0x%x pages, returning null", pages);
+	ksync_mutex_rel(&kmem_phys_lock);
 	return (void *)0;
 }
 
@@ -247,6 +256,9 @@ void* kmem_palloc(size_t pages, uint8_t align)
 void kmem_pfree(void* addr, size_t pages)
 {
 	uint64_t phys_addr = (uint64_t)addr;
+
+	ksync_mutex_acq(&kmem_phys_lock);
+
 	if (phys_addr >= 0x100000000)
 	{
 		if ((phys_addr / 0x1000) + pages >= kmem_bitmap_hi_max * 64)
@@ -261,4 +273,6 @@ void kmem_pfree(void* addr, size_t pages)
 
 		kmem_pmapset(phys_addr / 0x1000, pages, 0, 0);
 	}
+
+	ksync_mutex_rel(&kmem_phys_lock);
 }

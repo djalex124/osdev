@@ -7,7 +7,7 @@ atomic_flag *ksync_mutex_new()
     return kmem_kalloc(sizeof(atomic_flag));
 }
 
-void ksync_mutex_acq(atomic_flag* mutex)
+void ksync_mutex_acq(atomic_flag *mutex)
 {
     while (atomic_flag_test_and_set(mutex));
 }

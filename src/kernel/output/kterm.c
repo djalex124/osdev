@@ -459,7 +459,7 @@ void kterm_run()
         if (cx & (1 << 28))
             kterm_putf(" AVX");
 
-        kterm_putf("\n - Total APs Running: %d", kacpi_apsrunning);
+        kterm_putf("\n - Total APs Running: %d", kacpi_apsrunning + 1);
     }
     else if (str_cmp(kterm_argv[0], "crash") == 0)
     {

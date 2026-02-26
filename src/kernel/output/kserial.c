@@ -3,10 +3,13 @@
 #include <stdint.h>
 
 #include <kernel/kstring.h>
+#include <sched/sync.h>
 
 #include <x86_64/port.h>
 
 #define PORT1 0x3F8
+
+atomic_flag kserial_print_lock;
 
 void kserial_init()
 {
@@ -38,6 +41,8 @@ void kserial_outs(char *s)
 
 void kserial_outf(const char *fmt, ...)
 {
+    ksync_mutex_acq(&kserial_print_lock);
+
     va_list arg;
     va_start(arg, fmt);
 
@@ -148,4 +153,6 @@ void kserial_outf(const char *fmt, ...)
     }
 
     va_end(arg);
+
+    ksync_mutex_rel(&kserial_print_lock);
 }

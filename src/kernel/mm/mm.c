@@ -4,6 +4,8 @@
 #include <kernel/kernel.h>
 #include <kernel/debug.h>
 
+#include <sched/sync.h>
+
 #include <mm/mem.h>
 
 #include <stdint.h>
@@ -19,9 +21,13 @@ typedef struct kmem_heapblock
 #define kmem_heapsize 0x80
 kmem_heapblock *heap_start = 0;
 
+atomic_flag kmem_heap_lock;
+
 //heap alloc
 void* kmem_kalloc(uint64_t size)
 {
+    ksync_mutex_acq(&kmem_heap_lock);
+
     kmem_heapblock *heap_ptr = heap_start;
     while (heap_ptr != NULL)
     {
@@ -40,18 +46,22 @@ void* kmem_kalloc(uint64_t size)
             }
 
             heap_ptr->used = 1;
+            ksync_mutex_rel(&kmem_heap_lock);
             return (void *)((uint64_t)heap_ptr + sizeof(kmem_heapblock));
         }
 
         heap_ptr = heap_ptr->next;
     }
 
+    ksync_mutex_rel(&kmem_heap_lock);
     return NULL;
 }
 
 //heap free
 void kmem_kfree(void *addr)
 {
+    ksync_mutex_acq(&kmem_heap_lock);
+
     kmem_heapblock *free_block = (kmem_heapblock *)((uint64_t)addr - sizeof(kmem_heapblock));
     free_block->used = 0;
 
@@ -66,6 +76,8 @@ void kmem_kfree(void *addr)
         free_block->prev->size += free_block->size;
         free_block->prev->next = free_block->next;
     }
+
+    ksync_mutex_rel(&kmem_heap_lock);
 }
 
 void kmem_heapinit()

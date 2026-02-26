@@ -67,7 +67,7 @@ typedef struct
 }acpi_madt_type9;
 
 uint32_t *kacpi_apstartup = (uint32_t *)0x8000;
-uint8_t kacpi_apsrunning = 1;
+uint8_t kacpi_apsrunning = 0;
 volatile uint8_t bsplock = 0;
 
 volatile uint64_t kacpi_apstacks = 0;
@@ -77,8 +77,20 @@ extern void ap_trampoline();
 void kacpi_aploop()
 {
     kacpi_apsrunning++;
+    
     while (!bsplock)
-        asm("hlt");
+        asm("nop");
+
+    uint64_t current_apicid = 0;
+    asm volatile ("mov $1, %%rax; cpuid; shr $24, %%rbx;" : "=b"(current_apicid) : : );
+
+#ifdef AQUA_DEBUG
+    kdebug_outf("\nkacpi: processor 0x%d successfully started", current_apicid);
+    uint8_t *test_alloc = kmem_kalloc(15);
+    kdebug_outf("\nkacpi: processor 0x%d acquired memory at 0x%x", current_apicid, (uint64_t)test_alloc);
+    kmem_kfree(test_alloc);
+    kdebug_outf("\nkacpi: processor 0x%d freed memory at 0x%x", current_apicid, (uint64_t)test_alloc);
+#endif
 
     //from here the ap should be
     //marked available for tasks

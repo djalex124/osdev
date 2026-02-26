@@ -2,6 +2,8 @@
 #include <kernel/debug.h>
 #include <kernel/crash.h>
 
+#include <sched/sync.h>
+
 #include <mm/mem.h>
 
 #include <stdint.h>
@@ -20,6 +22,8 @@ typedef struct kmem_virtmap_s
 
 uint64_t kernel_vmmap_max = 0;
 kmem_virtmap *kernel_vmmap_start = 0;
+
+atomic_flag kmem_virt_lock;
 
 uint32_t kmem_virtmapnew(uint32_t prev, uint32_t next, uint8_t used, uint64_t start, size_t length)
 {
@@ -361,6 +365,8 @@ void* kmem_page(uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing)
 {
 	uint64_t offset = 0;
 
+	ksync_mutex_acq(&kmem_virt_lock);
+
 #ifdef AQUA_DEBUG_MEM
 	kdebug_outf("\nkm_vp: paging %x, %x len", address, size);
 #endif
@@ -395,11 +401,15 @@ void* kmem_page(uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing)
     {
         uint64_t virtual_mapping = (uint64_t)kmem_virtmapalloc(size, sizing);
 		kmem_pageentry(address, virtual_mapping, size, flags, sizing);
+
+		ksync_mutex_rel(&kmem_virt_lock);
 		
         return (void *)(virtual_mapping + offset);
     }
 
     kmem_pageentry(address, address, size, flags, sizing);
+
+	ksync_mutex_rel(&kmem_virt_lock);
 
     return (void *)(address + offset);
 }
@@ -410,10 +420,14 @@ void kmem_unpage(void *address, uint64_t size)
     uint64_t addr = (uintptr_t)address;
     addr &= -0x1000ull;
 
+	ksync_mutex_acq(&kmem_virt_lock);
+
     if (kernel_vmmap_max)
         kmem_virtmapfree(addr);
 
     kmem_unpageentry(addr, size);
+
+	ksync_mutex_rel(&kmem_virt_lock);
 }
 
 void kmem_vmminit(uint64_t phys_low, uint64_t phys_hi)
