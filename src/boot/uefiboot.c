@@ -270,12 +270,15 @@ EFI_STATUS create_tables_and_exit(EFI_HANDLE image_handle)
     UINTN start_addr = 0x100000 + kernel_size;
     UINTN *pt4 = (UINTN *)start_addr;
     UINTN *pt3 = (UINTN *)(start_addr + 0x1000);
+    UINTN *pt2 = (UINTN *)(start_addr + 0x2000);
 
-    start_addr += 0x2000;
+    start_addr += 0x3000;
 
     pt4[0] = (UINTN)pt3 + 0x3;
     pt4[511] = (UINTN)pt3 + 0x3;
-    pt3[0] = 0x83;
+    pt3[0] = (UINTN)pt2 + 0x3;
+    for (int i = 0; i < 512; i++)
+        pt2[i] = 0x83;
 
     table = (boot_table *)(start_addr);
     start_addr += sizeof(boot_table);

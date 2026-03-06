@@ -199,6 +199,11 @@ extern void kirq13();
 extern void kirq14();
 extern void kirq15();
 
+void kdesc_earlyirq1()
+{
+    inb(0x60);
+}
+
 void kdesc_setinterruptfunc(uint16_t irq, void* function)
 {
     if (irq >= 0 && irq <= 15)
@@ -292,6 +297,8 @@ void kdesc_install()
 
     for (int i = 0; i < 16; i++)
         kdesc_setinterruptfunc(i, (void *)0);
+
+    kdesc_setinterruptfunc(1, &kdesc_earlyirq1);
 
     kdebug_outf("\nkdesc: interrupt descriptors set");
 }

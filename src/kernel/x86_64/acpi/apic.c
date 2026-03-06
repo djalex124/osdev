@@ -169,18 +169,20 @@ void kacpi_processapic(acpi_madt *madt)
 
     kdebug_outf("\nkacpi: smp startup code at 0x%x", (uint64_t)kacpi_apstartup);
 
-    kmem_pageentry(0x8000, 0x8000, 0x3000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
+    kmem_pageentry(0x8000, 0x8000, 0x4000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
 
     //first 2mb should be identity mapped
     memcpy(kacpi_apstartup, &ap_trampoline, 0x1000);
-    memset((void *)0x9000, 0, 0x2000);
+    memset((void *)0x9000, 0, 0x3000);
 
     uint64_t *pt4 = (uint64_t *)0x9000;
     uint64_t *pt3 = (uint64_t *)0xA000;
+    uint64_t *pt2 = (uint64_t *)0xB000;
 
     pt4[0] = (uint64_t)pt3 | kmem_paging_present | kmem_paging_writable;
     pt4[511] = (uint64_t)pt3 | kmem_paging_present | kmem_paging_writable;
-    pt3[0] = (1 << 7) | kmem_paging_present | kmem_paging_writable;
+    pt3[0] = (uint64_t)pt2 | kmem_paging_present | kmem_paging_writable;
+    pt2[0] = (1 << 7) | kmem_paging_present | kmem_paging_writable;
 
     //1 page of stack per processor to start
     kacpi_apstacks = (uint64_t)kmem_alloc(total_processors - 1);

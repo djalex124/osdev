@@ -7,6 +7,7 @@
 #include <mm/mem.h>
 
 #include <stdint.h>
+#include <cpuid.h>
 
 typedef struct kmem_virtmap_s
 {
@@ -23,6 +24,7 @@ typedef struct kmem_virtmap_s
 uint64_t kernel_vmmap_max = 0;
 kmem_virtmap *kernel_vmmap_start = 0;
 
+uint8_t kmem_virt_use_1gb = 0;
 atomic_flag kmem_virt_lock;
 
 uint32_t kmem_virtmapnew(uint32_t prev, uint32_t next, uint8_t used, uint64_t start, size_t length)
@@ -196,6 +198,9 @@ void kmem_pageentry(uint64_t physical, uint64_t address, uint64_t size, uint16_t
 #endif
 	size = size + (address & 0xFFF);
 
+	if (sizing == kmem_paging_1gb && kmem_virt_use_1gb == 0)
+		sizing = kmem_paging_2mb;
+
 	while (size)
 	{
 		uint64_t *pt3, *pt2, *pt1;
@@ -365,6 +370,9 @@ void* kmem_page(uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing)
 {
 	uint64_t offset = 0;
 
+	if (sizing == kmem_paging_1gb && kmem_virt_use_1gb == 0)
+		sizing = kmem_paging_2mb;
+
 	ksync_mutex_acq(&kmem_virt_lock);
 
 #ifdef AQUA_DEBUG_MEM
@@ -439,6 +447,14 @@ void kmem_vmminit(uint64_t phys_low, uint64_t phys_hi)
 	kdebug_outf("\nkm_iv: bootcr3 %x", boot_ptab4);
 	kdebug_outf("\nkm_iv: safemem %x", phys_from_virt(k_boottable.safe_mem));
 #endif
+
+	unsigned int unused, edx;
+    __cpuid(0x80000001, unused, unused, unused, edx);
+
+	if (edx & (1 << 26))
+		kmem_virt_use_1gb = 1;
+
+	kdebug_outf("\nkm_iv: 1gb paging enabled: %d", kmem_virt_use_1gb);
 
 	uint64_t *pt4 = (uint64_t *)kmem_palloc(1, kmem_paging_1kb);
 	memset(pt4, 0, 0x1000);
