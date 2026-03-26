@@ -1,34 +1,16 @@
-#include <limits.h>
-#include <cpuid.h>
 #include <stdarg.h>
 
 #include <kernel/kstring.h>
 #include <kernel/kernel.h>
-#include <kernel/crash.h>
 #include <kernel/debug.h>
 
 #include <output/screen.h>
-#include <output/image.h>
 #include <output/kterm.h>
+#include <output/kcmd.h>
 
-#include <x86_64/acpi/acpi.h>
-#include <x86_64/pci.h>
-#include <x86_64/pit.h>
-
-#include <ps2/mouse.h>
 #include <ps2/kbd.h>
 
 #include <mm/mem.h>
-
-#include <fs/fs.h>
-
-#define kterm_buffersize 100
-#define kterm_maxargs 16
-
-#define kterm_titletext1 "[AQUA Kernel]"
-#define kterm_titletext2 "Build: (" AQUA_VER_STRING ")"
-
-#define kterm_infotext "[AQUA Kernel (" AQUA_VER_STRING ")]\n[Built " __TIME__" "__DATE__ " Central Time]\n[Quote: Never back down, never give up!]"
 
 kscreen_pos kterm_pos;
 char kterm_buffer[kterm_buffersize];
@@ -45,8 +27,6 @@ extern graphics_info kgraphics;
 uint32_t *kterm_gbuffer;
 
 int kterm_currentpartition = -1;
-
-extern uint8_t kacpi_apsrunning;
 
 extern char _binary____font_psf_start[];
 uint32_t fg = 0xC5C5C5, bg = default_color;
@@ -361,6 +341,16 @@ void kterm_setcolor(uint32_t foreground, uint32_t background)
     bg = background;
 }
 
+int kterm_getpartition()
+{
+    return kterm_currentpartition;
+}
+
+void kterm_setpartition(int fs)
+{
+    kterm_currentpartition = fs;
+}
+
 void kterm_input(kkeyboard_state *k)
 {
     kterm_next = k;
@@ -379,313 +369,8 @@ void kterm_run()
 
     if (kterm_argv[0] == NULL)
         return;
-    else if (str_cmp(kterm_argv[0], "clear") == 0)
-    {
-        kterm_clr(bg);
-    }
-    else if (str_cmp(kterm_argv[0], "color") == 0)
-    {
-        if (kterm_argc == 1)
-            kterm_setcolor(0xC5C5C5, default_color);
-        else if (kterm_argc == 3)
-        {
-            int64_t new_fg, new_bg;
-            new_fg = str_atoi(kterm_argv[1]);
-            new_bg = str_atoi(kterm_argv[2]);
-            if (new_fg > 0xFFFFFFFF || new_fg < 0 ||
-                new_bg > 0xFFFFFFFF || new_bg < 0)
-                kterm_putf("\nInvalid colors.");
-            else
-                kterm_setcolor(new_fg, new_bg);
-        }
-        else
-            kterm_putf("\nInvalid argument count.");
-    }
-    else if (str_cmp(kterm_argv[0], "compare") == 0)
-    {
-        if (kterm_argc < 3)
-            kterm_putf("\nNot enough arguments.");
-        else
-        {
-            long a = 0, b = 0;
-            if (kterm_argv[1])
-                a = str_atoi(kterm_argv[1]);
-            if (kterm_argv[2])
-                b = str_atoi(kterm_argv[2]);
-            kterm_putf("\nlarger number is: ");
-            if (a == b)
-                kterm_putf("both numbers (%d) (%d)", a, b);
-            else if (a > b)
-                kterm_putf("number 1 (%d)", a);
-            else
-                kterm_putf("number 2 (%d)", b);
-        }
-    }
-    else if (str_cmp(kterm_argv[0], "cpu_info") == 0)
-    {
-        unsigned int ax, bx, cx, dx;
-        __cpuid(0, ax, bx, cx, dx);
 
-        kterm_putf("\n - Vendor [%4s%4s%4s]", &bx, &dx, &cx);
-
-        __cpuid(0x80000000, ax, bx, cx, dx);
-        if (ax >= 0x80000004)
-        {
-            uint32_t* name = kmem_alloc(1);
-            __cpuid(0x80000002, name[0], name[1], name[2], name[3]);
-            __cpuid(0x80000003, name[4], name[5], name[6], name[7]);
-            __cpuid(0x80000004, name[8], name[9], name[10], name[11]);
-            name[12] = 0;
-            
-            str_trim((char *)name);
-            kterm_putf(" Brand [%s]", name);
-            kmem_free(name, 1);
-        }
-
-        __cpuid(1, ax, bx, cx, dx);
-        kterm_putf("\n - Features Tracked:");
-        if (dx & (1 << 25))
-            kterm_putf(" SSE");
-        if (dx & (1 << 26))
-            kterm_putf(" SSE2");
-        if (cx & (1 << 0))
-            kterm_putf(" SSE3");
-        if (cx & (1 << 9))
-            kterm_putf(" SSSE3");
-        if (cx & (1 << 19))
-            kterm_putf(" SSE4.1");
-        if (cx & (1 << 20))
-            kterm_putf(" SSE4.2");
-        if (cx & (1 << 28))
-            kterm_putf(" AVX");
-
-        kterm_putf("\n - Total APs Running: %d", kacpi_apsrunning + 1);
-    }
-    else if (str_cmp(kterm_argv[0], "crash") == 0)
-    {
-        kterm_putf("\nInitiating crash...");
-        kcrash("User Requested");
-    }
-    else if (str_cmp(kterm_argv[0], "fs") == 0)
-    {
-        if (kterm_argc < 2)
-            kterm_putf("\nNot enough arguments.");
-        else
-        {
-            long part = 0;
-            if (kterm_argv[1])
-                part = str_atoi(kterm_argv[1]);
-            
-            if (part < 0 || part > 15)
-            {
-                kterm_putf("\nInvalid partition selection.");
-                kterm_currentpartition = -1;
-            }
-            else if ((uint64_t)k_infotable.kfs_partitions[part] == 0)
-            {
-                kterm_putf("\nPartition does not exist.");
-                kterm_currentpartition = -1;
-            }
-            else
-            {
-                kterm_putf("\nPartition set to %d.", part);
-                kterm_currentpartition = part;
-            }
-        }
-    }
-    else if (str_cmp(kterm_argv[0], "fs_info") == 0)
-    {
-        kfs_printinfo();
-        kterm_putf("\nmounted partitions:");
-
-        int partitions = 0;
-        for (int i = 0; i < 16; i++)
-        {
-            if ((uint64_t)k_infotable.kfs_partitions[i])
-            {
-                kterm_putf("\n - partition %d:", i);
-                kfs_printpartition(k_infotable.kfs_partitions[i]);
-                partitions = 1;
-            }
-        }
-
-        if (partitions == 0)
-            kterm_putf("\n - No partitions mounted");
-    }
-    else if (str_cmp(kterm_argv[0], "font") == 0)
-    {
-        kterm_putf("\n");
-        uint8_t c = 0;
-        for (; c < 255; c++)
-            kterm_putf("%c", c);
-    }
-    else if (str_cmp(kterm_argv[0], "help") == 0)
-    {
-        kterm_putf("\nList of currently available commands:");
-        kterm_putf("\n clear - clears the screen");
-        kterm_putf("\n color [fg] [bg] - set terminal colors in base10 of hex code, no values to reset");
-        kterm_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
-        kterm_putf("\n cpu_info - lists CPU model and capabilities");
-        kterm_putf("\n crash - crashes the AQUA kernel");
-        kterm_putf("\n fs - sets the currently selected partition for file operations");
-        kterm_putf("\n fs_info - lists detected disks and drives");
-        kterm_putf("\n font - prints all characters in boot font");
-        kterm_putf("\n help - lists available commands");
-        kterm_putf("\n image [filename] - attempt printing .tga image to screen from file");
-        kterm_putf("\n info - prints current AQUA build information");
-        kterm_putf("\n mem_info - prints current memory usage");
-        kterm_putf("\n pci_info - prints pci busses and devices");
-        kterm_putf("\n read_file [filename] - attempt read of file on selected partition");
-        kterm_putf("\n shutdown - attempts acpi shutdown");
-        kterm_putf("\n test - test random features");
-        kterm_putf("\n test_mouse - tests ps2 mouse input");
-        kterm_putf("\n wait [num1] - wait given number of seconds");
-    }
-    else if (str_cmp(kterm_argv[0], "image") == 0)
-    {
-        if (kterm_argc < 2)
-            kterm_putf("\nNot enough arguments.");
-        else if (kterm_currentpartition < 0 || kterm_currentpartition > 15)
-        {
-            kterm_putf("\nInvalid partition selection.");
-            kterm_currentpartition = -1;
-        }
-        else if ((uint64_t)k_infotable.kfs_partitions[kterm_currentpartition] == 0)
-        {
-            kterm_putf("\nPartition does not exist.");
-            kterm_currentpartition = -1;
-        }
-        else
-        {
-            char *filename = 0;
-            if (kterm_argv[1])
-                filename = kterm_argv[1];
-            
-            size_t file_length;
-            uint8_t *file = 0;
-            size_t image_pages = 0;
-    
-            kfs_partition *selected_partition = k_infotable.kfs_partitions[kterm_currentpartition];
-            if (selected_partition->fs == 1)
-                file = kfs_readfilefat(selected_partition, filename, &file_length);
-
-            if ((uint64_t)file == 0)
-            {
-                kterm_putf("\nUnable to read file.");
-                return;
-            }
-
-            if (file[0] != 0 || file[1] != 0 || file[2] != 0x0A || file[3] != 0 || file[4] != 0
-                || file[5] != 0 || file[6] != 0 || file[7] != 0 || file[8] != 0 || file[9] != 0
-                || (file[16] != 24 && file[16] != 32))
-            {
-                kterm_putf("\nInvalid tga file.");
-            }
-            else
-            {
-                uint32_t *image_pixels = kimage_getbuftga(file, (int)file_length, &image_pages);
-                kimage_termblit(image_pixels, 100, 100);
-                kmem_free(image_pixels, image_pages);
-            }
-
-            kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
-        }
-    }
-    else if (str_cmp(kterm_argv[0], "info") == 0)
-    {
-        kterm_putf("\n%s", kterm_infotext);
-    }
-    else if (str_cmp(kterm_argv[0], "mem_info") == 0)
-    {
-        kmem_printinfo();
-    }
-    else if (str_cmp(kterm_argv[0], "pci_info") == 0)
-    {
-        kterm_putf("\nkpci_info: current pci device table");
-        kpci_device* kpci_table = k_infotable.kpci_table;
-        for (int i = 0; i < k_infotable.kpci_tablesize; i++)
-        {
-            kterm_putf("\n - %2x:%2x:%2x:%2x ", kpci_table[i].section, kpci_table[i].bus, kpci_table[i].device, kpci_table[i].function);
-            kterm_putf("VendorID %4x DeviceID %4x [%s]/[%s]",
-                kpci_getvendorid(&kpci_table[i]), kpci_getdeviceid(&kpci_table[i]),
-                kpci_getclassname(kpci_getbaseclass(&kpci_table[i])),
-                kpci_getsubclassname(kpci_getbaseclass(&kpci_table[i]), kpci_getsubclass(&kpci_table[i])));
-        }
-    }
-    else if (str_cmp(kterm_argv[0], "read_file") == 0)
-    {
-        if (kterm_argc < 2)
-            kterm_putf("\nNot enough arguments.");
-        else if (kterm_currentpartition < 0 || kterm_currentpartition > 15)
-        {
-            kterm_putf("\nInvalid partition selection.");
-            kterm_currentpartition = -1;
-        }
-        else if ((uint64_t)k_infotable.kfs_partitions[kterm_currentpartition] == 0)
-        {
-            kterm_putf("\nPartition does not exist.");
-            kterm_currentpartition = -1;
-        }
-        else
-        {
-            char *filename = 0;
-            if (kterm_argv[1])
-                filename = kterm_argv[1];
-            kfs_printreadfile(kterm_currentpartition, filename);
-        }
-    }
-    else if (str_cmp(kterm_argv[0], "shutdown") == 0)
-    {
-        kterm_putf("\nTrying to shutdown from ACPI...");
-        kacpi_shutdown();
-    }
-    else if (str_cmp(kterm_argv[0], "test") == 0)
-    {
-        kterm_putf("\ntest output of the commands!!");
-        uint16_t* test = kmem_palloc(2, kmem_paging_1kb);
-        uint16_t* test2 = kmem_page((uint64_t)&test[15], 0x1000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
-        kterm_putf("\ntest %x", (uint64_t)test2);
-        test2[32] = 0xCA;
-        kterm_putf("\ntest2[32] %x", test2[32]);
-        kmem_unpage(test2, 0x1000);
-        kmem_pfree(test, 2);
-        uint16_t* test3 = kmem_alloc(1024);
-        kterm_putf("\ntest3 %x", test3);
-        kmem_free(test3, 1024);
-        kterm_putf("\nwait a few second :) -");
-        for (uint16_t i = 1; i <= 5; i++)
-        {
-            ksleep(1000);
-            kterm_putf(" %d", i);
-        }
-    }
-    else if (str_cmp(kterm_argv[0], "test_mouse") == 0)
-    {
-        kmouse_test();
-        kkeyboard_setinput(*kterm_input);
-    }
-    else if (str_cmp(kterm_argv[0], "wait") == 0)
-    {
-        if (kterm_argc < 2)
-            kterm_putf("\nNot enough arguments.");
-        else
-        {
-            int64_t input = 0;
-            if (kterm_argv[1])
-                input = str_atoi(kterm_argv[1]);
-            if (input >= 0)
-            {    
-                kterm_putf("\nWaiting %d seconds...", input);
-                ksleep(input * 1000);
-            }
-            else
-                kterm_putf("\nInvalid number.");
-        }
-    }
-    else
-    {
-        kterm_putf("\nCommand \'%s\' not found.\nUse the command \'help\' to list available commands.", kterm_argv[0]);
-    }
+    kcmd_runcommand(kterm_argv, kterm_argc);
 }
 
 inline void kterm_prevtermpos()

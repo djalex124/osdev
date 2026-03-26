@@ -83,7 +83,6 @@ void kmouse_test()
     kmouse_draw = 0;
 }
 
-
 static inline void kmouse_wait(uint8_t type)
 {
     unsigned wait = 100000;

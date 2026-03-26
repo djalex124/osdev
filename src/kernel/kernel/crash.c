@@ -291,6 +291,12 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
                             index++;
                             break;
                         }
+                        else if (block->data[index] == 0x80)
+                        {
+                            size += 4;
+                            index++;
+                            break;
+                        }
                         else if (abbrev_check == block->type &&
                                 (block->tag == 0x2E || block->tag == 0x11) &&
                                 block->data[index] == 0x11)
