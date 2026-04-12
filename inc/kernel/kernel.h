@@ -48,6 +48,8 @@ typedef struct {
 #include <fs/fs.h>
 
 typedef struct {
+    graphics_info *k_graphics;
+    
     uint64_t *mcfg_table;
 
     size_t kpci_tablesize;

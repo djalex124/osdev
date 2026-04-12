@@ -139,7 +139,7 @@ void kcmd_help()
     kterm_putf("\n fs [part] - sets current fs to selected partition");
     kterm_putf("\n font - prints all characters in boot font");
     kterm_putf("\n help - lists available commands");
-    kterm_putf("\n image [filename] - attempt printing .tga image to screen from file");
+    kterm_putf("\n image [filename] - attempts printing supported image types to screen");
     kterm_putf("\n info - prints current AQUA build information");
     kterm_putf("\n info [subcommand] - gives specific environment info");
     kterm_putf("\n read_file [filename] - attempt read of file on current partition");
@@ -191,16 +191,16 @@ void kcmd_image(char *kterm_argv[], int kterm_argc)
         return;
     }
 
-    if (file[0] != 0 || file[1] != 0 || file[2] != 0x0A || file[3] != 0 || file[4] != 0
-        || file[5] != 0 || file[6] != 0 || file[7] != 0 || file[8] != 0 || file[9] != 0
-        || (file[16] != 24 && file[16] != 32))
-    {
-        kterm_putf("\nInvalid tga file.");
-    }
+    uint32_t *image_pixels = 0;
+
+    if (kimage_istga(file) == 1)
+        image_pixels = kimage_getbuftga(file, (int)file_length, &image_pages);
     else
+        kterm_putf("\nUnable to read file.");
+
+    if ((uint64_t)image_pixels != 0)
     {
-        uint32_t *image_pixels = kimage_getbuftga(file, (int)file_length, &image_pages);
-        kimage_termblit(image_pixels, 100, 100);
+        kimage_termblit(image_pixels, k_infotable.k_graphics->horizontal_res / 16, 25);
         kmem_free(image_pixels, image_pages);
     }
 

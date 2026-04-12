@@ -70,6 +70,7 @@ INTN boot_guidcmp(EFI_GUID *a, EFI_GUID *b)
     return value;
 }
 
+EFI_GRAPHICS_OUTPUT_BLT_PIXEL clear = {.Red = 0, .Green = 0, .Blue = 0};
 EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 boot_table* table;
 UINTN kernel_size = 0;
@@ -322,6 +323,126 @@ EFI_STATUS create_tables_and_exit(EFI_HANDLE image_handle)
     return EFI_UNSUPPORTED;
 }
 
+void boot_menu_reset()
+{
+    uefi_call_wrapper(gop->Blt, 10, gop, &clear, EfiBltVideoFill, 0, 0, 0, 0,
+        gop->Mode->Info->HorizontalResolution, gop->Mode->Info->VerticalResolution, 0);
+    uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+    uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 0);
+}
+
+void boot_menu_graphics()
+{
+    UINTN page = 1;
+    UINTN redraw = 1;
+    
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *gop_info;
+    UINTN gop_info_size;
+    
+    do
+    {
+        if (redraw)
+        {
+            boot_menu_reset();
+
+            Print(L"Available graphics modes:");
+            redraw = 0;
+        }
+
+        uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 2);
+        Print(L"Page (%d/%d)\r\n", page, gop->Mode->MaxMode / 10);
+        UINTN last = (gop->Mode->MaxMode < page * 10)?gop->Mode->MaxMode:(page * 10);
+        for (UINTN index = (page - 1) * 10; index < last; index++)
+        {
+            uefi_call_wrapper(gop->QueryMode, 4, gop, 
+                index, &gop_info_size, &gop_info);
+            Print(L"[%d]: %dx%d", index - (page - 1) * 10, gop_info->HorizontalResolution,
+                gop_info->VerticalResolution);
+            if (index == gop->Mode->Mode)
+                Print(L" *");
+            Print(L"\r\n");
+        }
+
+        Print(L"\r\n");
+        Print(L"Press [N] to see next page.\r\n");
+        Print(L"Press [P] to see previous page.\r\n");
+        Print(L"Press [0-9] to select mode.\r\n");
+        Print(L"Press [enter] to confirm.\r\n");
+
+        uefi_call_wrapper(BS->WaitForEvent, 3, 1, &ST->ConIn->WaitForKey, NULL);
+        uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key);
+
+        if (key.UnicodeChar == 0x6E)
+        {
+            if (gop->Mode->MaxMode >= (page + 1) * 10)
+            {
+                page++;
+                redraw = 1;
+            }
+        }
+        else if (key.UnicodeChar == 0x70)
+        {
+            if (page - 1 > 0)
+            {
+                page--;
+                redraw = 1;
+            }
+        }
+        else if (key.UnicodeChar >= 0x30 && key.UnicodeChar <= 0x39)
+        {
+            UINTN selection = key.UnicodeChar - 0x30 + (page - 1) * 10;
+            uefi_call_wrapper(gop->SetMode, 2, gop, selection);
+            redraw = 1;
+        }
+    } while (key.UnicodeChar != 0xD);
+
+    key.UnicodeChar = 0;
+    
+    boot_menu_reset();
+    Print(L"Welcome to ConcatenOS pre-boot environment!"); 
+}
+
+void boot_menu()
+{
+    uefi_call_wrapper(ST->ConIn->Reset, 2, ST->ConIn, FALSE);
+
+    boot_menu_reset();
+    Print(L"Welcome to ConcatenOS pre-boot environment!"); 
+
+    do
+    {
+        uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 2);
+
+        Print(L"Current graphics mode: %dx%d\r\n", 
+            gop->Mode->Info->HorizontalResolution,
+            gop->Mode->Info->VerticalResolution);
+#ifdef AQUA_DEBUG
+        Print(L"Debugging symbols enabled: %x\r\n", debug_symbols);
+#endif
+
+        Print(L"\r\n");
+        Print(L"Press [G] to change graphics mode.\r\n");
+
+#ifdef AQUA_DEBUG
+        Print(L"Press [1] to toggle debugging symbols.\r\n");
+#endif
+
+        Print(L"\r\nPress [enter] to boot.");
+
+        uefi_call_wrapper(BS->WaitForEvent, 3, 1, &ST->ConIn->WaitForKey, NULL);
+        uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key);
+
+        if (key.UnicodeChar == 0x67)
+            boot_menu_graphics();
+#ifdef AQUA_DEBUG
+        else if (key.UnicodeChar == 0x31)
+            debug_symbols ^= 1;
+#endif
+    } while (key.UnicodeChar != 0xD);
+
+    Print(L"\r\n\r\n");
+}
+
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 {
     ST = system_table;
@@ -334,29 +455,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     s = load_graphics();
     assert(s);
 
-    uefi_call_wrapper(ST->ConIn->Reset, 2, ST->ConIn, FALSE);
-    uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 4);
-    Print(L"Welcome to ConcatenOS pre-boot environment!"); 
-
-    do
-    {
-        uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 6);
-
-#ifdef AQUA_DEBUG
-        Print(L"Debugging symbols enabled: %x\r\n\r\nPress [1] to toggle debugging symbols.\r\n", debug_symbols);
-#endif
-        Print(L"Press [enter] to boot.");
-
-        uefi_call_wrapper(BS->WaitForEvent, 3, 1, &ST->ConIn->WaitForKey, NULL);
-        uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key);
-
-#ifdef AQUA_DEBUG
-        if (key.UnicodeChar == 0x31)
-            debug_symbols ^= 1;
-#endif
-    } while (key.UnicodeChar != 0xD);
-
-    Print(L"\r\n\r\n");
+    boot_menu();
 
     s = load_kernel(image_handle);
     assert(s);

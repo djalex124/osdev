@@ -23,26 +23,25 @@ char *kterm_prompt = "aqua >";
 kkeyboard_state *kterm_next;
 uint8_t kterm_changed = 0;
 
-extern graphics_info kgraphics;
 uint32_t *kterm_gbuffer;
 
 int kterm_currentpartition = -1;
 
 extern char _binary____font_psf_start[];
 uint32_t fg = 0xC5C5C5, bg = default_color;
-unsigned int cx = 0, cy = 0, cw = 0, ch = 0;
+uint16_t cx = 0, cy = 0, cw = 0, ch = 0;
 psf_font *font;
 
 kscreen_pos update_header;
 
 static inline void kterm_putp(int x, int y, uint32_t color)
 {
-    if (x >= kgraphics.horizontal_res || x < 0)
+    if (x >= k_infotable.k_graphics->horizontal_res || x < 0)
         return;
-    else if (y >= kgraphics.vertical_res || y < 0)
+    else if (y >= k_infotable.k_graphics->vertical_res || y < 0)
         return;
     
-    unsigned where = x*4 + y*kgraphics.ppsl*4;
+    unsigned where = x*4 + y*k_infotable.k_graphics->ppsl*4;
     ((unsigned char*)kterm_gbuffer)[where] = color & 0xFF;
     ((unsigned char*)kterm_gbuffer)[where + 1] = (color >> 8) & 0xFF;
     ((unsigned char*)kterm_gbuffer)[where + 2] = (color >> 16) & 0xFF;
@@ -57,7 +56,7 @@ void kterm_drawrect(int x, int y, int w, int h, uint32_t color)
 
 void kterm_clr(uint32_t color)
 {
-    kterm_drawrect(0, 0, kgraphics.horizontal_res, kgraphics.vertical_res, color);
+    kterm_drawrect(0, 0, k_infotable.k_graphics->horizontal_res, k_infotable.k_graphics->vertical_res, color);
     cx = 0;
     cy = 1;
 }
@@ -91,10 +90,10 @@ void kterm_putc(uint16_t c)
 
 void kterm_scroll()
 {
-    memcpy_ssealign(kterm_gbuffer + (font->height * kgraphics.ppsl),
-        kterm_gbuffer + 2 * (font->height * kgraphics.ppsl),
-        (ch - 2) * kgraphics.ppsl * font->height * 4);
-    kterm_drawrect(0, (cy - 1) * font->height, kgraphics.horizontal_res, font->height, bg);
+    memcpy_ssealign(kterm_gbuffer + (font->height * k_infotable.k_graphics->ppsl),
+        kterm_gbuffer + 2 * (font->height * k_infotable.k_graphics->ppsl),
+        (ch - 2) * k_infotable.k_graphics->ppsl * font->height * 4);
+    kterm_drawrect(0, (cy - 1) * font->height, k_infotable.k_graphics->horizontal_res, font->height, bg);
     
     cy--;
 }
@@ -148,7 +147,7 @@ void kterm_update()
     cx = 0;
     cy = 0;
 
-    kterm_drawrect(0, 0, kgraphics.horizontal_res, font->height, bg);
+    kterm_drawrect(0, 0, k_infotable.k_graphics->horizontal_res, font->height, bg);
 
     kterm_prints(kterm_titletext1);
 
@@ -359,18 +358,51 @@ void kterm_input(kkeyboard_state *k)
 
 void kterm_run()
 {
-    char *arg = str_tok(kterm_buffer, " ");
-    while (arg && kterm_argc < kterm_maxargs - 1)
+    str_trim(kterm_buffer);
+    int index = 0;
+
+    while (index < kterm_bufferindex && kterm_argc < kterm_maxargs)
     {
-        kterm_argv[kterm_argc++] = arg;
-        arg = str_tok((void *)0, " ");
+        char *current = &kterm_buffer[index];
+        char splitting_char = ' ';
+        int end = index;
+
+        while (*current != splitting_char && *current != 0)
+        {
+            if (*current == '\'' || *current == '\"')
+            {
+                index++;
+                splitting_char = *current;
+            }
+
+            current++;
+            end++;
+        }
+
+        if (end == index)
+        {
+            index++;
+            continue;
+        }
+        
+        kterm_argv[kterm_argc] = kmem_kalloc(end - index + 1);
+        memcpy(kterm_argv[kterm_argc], &kterm_buffer[index], end - index);
+        kterm_argv[kterm_argc][end - index] = 0;
+        index = end + 1;
+        
+        kterm_argc++;
     }
-    kterm_argv[kterm_argc] = 0;
 
     if (kterm_argv[0] == NULL)
         return;
 
     kcmd_runcommand(kterm_argv, kterm_argc);
+
+    for (int i = 0; i < kterm_argc; i++)
+    {
+        if ((uint64_t)kterm_argv[i])
+            kmem_kfree((void *)kterm_argv[i]);
+    }
 }
 
 inline void kterm_prevtermpos()
@@ -474,8 +506,9 @@ uint8_t kterm_draw = 0;
 
 void kterm_init()
 {
-    cw = kgraphics.horizontal_res / ((psf_font *)&_binary____font_psf_start)->width;
-    ch = kgraphics.vertical_res / ((psf_font *)&_binary____font_psf_start)->height;
+    cw = k_infotable.k_graphics->horizontal_res / ((psf_font *)&_binary____font_psf_start)->width;
+    ch = k_infotable.k_graphics->vertical_res / ((psf_font *)&_binary____font_psf_start)->height;
+    kdebug_outf("\nkterm: kterm size %dx%x", cw, ch);
 
     update_header.x = cw - str_len(kterm_titletext2);
     update_header.y = 0;

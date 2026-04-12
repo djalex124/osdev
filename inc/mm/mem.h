@@ -46,4 +46,8 @@ void kmem_free(void* addr, size_t pages);
 void kmem_printpmminfo();
 void kmem_printinfo();
 
+#ifdef AQUA_DEBUG_MEM
+void kmem_vmm_traverse(uint64_t cr2);
+#endif
+
 #endif

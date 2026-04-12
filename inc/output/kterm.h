@@ -17,8 +17,8 @@ void kterm_input(kkeyboard_state *k);
 
 typedef struct
 {
-    uint8_t x;
-    uint8_t y;
+    uint16_t x;
+    uint16_t y;
 }kscreen_pos;
 
 kscreen_pos kterm_getpos();
@@ -37,7 +37,7 @@ int kterm_getpartition();
 #define kterm_titletext1 "[AQUA Kernel]"
 #define kterm_titletext2 "Build: (" AQUA_VER_STRING ")"
 
-#define kterm_infotext "[AQUA Kernel (" AQUA_VER_STRING ")]\n[Built " __TIME__" "__DATE__ " Central Time]\n[Quote: Never back down, never give up!]"
+#define kterm_infotext "[AQUA Kernel (" AQUA_VER_STRING ")]\n[Built " __TIME__" "__DATE__ " Central Time]\n[Quote: Real eyes realize real lies.]"
 
 #define default_color 0x34568B
 

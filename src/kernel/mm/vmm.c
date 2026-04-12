@@ -495,17 +495,72 @@ void kmem_vmminit(uint64_t phys_low, uint64_t phys_hi)
 		kmem_virtmapfree((uint64_t)temp);
 	}
 
+	kdebug_outf("\nkm_iv: paging done");
+}
+
 #ifdef AQUA_DEBUG_MEM
-	kdebug_outf("\nkm_iv: virtual memory topology");
+uint8_t traversed = 0;
+void kmem_vmm_traverse(uint64_t cr2)
+{
+	if (traversed == 1)
+		return;
+	traversed = 1;
+
+	kdebug_outf("\nkm_vmt: virtual memory topology");
 	kmem_virtmap *vmmap = &kernel_vmmap_start[0];
 	while (1)
 	{
-		kdebug_outf("\nkm_iv: used %x start %x len %x", vmmap->used, vmmap->start, vmmap->length);
+		kdebug_outf("\nkm_vmt: used %x start %x len %x", vmmap->used, vmmap->start, vmmap->length);
 		if (vmmap->next == 0)
 			break;
 		vmmap = &kernel_vmmap_start[vmmap->next];
 	}
-#endif
 
-	kdebug_outf("\nkm_iv: paging done");
+	uint64_t *pt3, *pt2, *pt1;
+	size_t p4_index = ((uint64_t)cr2 >> 39) & 0x1FF;
+	size_t p3_index = ((uint64_t)cr2 >> 30) & 0x1FF;
+	size_t p2_index = ((uint64_t)cr2 >> 21) & 0x1FF;
+	size_t p1_index = ((uint64_t)cr2 >> 12) & 0x1FF;
+
+	kdebug_outf("\nkm_vmt: crash occured at ");
+
+	if (!(ptab4[p4_index] & 0x1))
+	{
+		kdebug_outf("non-existent entry");
+		return;
+	}
+
+	pt3 = kmem_pagegettable(ptab4, p4_index);
+	if (!(pt3[p3_index] & 0x1))
+	{
+		kdebug_outf("non-existent entry");
+		return;
+	}
+	if (pt3[p3_index] & (1 << 7))
+	{
+		kdebug_outf("(0x%x) -> [0x%x]", cr2, pt3[p3_index] & ~0x3FFFFFFF);
+		return;
+	}
+
+	pt2 = kmem_pagegettable(pt3, p3_index);
+	if (!(pt2[p2_index] & 0x1))
+	{
+		kdebug_outf("non-existent entry");
+		return;
+	}
+	if (pt2[p2_index] & (1 << 7))
+	{
+		kdebug_outf("(0x%x) -> [0x%x]", cr2, pt2[p2_index] & ~0x1FFFFF);
+		return;
+	}
+
+	pt1 = kmem_pagegettable(pt2, p2_index);;
+	if (pt1[p1_index] & 0x1)
+	{
+		kdebug_outf("(0x%x) -> [0x%x]", cr2, pt1[p1_index] & ~0xFFF);
+		return;
+	}
+	
+	kdebug_outf("non-existent entry");
 }
+#endif

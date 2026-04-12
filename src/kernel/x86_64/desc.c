@@ -23,6 +23,10 @@ const char* kdesc_ints[] =
 
 char error_message[48];
 
+#ifdef AQUA_DEBUG_MEM
+#include <mm/mem.h>
+#endif
+
 void kwrapper_isr(kframe_int *k)
 {   
 #ifdef AQUA_DEBUG
@@ -81,6 +85,10 @@ void kwrapper_isr(kframe_int *k)
             kdebug_outf("ss access|");
         if (k->err_code & (1 << 14))
             kdebug_outf("sgx violation|");
+
+#ifdef AQUA_DEBUG_MEM
+        kmem_vmm_traverse(cr2);
+#endif
     }
 #endif
 
