@@ -23,6 +23,19 @@ kmem_heapblock *heap_start = 0;
 
 atomic_flag kmem_heap_lock;
 
+/*
+void kmem_heap_print()
+{
+    kmem_heapblock *heap_ptr = heap_start;
+    kdebug_outf("\nkheap: ");
+    while (heap_ptr != NULL)
+    {
+        kdebug_outf(" sz%x u%b ->", heap_ptr->size, heap_ptr->used);
+        heap_ptr = heap_ptr->next;
+    }
+}
+*/
+
 //heap alloc
 void* kmem_kalloc(uint64_t size)
 {
@@ -31,7 +44,7 @@ void* kmem_kalloc(uint64_t size)
     kmem_heapblock *heap_ptr = heap_start;
     while (heap_ptr != NULL)
     {
-        if (heap_ptr->used == 0 && heap_ptr->size >= size + sizeof(kmem_heapblock))
+        if ((heap_ptr->used == 0) && (heap_ptr->size >= size + sizeof(kmem_heapblock)))
         {
             if (heap_ptr->size > size + sizeof(kmem_heapblock) * 2)
             {
@@ -41,13 +54,21 @@ void* kmem_kalloc(uint64_t size)
                 split_block->next = heap_ptr->next;
                 split_block->prev = heap_ptr;
 
+                if (split_block->next != NULL)
+                    split_block->next->prev = split_block;
+
                 heap_ptr->size = size + sizeof(kmem_heapblock);
                 heap_ptr->next = split_block;
             }
 
             heap_ptr->used = 1;
+            
+            void *return_addr = (void *)((uint64_t)heap_ptr + sizeof(kmem_heapblock));
+            memset(return_addr, 0, size);
+
             ksync_mutex_rel(&kmem_heap_lock);
-            return (void *)((uint64_t)heap_ptr + sizeof(kmem_heapblock));
+
+            return return_addr;
         }
 
         heap_ptr = heap_ptr->next;
@@ -74,6 +95,8 @@ void kmem_kfree(void *addr)
     if (free_block->prev != NULL && free_block->prev->used == 0)
     {
         free_block->prev->size += free_block->size;
+        if (free_block->next != NULL)
+            free_block->next->prev = free_block->prev;
         free_block->prev->next = free_block->next;
     }
 
@@ -84,7 +107,7 @@ void kmem_heapinit()
 {
     heap_start = (kmem_heapblock *)kmem_alloc(kmem_heapsize);
     // 512kb in total size
-    
+
     heap_start->size = (kmem_heapsize * 0x1000) - sizeof(kmem_heapblock);
     heap_start->used = 0;
     heap_start->next = 0;
@@ -99,7 +122,7 @@ void* kmem_alloc(size_t pages)
 
     void *addr = kmem_page((uint64_t)phys, pages * 0x1000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
 #ifdef AQUA_DEBUG_MEM
-    kdebug_outf("\nkm_a: returning %x", addr);
+    kdebug_outf("\nkm_a: returning %x - %x", addr, addr + pages * 0x1000);
 #endif
 
     memset(addr, 0, pages * 0x1000);

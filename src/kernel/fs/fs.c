@@ -12,45 +12,34 @@
 
 #include <mm/mem.h>
 
+#include <fs/fs_ata.h>
+#include <fs/fs_fat.h>
 #include <fs/fs.h>
 
 kfs_drive *kfs_drives[32];
 
-void kfs_printreadfile(uint8_t partition, char *filename)
+uint8_t *kfs_readfile(kfs_partition *partition, char *filename, size_t *file_size)
 {
-    if ((uint64_t)k_infotable.kfs_partitions[partition] == 0)
-    {
-        kterm_putf("\ninvalid partition number!");
-        return;
-    }
-    if ((uint64_t)filename == 0)
-    {
-        kterm_putf("\nunable to parse file name!");
-        return;
-    }
-    
-    kfs_partition *selected_partition = k_infotable.kfs_partitions[partition];
-
-    size_t file_length = 0;
     uint8_t *file = 0;
-    
-    if (selected_partition->fs == 1)
-        file = kfs_readfilefat(selected_partition, filename, &file_length);
+    if (partition->fs == 1)
+        file = kfs_readfilefat(partition, filename, file_size);
 
-    if ((uint64_t)file)
-    {
-        kterm_putf("\nhex output 0x%x bytes:\n", file_length);
-        int i;
-        for (i = 0; i < (file_length - 7); i += 8)
-            kterm_putf("%2x%2x%2x%2x%2x%2x%2x%2x", 
-                file[i], file[i + 1], file[i + 2], file[i + 3], 
-                file[i + 4], file[i + 5], file[i + 6], file[i + 7]);
-        for (; i < file_length; i++)
-            kterm_putf("%2x", file[i]);
-        kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
-    }
-    else
-        kterm_putf("\nfile not found!");
+    return file;
+}
+
+int kfs_checkdir(kfs_partition *partition, char *filename, char *absolutepath)
+{
+    int exists = 0;
+    if (partition->fs == 1)
+        exists = kfs_checkdirfat(partition, filename, absolutepath);
+
+    return exists;
+}
+
+void kfs_printdir(kfs_partition *partition, char *filename)
+{
+    if (partition->fs == 1)
+        kfs_printdirfat(partition, filename);
 }
 
 void kfs_printpartition(kfs_partition *part)
@@ -60,9 +49,6 @@ void kfs_printpartition(kfs_partition *part)
         kfs_patadrive *drive = (kfs_patadrive *)part->drive->drive_data;
         kterm_putf(" PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
     }
-
-    if (part->fs == 1)
-        kfs_readfat(part);
 }
 
 void kfs_printinfo()

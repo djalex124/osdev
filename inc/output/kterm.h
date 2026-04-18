@@ -28,8 +28,12 @@ uint32_t kterm_getfg();
 uint32_t kterm_getbg();
 void kterm_setcolor(uint32_t foreground, uint32_t background);
 
-void kterm_setpartition(int fs);
+char *kterm_getabsolutedir(char *filepath);
+char *kterm_getdir();
+void kterm_setdir(char *dir);
+
 int kterm_getpartition();
+void kterm_setpartition(int fs);
 
 #define kterm_buffersize 100
 #define kterm_maxargs 16

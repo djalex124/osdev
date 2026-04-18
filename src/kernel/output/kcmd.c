@@ -22,6 +22,36 @@
 
 extern uint8_t kacpi_apsrunning;
 
+void kcmd_cd(char *kterm_argv[], int kterm_argc)
+{
+    if (kterm_getpartition() == -1)
+    {
+        kterm_putf("\nInvalid partition selection.");
+        return;
+    }
+
+    kfs_partition *selected_partition = k_infotable.kfs_partitions[kterm_getpartition()];
+
+    if ((uint64_t)selected_partition == 0)
+    {
+        kterm_putf("\nPartition does not exist.");
+        kterm_setpartition(-1);
+        return;
+    }
+
+    int check = 0;
+    if (kterm_argv[1])
+    {
+        char *fullname = kterm_getabsolutedir(kterm_argv[1]);
+
+        char *absolutename = kmem_kalloc(str_len(fullname) + str_len(kterm_argv[1]) + 2);
+        check = kfs_checkdir(selected_partition, fullname, absolutename);
+        
+        if (check == 1)
+            kterm_setdir(absolutename);
+    }
+}
+
 void kcmd_clear()
 {
     kterm_clr(kterm_getbg());
@@ -73,6 +103,40 @@ void kcmd_crash()
     kcrash("User Requested");
 }
 
+#include <fs/fs_fat.h>
+
+void kcmd_dir(char *kterm_argv[], int kterm_argc)
+{
+    if (kterm_getpartition() == -1)
+    {
+        kterm_putf("\nInvalid partition selection.");
+        return;
+    }
+
+    kfs_partition *selected_partition = k_infotable.kfs_partitions[kterm_getpartition()];
+
+    if ((uint64_t)selected_partition == 0)
+    {
+        kterm_putf("\nPartition does not exist.");
+        kterm_setpartition(-1);
+        return;
+    }
+
+    if (kterm_argc < 2)
+        kfs_printdir(selected_partition, kterm_getdir());
+    else if (kterm_argc == 2)
+    {
+        if (!kterm_argv[1])
+            kfs_printdir(selected_partition, kterm_getdir());
+        else
+        {
+            char *fullname = kterm_getabsolutedir(kterm_argv[1]);
+            kfs_printdir(selected_partition, fullname);
+            kmem_kfree(fullname);
+        }
+    }
+}
+
 void kcmd_fs(char *kterm_argv[], int kterm_argc)
 {
     if (kterm_argc < 2)
@@ -114,6 +178,7 @@ void kcmd_fs(char *kterm_argv[], int kterm_argc)
         {
             kterm_putf("\nPartition set to %d.", part);
             kterm_setpartition(part);
+            kterm_setdir("/");
         }
     }
     else
@@ -131,10 +196,13 @@ void kcmd_font()
 void kcmd_help()
 {
     kterm_putf("\nList of currently available commands:");
+    kterm_putf("\n cd [path] - changes current directory");
     kterm_putf("\n clear - clears the screen");
     kterm_putf("\n color [fg] [bg] - set terminal colors in base10 of hex code, no values to reset");
     kterm_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
     kterm_putf("\n crash - crashes the AQUA kernel");
+    kterm_putf("\n dir - prints files and folders of cwd");
+    kterm_putf("\n dir [path] - prints files and folders of path");
     kterm_putf("\n fs - provides all fs info");
     kterm_putf("\n fs [part] - sets current fs to selected partition");
     kterm_putf("\n font - prints all characters in boot font");
@@ -159,14 +227,6 @@ void kcmd_image(char *kterm_argv[], int kterm_argc)
         kterm_putf("\nInvalid partition selection.");
         return;
     }
-    
-    char *filename = 0;
-    if (kterm_argv[1])
-        filename = kterm_argv[1];
-    
-    size_t file_length;
-    uint8_t *file = 0;
-    size_t image_pages = 0;
 
     kfs_partition *selected_partition = k_infotable.kfs_partitions[kterm_getpartition()];
 
@@ -177,19 +237,26 @@ void kcmd_image(char *kterm_argv[], int kterm_argc)
         return;
     }
 
-    if (selected_partition->fs == 1)
-        file = kfs_readfilefat(selected_partition, filename, &file_length);
-    else
+    char *filename = 0;
+    if (kterm_argv[1])
+        filename = kterm_argv[1];
+
+    size_t file_length;
+    uint8_t *file = 0;
+    size_t image_pages = 0;
+
+    char *fullname = kterm_getabsolutedir(filename);
+
+    file = kfs_readfile(selected_partition, fullname, &file_length);
+    
+    if ((uint64_t)file == 0)
     {
-        kterm_putf("\nUnsupported fs type.");
+        kterm_putf("\nFile not found.");
+        kmem_kfree(fullname);
         return;
     }
 
-    if ((uint64_t)file == 0)
-    {
-        kterm_putf("\nUnable to read file.");
-        return;
-    }
+    kmem_kfree(fullname);
 
     uint32_t *image_pixels = 0;
 
@@ -283,7 +350,10 @@ void kcmd_info(char *kterm_argv[], int kterm_argc)
 void kcmd_readfile(char *kterm_argv[], int kterm_argc)
 {
     if (kterm_argc < 2)
+    {
         kterm_putf("\nNot enough arguments.");
+        return;
+    }
 
     if (kterm_getpartition() == -1)
     {
@@ -303,8 +373,30 @@ void kcmd_readfile(char *kterm_argv[], int kterm_argc)
     char *filename = 0;
     if (kterm_argv[1])
         filename = kterm_argv[1];
+
+    size_t file_length;
+    uint8_t *file = 0;
+
+    char *fullname = kterm_getabsolutedir(filename);
     
-    kfs_printreadfile(kterm_getpartition(), filename);
+    file = kfs_readfile(selected_partition, fullname, &file_length);
+
+    kmem_kfree(fullname);
+
+    if ((uint64_t)file)
+    {
+        kterm_putf("\nhex output 0x%x bytes:\n", file_length);
+        int i;
+        for (i = 0; i < (file_length - 7); i += 8)
+            kterm_putf("%2x%2x%2x%2x%2x%2x%2x%2x", 
+                file[i], file[i + 1], file[i + 2], file[i + 3], 
+                file[i + 4], file[i + 5], file[i + 6], file[i + 7]);
+        for (; i < file_length; i++)
+            kterm_putf("%2x", file[i]);
+        kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
+    }
+    else
+        kterm_putf("\nFile not found!");
 }
 
 void kcmd_shutdown()
@@ -335,9 +427,9 @@ void kcmd_test(char *kterm_argv[], int kterm_argc)
         kterm_putf("\ntest2[32] %x", test2[32]);
         kmem_unpage(test2, 0x1000);
         kmem_pfree(test, 2);
-        uint16_t* test3 = kmem_alloc(1024);
+        uint16_t* test3 = kmem_kalloc(1024);
         kterm_putf("\ntest3 %x", test3);
-        kmem_free(test3, 1024);
+        kmem_kfree(test3);
         kterm_putf("\nwait a few second :) -");
         for (uint16_t i = 1; i <= 5; i++)
         {
@@ -372,7 +464,9 @@ void kcmd_wait(char *kterm_argv[], int kterm_argc)
 
 void kcmd_runcommand(char *kterm_argv[], int kterm_argc)
 {
-    if (kcmd_strequal(kterm_argv[0], "clear"))
+    if (kcmd_strequal(kterm_argv[0], "cd"))
+        kcmd_cd(kterm_argv, kterm_argc);
+    else if (kcmd_strequal(kterm_argv[0], "clear"))
         kcmd_clear();
     else if (kcmd_strequal(kterm_argv[0], "color"))
         kcmd_color(kterm_argv, kterm_argc);
@@ -380,6 +474,8 @@ void kcmd_runcommand(char *kterm_argv[], int kterm_argc)
         kcmd_compare(kterm_argv, kterm_argc);
     else if (kcmd_strequal(kterm_argv[0], "crash"))
         kcmd_crash();
+    else if (kcmd_strequal(kterm_argv[0], "dir"))
+        kcmd_dir(kterm_argv, kterm_argc);
     else if (kcmd_strequal(kterm_argv[0], "fs"))
         kcmd_fs(kterm_argv, kterm_argc);
     else if (kcmd_strequal(kterm_argv[0], "font"))

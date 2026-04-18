@@ -517,7 +517,7 @@ void kcrash(char *message)
     screen = cw && ch;
     already_crashing++;
 
-    kscreen_pos offset = {.x = 0, .y = 0};
+    kscreen_pos offset = {.x = 0, .y = 2};
 
     if (screen && already_crashing <= 1)
     {

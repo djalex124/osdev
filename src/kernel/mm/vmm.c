@@ -178,7 +178,8 @@ uint64_t kmem_newpagetable()
 	return (uint64_t)new_pt;
 }
 
-extern void kmem_flush(void *);
+extern void kmem_invlpg(void *);
+extern void kmem_tlbflush();
 
 static inline uint64_t *kmem_pagegettable(uint64_t *pt, size_t index)
 {
@@ -260,6 +261,8 @@ void kmem_pageentry(uint64_t physical, uint64_t address, uint64_t size, uint16_t
 		else
 			kcrash("Requested paging mode not implemented!");
 	}
+
+	kmem_tlbflush();
 }
 
 //assumes that all inputs are page aligned
@@ -293,7 +296,7 @@ void kmem_unpageentry(uint64_t address, uint64_t size)
 		if (pt3[p3_index] & (1 << 7))
 		{
 			pt3[p3_index] &= ~1;
-			kmem_flush((void *)address);
+			kmem_invlpg((void *)address);
 
 			address += 0x40000000;
 			size -= 0x40000000;
@@ -310,7 +313,7 @@ void kmem_unpageentry(uint64_t address, uint64_t size)
 		if (pt2[p2_index] & (1 << 7))
 		{
 			pt2[p2_index] &= ~1;
-			kmem_flush((void *)address);
+			kmem_invlpg((void *)address);
 
 			address += 0x40000000;
 			size -= 0x40000000;
@@ -324,7 +327,7 @@ void kmem_unpageentry(uint64_t address, uint64_t size)
 		else
 			kdebug_outf("\nkm_v: unpaging non-existent entry");
 
-		kmem_flush((void *)address);
+		kmem_invlpg((void *)address);
 		
 		address += 0x1000;
 		size -= 0x1000;

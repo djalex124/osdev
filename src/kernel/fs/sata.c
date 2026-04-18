@@ -7,6 +7,7 @@
 
 #include <mm/mem.h>
 
+#include <fs/fs_ata.h>
 #include <fs/fs.h>
 
 typedef struct

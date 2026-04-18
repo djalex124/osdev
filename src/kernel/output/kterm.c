@@ -25,6 +25,7 @@ uint8_t kterm_changed = 0;
 
 uint32_t *kterm_gbuffer;
 
+char *kterm_currentdir = 0;
 int kterm_currentpartition = -1;
 
 extern char _binary____font_psf_start[];
@@ -340,6 +341,48 @@ void kterm_setcolor(uint32_t foreground, uint32_t background)
     bg = background;
 }
 
+char *kterm_getabsolutedir(char *filepath)
+{
+    size_t pathlen = str_len(filepath);
+    size_t dirlen = str_len(kterm_currentdir);
+    char *fullname;
+
+    if (filepath[0] == '/')
+    {
+        fullname = kmem_kalloc(pathlen + 1);
+        memcpy(fullname, filepath, pathlen);
+        fullname[pathlen + 1] = 0;
+
+        return fullname;
+    }
+
+    fullname = kmem_kalloc(pathlen + dirlen + 1);
+    memcpy(fullname, kterm_currentdir, dirlen);
+    memcpy(fullname + dirlen, filepath, pathlen);
+    fullname[pathlen + dirlen + 1] = 0;
+
+    return fullname;
+}
+
+char *kterm_getdir()
+{
+    return kterm_currentdir;
+}
+
+void kterm_setdir(char *dir)
+{
+    if ((uint64_t)dir == 0)
+    {
+        kterm_setdir("/");
+        return;
+    }
+
+    if (kterm_currentdir)
+        kmem_kfree(kterm_currentdir);
+    kterm_currentdir = kmem_kalloc(str_len(dir) + 1);
+    memcpy(kterm_currentdir, dir, str_len(dir));
+}
+
 int kterm_getpartition()
 {
     return kterm_currentpartition;
@@ -348,6 +391,8 @@ int kterm_getpartition()
 void kterm_setpartition(int fs)
 {
     kterm_currentpartition = fs;
+    if (fs == -1)
+        kterm_setdir(0);
 }
 
 void kterm_input(kkeyboard_state *k)
@@ -454,7 +499,7 @@ void kterm_processinput()
             if (kterm_pos.x != 0 && kterm_pos.y != ch)
                 kterm_putf("\n");
             if (kterm_currentpartition != -1)
-                kterm_putf("(%d) ", kterm_currentpartition);
+                kterm_putf("(%d:%s) ", kterm_currentpartition, kterm_currentdir);
             kterm_putf("%s%c", kterm_prompt, 128);
             break;
         default:
