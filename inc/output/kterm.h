@@ -28,7 +28,9 @@ uint32_t kterm_getfg();
 uint32_t kterm_getbg();
 void kterm_setcolor(uint32_t foreground, uint32_t background);
 
-char *kterm_getabsolutedir(char *filepath);
+char *kterm_getabspath(char *fullpath);
+char *kterm_getrelpath(char *filepath);
+
 char *kterm_getdir();
 void kterm_setdir(char *dir);
 

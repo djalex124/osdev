@@ -26,9 +26,9 @@ extern kfs_drive *kfs_drives[32];
 void kfs_printpartition(kfs_partition *part);
 void kfs_printinfo();
 
-uint8_t *kfs_readfile(kfs_partition *partition, char *filename, size_t *file_size);
-int kfs_checkdir(kfs_partition *partition, char *filename, char *absolutepath);
-void kfs_printdir(kfs_partition *partition, char *filename);
+uint8_t *kfs_readfile(kfs_partition *partition, char *absolutepath, size_t *file_size);
+int kfs_checkdir(kfs_partition *partition, char *absolutepath);
+void kfs_printdir(kfs_partition *partition, char *absolutepath);
 
 int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr);
 int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, void *addr);

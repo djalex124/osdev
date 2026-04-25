@@ -42,13 +42,17 @@ void kcmd_cd(char *kterm_argv[], int kterm_argc)
     int check = 0;
     if (kterm_argv[1])
     {
-        char *fullname = kterm_getabsolutedir(kterm_argv[1]);
+        char *fullpath = kterm_getrelpath(kterm_argv[1]);
+        char *absolutepath = kterm_getabspath(fullpath);
 
-        char *absolutename = kmem_kalloc(str_len(fullname) + str_len(kterm_argv[1]) + 2);
-        check = kfs_checkdir(selected_partition, fullname, absolutename);
+        check = kfs_checkdir(selected_partition, absolutepath);
+
+        kmem_kfree(fullpath);
         
         if (check == 1)
-            kterm_setdir(absolutename);
+            kterm_setdir(absolutepath);
+        
+        kmem_kfree(absolutepath);
     }
 }
 
@@ -130,9 +134,9 @@ void kcmd_dir(char *kterm_argv[], int kterm_argc)
             kfs_printdir(selected_partition, kterm_getdir());
         else
         {
-            char *fullname = kterm_getabsolutedir(kterm_argv[1]);
-            kfs_printdir(selected_partition, fullname);
-            kmem_kfree(fullname);
+            char *absolutename = kterm_getabspath(kterm_argv[1]);
+            kfs_printdir(selected_partition, absolutename);
+            kmem_kfree(absolutename);
         }
     }
 }
@@ -245,18 +249,19 @@ void kcmd_image(char *kterm_argv[], int kterm_argc)
     uint8_t *file = 0;
     size_t image_pages = 0;
 
-    char *fullname = kterm_getabsolutedir(filename);
+    char *relpath = kterm_getrelpath(filename);
+    char *abspath = kterm_getabspath(relpath);
 
-    file = kfs_readfile(selected_partition, fullname, &file_length);
+    file = kfs_readfile(selected_partition, abspath, &file_length);
+
+    kmem_kfree(relpath);
+    kmem_kfree(abspath);
     
     if ((uint64_t)file == 0)
     {
         kterm_putf("\nFile not found.");
-        kmem_kfree(fullname);
         return;
     }
-
-    kmem_kfree(fullname);
 
     uint32_t *image_pixels = 0;
 
@@ -377,11 +382,13 @@ void kcmd_readfile(char *kterm_argv[], int kterm_argc)
     size_t file_length;
     uint8_t *file = 0;
 
-    char *fullname = kterm_getabsolutedir(filename);
+    char *relpath = kterm_getrelpath(filename);
+    char *abspath = kterm_getabspath(relpath);
     
-    file = kfs_readfile(selected_partition, fullname, &file_length);
+    file = kfs_readfile(selected_partition, abspath, &file_length);
 
-    kmem_kfree(fullname);
+    kmem_kfree(relpath);
+    kmem_kfree(abspath);
 
     if ((uint64_t)file)
     {
@@ -421,7 +428,7 @@ void kcmd_test(char *kterm_argv[], int kterm_argc)
     {
         kterm_putf("\nAvailable subcommands: mouse");
         uint16_t* test = kmem_palloc(2, kmem_paging_1kb);
-        uint16_t* test2 = kmem_page((uint64_t)&test[15], 0x1000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
+        uint16_t* test2 = kmem_page((uint64_t)&test[15], 0x1500, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
         kterm_putf("\ntest %x", (uint64_t)test2);
         test2[32] = 0xCA;
         kterm_putf("\ntest2[32] %x", test2[32]);

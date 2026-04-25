@@ -18,28 +18,28 @@
 
 kfs_drive *kfs_drives[32];
 
-uint8_t *kfs_readfile(kfs_partition *partition, char *filename, size_t *file_size)
+uint8_t *kfs_readfile(kfs_partition *partition, char *absolutepath, size_t *file_size)
 {
     uint8_t *file = 0;
     if (partition->fs == 1)
-        file = kfs_readfilefat(partition, filename, file_size);
+        file = kfs_readfilefat(partition, absolutepath, file_size);
 
     return file;
 }
 
-int kfs_checkdir(kfs_partition *partition, char *filename, char *absolutepath)
+int kfs_checkdir(kfs_partition *partition, char *absolutepath)
 {
     int exists = 0;
     if (partition->fs == 1)
-        exists = kfs_checkdirfat(partition, filename, absolutepath);
+        exists = kfs_checkdirfat(partition, absolutepath);
 
     return exists;
 }
 
-void kfs_printdir(kfs_partition *partition, char *filename)
+void kfs_printdir(kfs_partition *partition, char *absolutepath)
 {
     if (partition->fs == 1)
-        kfs_printdirfat(partition, filename);
+        kfs_printdirfat(partition, absolutepath);
 }
 
 void kfs_printpartition(kfs_partition *part)

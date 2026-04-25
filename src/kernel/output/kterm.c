@@ -341,7 +341,87 @@ void kterm_setcolor(uint32_t foreground, uint32_t background)
     bg = background;
 }
 
-char *kterm_getabsolutedir(char *filepath)
+char *kterm_getabspath(char *fullpath)
+{
+    char *absolutepath = kmem_kalloc(str_len(fullpath) + 2);
+
+    int count_index = 0;
+    int count_len = str_len(fullpath);
+    int count_absindex = 0;
+
+    char last_char = 0;
+
+    while (count_index < count_len && fullpath[count_index])
+    {
+        if (fullpath[count_index] == '/')
+        {
+            if (last_char != '/')
+                absolutepath[count_absindex++] = fullpath[count_index];
+        }
+        else
+            absolutepath[count_absindex++] = fullpath[count_index];
+        last_char = fullpath[count_index];
+        count_index++;
+    }
+
+    if (last_char == '/')
+    {
+        absolutepath[count_len] = 0;
+    }
+    else
+    {
+        absolutepath[count_len] = '/';
+        absolutepath[count_len + 1] = 0;
+    }
+
+    count_index = 0;
+    count_len = str_len(absolutepath);
+    while (count_index < count_len && absolutepath[count_index])
+    {
+        if (count_index > 3)
+        {
+            if (strn_cmp(absolutepath + count_index, "/..", 3) == 0)
+            {
+                int prev_len = 0;
+                for (int i = count_index - 1; absolutepath[i] != '/' && i >= 0; i--, prev_len++);
+                
+                if (prev_len >= count_index)
+                {
+                    absolutepath[0] = '/';
+                    absolutepath[1] = 0;
+                    break;
+                }
+
+                memcpy(absolutepath + count_index - prev_len, absolutepath + count_index + 4, count_len - count_index);
+
+                count_index -= prev_len + 2;
+            }
+        }
+
+        count_index++;
+    }
+
+    count_index = 0;
+    count_len = str_len(absolutepath);
+    while (count_index < count_len && absolutepath[count_index])
+    {
+        if (count_index + 2 < count_len)
+        {
+            if (strn_cmp(absolutepath + count_index, "/.", 2) == 0)
+            {
+                memcpy(absolutepath + count_index, absolutepath + count_index + 2, count_len - count_index + 2);
+
+                count_index -= 1;
+            }
+        }
+
+        count_index++;
+    }
+
+    return absolutepath;
+}
+
+char *kterm_getrelpath(char *filepath)
 {
     size_t pathlen = str_len(filepath);
     size_t dirlen = str_len(kterm_currentdir);

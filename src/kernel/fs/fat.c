@@ -299,14 +299,14 @@ int kfs_checkfatlba(kfs_partition *partition, uint32_t selected_lba, const char 
     return entry_found;
 }
 
-uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_length)
+uint8_t *kfs_readfilefat(kfs_partition *partition, char *absolutepath, size_t *file_length)
 {
     fat16_info *info = (fat16_info *)partition->fs_data;
     size_t current_lba = info->startlba + info->fatoffset + (info->fatentrycount * info->fatsize);
 
-    char *tempname = kmem_kalloc(str_len(filename) + 1);
-    memcpy(tempname, filename, str_len(filename));
-    tempname[str_len(filename)] = 0;
+    char *tempname = kmem_kalloc(str_len(absolutepath) + 1);
+    memcpy(tempname, absolutepath, str_len(absolutepath));
+    tempname[str_len(absolutepath)] = 0;
     char *foldername = str_tok(tempname, "/");
     int cont = 1;
 
@@ -331,8 +331,8 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
         else
             cont = 0;
 
-        memcpy(tempname, filename, str_len(filename));
-        tempname[str_len(filename)] = 0;
+        memcpy(tempname, absolutepath, str_len(absolutepath));
+        tempname[str_len(absolutepath)] = 0;
         foldername = str_tok(tempname, "/");
         for (int depth = cont - 1; depth > 0; depth--)
             foldername = str_tok(0, "/");
@@ -356,58 +356,10 @@ uint8_t *kfs_readfilefat(kfs_partition *partition, char *filename, size_t *file_
     return (uint8_t *)0;
 }
 
-void kfs_collapseabsolutefat(char *absolutepath)
+int kfs_checkdirfat(kfs_partition *partition, char *absolutepath)
 {
-    int count_index = 0;
-    int count_len = str_len(absolutepath);
-    while (count_index < count_len && absolutepath[count_index])
+    if (strn_cmp("/", absolutepath, str_len(absolutepath)) == 0)
     {
-        if (count_index > 3)
-        {
-            if (strn_cmp(absolutepath + count_index, "/..", 3) == 0)
-            {
-                int prev_len = 0;
-                for (int i = count_index - 1; absolutepath[i] != '/' && i >= 0; i--, prev_len++);
-                
-                if (prev_len >= count_index)
-                {
-                    absolutepath[0] = '/';
-                    absolutepath[1] = 0;
-                    break;
-                }
-
-                memcpy(absolutepath + count_index - prev_len, absolutepath + count_index + 4, count_len - count_index);
-
-                count_index -= prev_len + 2;
-            }
-        }
-
-        count_index++;
-    }
-
-    count_index = 0;
-    count_len = str_len(absolutepath);
-    while (count_index < count_len && absolutepath[count_index])
-    {
-        if (count_index + 2 < count_len)
-        {
-            if (strn_cmp(absolutepath + count_index, "/.", 2) == 0)
-            {
-                memcpy(absolutepath + count_index, absolutepath + count_index + 2, count_len - count_index + 2);
-
-                count_index -= 1;
-            }
-        }
-
-        count_index++;
-    }
-}
-
-int kfs_checkdirfat(kfs_partition *partition, char *filename, char *absolutepath)
-{
-    if (strn_cmp("/", filename, str_len(filename)) == 0)
-    {
-        absolutepath[0] = '/';
         return 1;
     }
 
@@ -415,44 +367,12 @@ int kfs_checkdirfat(kfs_partition *partition, char *filename, char *absolutepath
     size_t current_lba = info->startlba + info->fatoffset + (info->fatentrycount * info->fatsize);
 
     int count = 0;
-    int count_index = 0;
-    int count_len = str_len(filename);
-    char last_char = 0;
+    for (int i = 0; i < str_len(absolutepath) - 1; i++)
+        if (absolutepath[i] == '/') count++;
 
-    while (count_index < count_len && filename[count_index])
-    {
-        if (filename[count_index] == '/')
-        {
-            if (last_char != '/')
-            {
-                absolutepath[count_index] = filename[count_index];
-                count++;
-            }
-        }
-        else
-        {
-            absolutepath[count_index] = filename[count_index];
-        }
-        last_char = filename[count_index];
-        count_index++;
-    }
-
-    if (last_char == '/')
-    {
-        count--;
-        absolutepath[count_index] = 0;
-    }
-    else
-    {
-        absolutepath[count_index] = '/';
-        absolutepath[count_index + 1] = 0;
-    }
-
-    kfs_collapseabsolutefat(absolutepath);
-
-    char *tempname = kmem_kalloc(str_len(filename) + 1);
-    memcpy(tempname, filename, str_len(filename));
-    tempname[str_len(filename)] = 0;
+    char *tempname = kmem_kalloc(str_len(absolutepath) + 1);
+    memcpy(tempname, absolutepath, str_len(absolutepath));
+    tempname[str_len(absolutepath)] = 0;
     char *foldername = str_tok(tempname, "/");
     int cont = 1;
 
@@ -478,8 +398,8 @@ int kfs_checkdirfat(kfs_partition *partition, char *filename, char *absolutepath
         else
             cont = 0;
 
-        memcpy(tempname, filename, str_len(filename));
-        tempname[str_len(filename)] = 0;
+        memcpy(tempname, absolutepath, str_len(absolutepath));
+        tempname[str_len(absolutepath)] = 0;
         foldername = str_tok(tempname, "/");
         for (int depth = cont - 1; depth > 0; depth--)
             foldername = str_tok(0, "/");
@@ -493,39 +413,24 @@ int kfs_checkdirfat(kfs_partition *partition, char *filename, char *absolutepath
     return 0;
 }
 
-void kfs_printdirfat(kfs_partition *partition, char *filename)
+void kfs_printdirfat(kfs_partition *partition, char *absolutepath)
 {
     fat16_info *info = (fat16_info *)partition->fs_data;
     uint32_t current_lba = info->startlba + info->fatoffset + (info->fatentrycount * info->fatsize);
 
-    if (strn_cmp("/", filename, str_len(filename)) == 0)
+    if (strn_cmp("/", absolutepath, str_len(absolutepath)) == 0)
     {
         kfs_readfatlba(partition, current_lba);
         return;
     }
 
     int count = 0;
-    int count_index = 0;
-    int count_len = str_len(filename);
-    char last_char = 0;
+    for (int i = 0; i < str_len(absolutepath) - 1; i++)
+        if (absolutepath[i] == '/') count++;
 
-    while (count_index < count_len && filename[count_index])
-    {
-        if (filename[count_index] == '/')
-        {
-            if (last_char != '/')
-                count++;
-        }
-        last_char = filename[count_index];
-        count_index++;
-    }
-
-    if (last_char == '/')
-        count--;
-
-    char *tempname = kmem_kalloc(str_len(filename) + 1);
-    memcpy(tempname, filename, str_len(filename));
-    tempname[str_len(filename)] = 0;
+    char *tempname = kmem_kalloc(str_len(absolutepath) + 1);
+    memcpy(tempname, absolutepath, str_len(absolutepath));
+    tempname[str_len(absolutepath)] = 0;
     char *foldername = str_tok(tempname, "/");
     int cont = 1;
 
@@ -551,8 +456,8 @@ void kfs_printdirfat(kfs_partition *partition, char *filename)
         else
             cont = 0;
 
-        memcpy(tempname, filename, str_len(filename));
-        tempname[str_len(filename)] = 0;
+        memcpy(tempname, absolutepath, str_len(absolutepath));
+        tempname[str_len(absolutepath)] = 0;
         foldername = str_tok(tempname, "/");
         for (int depth = cont - 1; depth > 0; depth--)
             foldername = str_tok(0, "/");
