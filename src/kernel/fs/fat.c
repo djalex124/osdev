@@ -280,7 +280,8 @@ int kfs_checkfatlba(kfs_partition *partition, uint32_t selected_lba, const char 
             
             if (((kfs_lastentryattr & 0x10) || (kfs_lastentryattr != 0x08)) && kfs_lastentryname)
             {
-                if (strn_cmp(name, kfs_lastentryname, str_len(name)) == 0)
+                if ((str_len(kfs_lastentryname) == str_len(name)) &&
+                    (strn_cmp(name, kfs_lastentryname, str_len(name)) == 0))
                 {
                     entry_found = 1;
                     break;

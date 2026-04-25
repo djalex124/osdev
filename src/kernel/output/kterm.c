@@ -378,24 +378,17 @@ char *kterm_getabspath(char *fullpath)
     count_len = str_len(absolutepath);
     while (count_index < count_len && absolutepath[count_index])
     {
-        if (count_index > 3)
+        if (strn_cmp(absolutepath + count_index, "../", 3) == 0)
         {
-            if (strn_cmp(absolutepath + count_index, "/..", 3) == 0)
-            {
-                int prev_len = 0;
-                for (int i = count_index - 1; absolutepath[i] != '/' && i >= 0; i--, prev_len++);
-                
-                if (prev_len >= count_index)
-                {
-                    absolutepath[0] = '/';
-                    absolutepath[1] = 0;
-                    break;
-                }
+            int prev_len = 0;
+            if (count_index - 2 >= 0)
+                for (int i = count_index - 2; absolutepath[i] != '/' && i >= 0; i--, prev_len++);
+            else
+                prev_len = -1;
 
-                memcpy(absolutepath + count_index - prev_len, absolutepath + count_index + 4, count_len - count_index);
+            memcpy(absolutepath + count_index - prev_len - 2, absolutepath + count_index + 2, count_len - count_index + 1);
 
-                count_index -= prev_len + 2;
-            }
+            count_index = count_index - prev_len - 2;
         }
 
         count_index++;
@@ -405,14 +398,10 @@ char *kterm_getabspath(char *fullpath)
     count_len = str_len(absolutepath);
     while (count_index < count_len && absolutepath[count_index])
     {
-        if (count_index + 2 < count_len)
+        if (strn_cmp(absolutepath + count_index, "./", 2) == 0)
         {
-            if (strn_cmp(absolutepath + count_index, "/.", 2) == 0)
-            {
-                memcpy(absolutepath + count_index, absolutepath + count_index + 2, count_len - count_index + 2);
-
-                count_index -= 1;
-            }
+            memcpy(absolutepath + count_index, absolutepath + count_index + 2, count_len - count_index + 1);
+            count_index -= 1;
         }
 
         count_index++;
@@ -431,7 +420,6 @@ char *kterm_getrelpath(char *filepath)
     {
         fullname = kmem_kalloc(pathlen + 1);
         memcpy(fullname, filepath, pathlen);
-        fullname[pathlen + 1] = 0;
 
         return fullname;
     }
@@ -439,7 +427,6 @@ char *kterm_getrelpath(char *filepath)
     fullname = kmem_kalloc(pathlen + dirlen + 1);
     memcpy(fullname, kterm_currentdir, dirlen);
     memcpy(fullname + dirlen, filepath, pathlen);
-    fullname[pathlen + dirlen + 1] = 0;
 
     return fullname;
 }
@@ -459,6 +446,7 @@ void kterm_setdir(char *dir)
 
     if (kterm_currentdir)
         kmem_kfree(kterm_currentdir);
+    
     kterm_currentdir = kmem_kalloc(str_len(dir) + 1);
     memcpy(kterm_currentdir, dir, str_len(dir));
 }

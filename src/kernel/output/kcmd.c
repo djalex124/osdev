@@ -46,12 +46,11 @@ void kcmd_cd(char *kterm_argv[], int kterm_argc)
         char *absolutepath = kterm_getabspath(fullpath);
 
         check = kfs_checkdir(selected_partition, absolutepath);
-
-        kmem_kfree(fullpath);
         
         if (check == 1)
             kterm_setdir(absolutepath);
-        
+
+        kmem_kfree(fullpath);
         kmem_kfree(absolutepath);
     }
 }
