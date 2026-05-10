@@ -1,2 +1,3 @@
 FS0:
-boot.efi
+cd BOOT/EFI
+BOOTX64.EFI

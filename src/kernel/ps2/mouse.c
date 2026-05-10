@@ -146,6 +146,8 @@ void kmouse_init()
     outb(0x64, 0x60);
     kmouse_wait(1);
     outb(0x60, status); //ensure both ports can send data
+
+    outb(0x64, 0xFF); //reset ps2 kbd
     
     kmouse_cmd(0xFF); //reset mouse and clear buffer
     while (inb(0x60) != 0);

@@ -188,7 +188,7 @@ int kfs_readfatentry(kfs_partition *partition, uint8_t *buffer, uint32_t *curren
                 kfs_lastentrysize = 0;
 
             uint32_t lba = (((file->first_cluster_higher << 16) + file->first_cluster_lower - 2) * info->sectorspercluster)
-                + info->rootsize + (info->fatsize * info->fatentrycount) + info->startlba + 1;
+                + info->rootsize + (info->fatsize * info->fatentrycount) + info->fatoffset + info->startlba;
             kfs_lastentrylba = lba;
 
             continue_loop = 0;
@@ -494,7 +494,7 @@ void kfs_detectfat(kfs_drive *drive)
         start = *(uint32_t*)&mbr[entry];
     }
     else
-        kdebug_outf("\r\nkfs_testfat: no valid mbr, trying zero lba");
+        kdebug_outf("\nkfs_testfat: no valid mbr, trying zero lba");
 
     kfs_readsector(drive, start, 2, 1, mbr);
     bpb *esp = (bpb *)mbr;
@@ -503,8 +503,15 @@ void kfs_detectfat(kfs_drive *drive)
 
     kfs_partition* fat_partition = kmem_kalloc(sizeof(kfs_partition));
 
+    uint32_t fat_size = (esp->table_size_16 == 0) ? *(uint32_t *)(mbr + 36) : esp->table_size_16;
+    uint32_t total_sectors = (esp->total_sectors_16 == 0) ? esp->total_sectors_32 : esp->total_sectors_16;
+    uint32_t root_dir_sectors = ((esp->root_entry_count * 32) + (esp->bytes_per_sector - 1)) / esp->bytes_per_sector;
+    uint32_t data_sectors = total_sectors - (esp->reserved_sector_count + (esp->table_count * fat_size) + root_dir_sectors);
+    uint32_t total_clusters = data_sectors / esp->sectors_per_cluster;
+    kdebug_outf("\nkfs_testfat: total clusters %d", total_clusters);
+
     //kdebug_outf("\r\nmbr strings %8s", (char *)esp->oem_name);
-    if (mbr[38] == 0x28 || mbr[38] == 0x29)
+    if (total_clusters > 0 && total_clusters < 65525)
     {
         fat16_info *info = kmem_kalloc(sizeof(fat16_info));
         kdebug_outf("\r\nkfs_testfat: fat12/16 detected");

@@ -106,8 +106,6 @@ void kcmd_crash()
     kcrash("User Requested");
 }
 
-#include <fs/fs_fat.h>
-
 void kcmd_dir(char *kterm_argv[], int kterm_argc)
 {
     if (kterm_getpartition() == -1)

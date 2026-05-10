@@ -440,7 +440,8 @@ void kterm_setdir(char *dir)
 {
     if ((uint64_t)dir == 0)
     {
-        kterm_setdir("/");
+        kterm_currentdir = kmem_kalloc(2);
+        kterm_currentdir[0] = '/';
         return;
     }
 
@@ -513,8 +514,8 @@ void kterm_run()
 
     for (int i = 0; i < kterm_argc; i++)
     {
-        if ((uint64_t)kterm_argv[i])
-            kmem_kfree((void *)kterm_argv[i]);
+        if (kterm_argv[i])
+            kmem_kfree(kterm_argv[i]);
     }
 }
 

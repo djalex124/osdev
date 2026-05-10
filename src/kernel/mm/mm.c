@@ -16,7 +16,7 @@ typedef struct kmem_heapblock
     uint8_t used;
     struct kmem_heapblock *next;
     struct kmem_heapblock *prev;
-}__attribute__((packed)) kmem_heapblock;
+}kmem_heapblock;
 
 #define kmem_heapsize 0x80
 kmem_heapblock *heap_start = 0;
@@ -27,11 +27,11 @@ atomic_flag kmem_heap_lock;
 void kmem_heap_print()
 {
     kmem_heapblock *heap_ptr = heap_start;
-    kdebug_outf("\nkheap: ");
     while (heap_ptr != NULL)
     {
-        kdebug_outf("\nblk[%x]", (uint64_t)heap_ptr);
-        kdebug_outf("\n - mem[%x-%x]", (uint64_t)heap_ptr + sizeof(kmem_heapblock), (uint64_t)heap_ptr + sizeof(kmem_heapblock) + heap_ptr->size);
+        uint64_t heap_round = (uint64_t)heap_ptr & 0xFFFF;
+        kdebug_outf("[%3x](%d)", heap_round, heap_ptr->used);
+        kdebug_outf("-[%3x-%3x]", heap_round + sizeof(kmem_heapblock), heap_round + sizeof(kmem_heapblock) + heap_ptr->size);
         heap_ptr = heap_ptr->next;
     }
 }
@@ -40,22 +40,24 @@ void kmem_heap_print()
 void kmem_simplify(kmem_heapblock *block)
 {
     kmem_heapblock* free_block = block;
-    if (block->used != 0)
+    if (block->used == 1)
         return;
 
     if (free_block->next != NULL && free_block->next->used == 0)
     {
         free_block->size += free_block->next->size + sizeof(kmem_heapblock);
-        free_block->next->prev = free_block->prev;
         free_block->next = free_block->next->next;
+        if (free_block->next != NULL)
+            free_block->next->prev = free_block;
     }
 
-    if (free_block->prev != NULL && free_block->prev->used == 0)
+    while (free_block->prev != NULL && free_block->prev->used == 0)
     {
         free_block = free_block->prev;
         free_block->size += free_block->next->size + sizeof(kmem_heapblock);
-        free_block->next->prev = free_block->prev;
         free_block->next = free_block->next->next;
+        if (free_block->next != NULL)
+            free_block->next->prev = free_block;
     }
 }
 
@@ -83,8 +85,6 @@ void* kmem_kalloc(uint64_t size)
                 heap_ptr->size = size;
                 heap_ptr->next = split_block;
                 heap_ptr->used = 1;
-
-                kmem_simplify(split_block);
             }
             else
                 heap_ptr->used = 1;
