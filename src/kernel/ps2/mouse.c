@@ -120,8 +120,14 @@ void kmouse_cmd(uint8_t cmd)
         kmouse_cmd(cmd);
 }
 
+void kmouse_flushint()
+{
+    inb(0x60);
+}
+
 void kmouse_init()
 {
+    kdesc_setinterruptfunc(12, *kmouse_flushint);
     kmouse_cmd(0xF5); //if enabled, disable packets
 
     kmouse_wait(1);
