@@ -15,3 +15,4 @@ char* str_tok(char *s, const char* split);
 char* str_itoa(long i, int b);
 char* str_utoa(uint64_t i, int b);
 int64_t str_atoi(const char *s);
+uint64_t str_toul(const char *str, int base);

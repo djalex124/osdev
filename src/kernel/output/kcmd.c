@@ -67,8 +67,8 @@ void kcmd_color(char *kterm_argv[], int kterm_argc)
     else if (kterm_argc == 3)
     {
         int64_t new_fg, new_bg;
-        new_fg = str_atoi(kterm_argv[1]);
-        new_bg = str_atoi(kterm_argv[2]);
+        new_fg = str_toul(kterm_argv[1], 16);
+        new_bg = str_toul(kterm_argv[2], 16);
         if (new_fg > 0xFFFFFFFF || new_fg < 0 ||
             new_bg > 0xFFFFFFFF || new_bg < 0)
             kterm_putf("\nInvalid colors.");
@@ -199,7 +199,7 @@ void kcmd_help()
     kterm_putf("\nList of currently available commands:");
     kterm_putf("\n cd [path] - changes current directory");
     kterm_putf("\n clear - clears the screen");
-    kterm_putf("\n color [fg] [bg] - set terminal colors in base10 of hex code, no values to reset");
+    kterm_putf("\n color [fg] [bg] - set terminal colors to given hex codes, no values to reset");
     kterm_putf("\n compare [num1] [num2] - compares two numbers and prints out the largest");
     kterm_putf("\n crash - crashes the AQUA kernel");
     kterm_putf("\n dir - prints files and folders of cwd");

@@ -228,3 +228,37 @@ int64_t str_atoi(const char *s)
     }
     return res * sign;
 }
+
+uint64_t str_toul(const char *str, int base)
+{
+    if (base < 2 || base > 36)
+        return 0;
+
+    unsigned char c = str[0];
+    int len = str_len(str);
+
+    long value = 0;
+    int i = 0;
+
+    if (base == 16 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+        i++;
+
+    for (; i < len; i++, c = (unsigned char)str[i]) {
+        if (c >= '0' && c <= '9')
+            c -= '0';
+        else if (c >= 'A' && c <= 'Z')
+            c -= ('A' - 10);
+        else if (c >= 'a' && c <= 'z')
+            c -= ('a' - 10);
+        else
+            break;
+
+        if (c > base)
+            break;
+
+        value *= base;
+        value += c;
+    }
+
+    return value;
+}
