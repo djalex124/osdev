@@ -209,12 +209,20 @@ void kfs_init()
         {
             kfs_drive *drive = kfs_drives[i];
             int working = 0;
-            if (drive->drive_type == KFS_PATA)
+            switch (drive->drive_type)
             {
-                working = kfs_patatest((kfs_patadrive *)drive->drive_data);
-                if (working > 0)
-                    kfs_detectfat(drive);
+                case KFS_PATA:
+                    working = kfs_pata_mbrtest((kfs_patadrive *)drive->drive_data);
+                    break;
+                case KFS_SATA:
+                    working = kfs_sata_mbrtest((kfs_satadrive *)drive->drive_data);
+                    break;
+                default:
+                    break;
             }
+
+            if (working > 0)
+                kfs_detectfat(drive);
         }
     }
 }

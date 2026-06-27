@@ -369,7 +369,7 @@ int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read
     return 0;
 }
 
-int kfs_patatest(kfs_patadrive *drive)
+int kfs_pata_mbrtest(kfs_patadrive *drive)
 {
 #ifdef AQUA_DEBUG
     uint64_t size = drive->sectors * drive->sector_size;
@@ -387,14 +387,14 @@ int kfs_patatest(kfs_patadrive *drive)
     {
         kdebug_outf("\nkfs_test: %2x %2x", addr[510], addr[511]);
         if (addr[510] == 0x55 && addr[511] == 0xaa)
-            kdebug_outf("\r\nkfs_test: successfully found MBR signature!");
+            kdebug_outf("\nkfs_test: successfully found MBR signature!");
         else
-            kdebug_outf("\r\nkfs_test: no read error - unknown format");
+            kdebug_outf("\nkfs_test: no read error - unknown format");
 
         result = 1;
     }
     else
-        kdebug_outf("\r\nkfs_test: unable to read");
+        kdebug_outf("\nkfs_test: unable to read");
 
     kmem_free(addr, 1);
 

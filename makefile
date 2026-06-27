@@ -47,7 +47,7 @@ obj/boot/uefiboot.o: src/boot/uefiboot.c
 
 drive/EFI/BOOT/BOOTX64.EFI: obj/boot/uefiboot.o
 	@$(efi_ld) -shared -Bsymbolic -L$(gnu_efi) -T$(gnu_efi)/elf_x86_64_efi.lds $(gnu_efi)/crt0-efi-x86_64.o obj/boot/uefiboot.o -o obj/boot/boot.so -lgnuefi -lefi
-	@$(objcopy) -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym  -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc --target efi-app-x86_64 --subsystem=10 obj/boot/boot.so drive/boot.efi
+	@$(objcopy) -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym  -j .rel -j .rela -j .rel.* -j .rela.* -j .reloc --output-target efi-app-x86_64 --subsystem=10 obj/boot/boot.so drive/boot.efi
 	@mkdir -p drive/EFI/BOOT
 	@mv drive/boot.efi drive/EFI/BOOT/BOOTX64.EFI
 
@@ -68,7 +68,7 @@ debug: build_debug
 
 image_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin
 	@dd if=/dev/zero of=bin/dev.img count=10 bs=1M
-	@mkfs.vfat -F 16 bin/dev.img
+	@mkfs.vfat bin/dev.img
 
 	@mcopy -i bin/dev.img drive/kernel.bin ::/
 	@mcopy -i bin/dev.img drive/startup.nsh ::/
@@ -83,7 +83,7 @@ image_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin
 image_debug: debug_flag += -DAQUA_DEBUG
 image_debug: drive/EFI/BOOT/BOOTX64.EFI drive/dbg_kernel.bin
 	@dd if=/dev/zero of=bin/dev.img count=10 bs=1M
-	@mkfs.vfat -F 16 bin/dev.img
+	@mkfs.vfat bin/dev.img
 
 	@mcopy -i bin/dev.img drive/kernel.bin ::/
 	@mcopy -i bin/dev.img drive/kernel.map ::/

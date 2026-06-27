@@ -111,6 +111,9 @@ void kwrapper_isr(kframe_int *k)
 typedef void (*kdesc_irqfunc)(void);
 kdesc_irqfunc kdesc_irqs[16];
 
+extern uint8_t kacpi_apic_enabled;
+extern void kacpi_apic_eoi();
+
 void kwrapper_irq(kframe_int *k)
 {
     if (kdesc_irqs[k->int_no])
@@ -118,12 +121,15 @@ void kwrapper_irq(kframe_int *k)
         void (*function)() = kdesc_irqs[k->int_no];
         function();
     }
-    else
-        kdebug_outf("\nkdesc: irq %d fired but no handler", k->int_no);
 
-    if (k->int_no >= 8)
-        outb(0xA0, 0x20);
-    outb(0x20, 0x20);
+    if (kacpi_apic_enabled == 0)
+    {
+        if (k->int_no >= 8)
+            outb(0xA0, 0x20);
+        outb(0x20, 0x20);
+    }
+    else
+        kacpi_apic_eoi();
 }
 
 gdt_entry kgdt_table[6];
@@ -221,7 +227,16 @@ void kdesc_setinterruptfunc(uint16_t irq, void* function)
 void kdesc_removeinterruptfunc(uint16_t irq)
 {
     if (irq >= 0 && irq <= 15)
-        kdesc_ints[irq] = 0;
+        kdesc_irqs[irq] = 0;
+}
+
+void kdesc_remapinterruptfunc(uint16_t from, uint16_t to)
+{
+    if ((from >= 0 && from <= 15) && (to >= 0 && to <= 15))
+    {
+        kdesc_irqs[to] = kdesc_irqs[from];
+        kdesc_irqs[from] = 0;
+    }
 }
 
 void kdesc_install()

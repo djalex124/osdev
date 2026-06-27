@@ -285,7 +285,8 @@ void kpci_confirmedfunction(uint16_t section, uint8_t bus, uint8_t device, uint8
     uint8_t base = kpci_getbaseclass(new_device);
     uint8_t sub  = kpci_getsubclass(new_device);
     uint16_t ven = kpci_getvendorid(new_device);
-    kdebug_outf("\r\nkpci_i: PCI(S%xB%xD%x) F%x V%x CLASS %2x:%2x", section, bus, device, func, ven, base, sub);
+    uint32_t ints = kpci_configread(new_device, PCI_OFFSET_HDR0_REGF);
+    kdebug_outf("\r\nkpci_i: PCI(S%xB%xD%x) F%x V%x CLASS %2x:%2x INT %x:%x", section, bus, device, func, ven, base, sub, (ints & 0xFF00) >> 8, ints & 0xFF);
 #endif
 
     k_infotable.kpci_tablesize++;

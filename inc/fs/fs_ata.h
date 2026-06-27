@@ -27,12 +27,13 @@ typedef enum {
 typedef struct {
     uint32_t drive;
     kfs_satatypes type;
-    kpci_device *ahci_controller;
+    void *port;
 } kfs_satadrive;
 
 int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr);
 
-int kfs_patatest(kfs_patadrive *drive);
+int kfs_pata_mbrtest(kfs_patadrive *drive);
+int kfs_sata_mbrtest(kfs_satadrive *drive);
 
 void kfs_patainit(kpci_device *ide_device);
 void kfs_satainit(kpci_device *ide_device);
