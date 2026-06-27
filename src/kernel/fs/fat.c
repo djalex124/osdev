@@ -474,7 +474,12 @@ void kfs_detectfat(kfs_drive *drive)
 {
     uint8_t *mbr = kmem_alloc(2);
 
-    kfs_readsector(drive, 0, 1, 1, mbr);
+    int read = kfs_readsector(drive, 0, 1, 1, mbr);
+    if (read != 0)
+    {
+        kdebug_outf("\nkfs_testfat: unable to read");
+        return;
+    }
 
     size_t entry = 0;
     if (mbr[0x1be] == 0x80)
@@ -527,7 +532,7 @@ void kfs_detectfat(kfs_drive *drive)
         info->startlba = start;
         info->sectorspercluster = esp->sectors_per_cluster;
 
-        fat_partition->fs = 1;
+        fat_partition->fs = KFS_FAT16;
         fat_partition->fs_data = (uint8_t *)info;
         fat_partition->drive = drive;
     }

@@ -14,9 +14,14 @@ typedef struct {
     void *drive_data;
 } kfs_drive;
 
+typedef enum {
+    KFS_NOPART = 0,
+    KFS_FAT16 = 1,
+    KFS_FAT32 = 2,
+} kfs_fstypes;
+
 typedef struct {
-    uint8_t fs;
-    // 1 = fat16
+    kfs_fstypes fs;
     kfs_drive *drive;
     uint8_t *fs_data;
 }__attribute__((packed)) kfs_partition;

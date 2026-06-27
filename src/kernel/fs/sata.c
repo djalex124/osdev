@@ -127,6 +127,18 @@ typedef struct
 uint8_t *kfs_satadmabuffer = 0;
 uint64_t ahci_base = 0;
 
+int kfs_getcmdslot(ahci_hbaport *port)
+{
+    uint32_t slots = port->sata_control | port->ci;
+    for (int i = 0; i < slots; i++)
+    {
+        if ((slots & 1) == 0)
+            return i;
+        slots >>= 1;
+    }
+    return -1;
+}
+
 void kfs_satarebase(ahci_hbaport *port, int portnum)
 {
     port->cmd &= ~0x01;
@@ -167,6 +179,86 @@ void kfs_satarebase(ahci_hbaport *port, int portnum)
     port->cmd |= 0x01;
 }
 
+void kfs_sataident(kfs_satadrive *drive)
+{
+    ahci_hbaport *port = (ahci_hbaport *)drive->port;
+    port->int_status = -1;
+    int ctr = 0;
+    int slot = kfs_getcmdslot(port);
+    if (slot == -1)
+        return;
+    
+    ahci_cmdheader *cmd = (ahci_cmdheader *)(uintptr_t)port->clb;
+    cmd += slot;
+    cmd->cflen = sizeof(ahci_fis_h2d) / sizeof(uint32_t);
+    cmd->rw = 0;
+    cmd->prdtl = 1; 
+
+    ahci_cmdtbl *cmdtbl = (ahci_cmdtbl *)(uintptr_t)cmd->ctba;
+    memset(cmdtbl, 0, sizeof(ahci_cmdtbl) + (cmd->prdtl - 1)*sizeof(ahci_prdt_entry));
+
+    uint8_t *buffer_ptr = (uint8_t *)kfs_satadmabuffer;
+
+    cmdtbl->prdt_entry[0].dba_low = (uint32_t)((uintptr_t)buffer_ptr & 0xFFFFFFFF);
+    cmdtbl->prdt_entry[0].dbc = 511;
+    cmdtbl->prdt_entry[0].i = 1;
+
+    ahci_fis_h2d *cmdfis = (ahci_fis_h2d *)&cmdtbl->cmd_fis;
+    memset(cmdfis, 0, sizeof(ahci_fis_h2d));
+
+    cmdfis->fis_type = 0x27;
+    cmdfis->c = 1;
+    cmdfis->command = (drive->type == AHCI_ATAPI) ? ATA_CMD_IDENT_PACKET : ATA_CMD_IDENT;
+    cmdfis->device = 0;
+
+    while ((port->tfd & (ATA_STATUS_BUSY | ATA_STATUS_DRQ)) && ctr < 1000000)
+        ctr++;
+
+    if (ctr == 1000000)
+    {
+        kdebug_outf("\nkfs: sata port is hung!");
+        return;
+    }
+
+    port->ci = 1 << slot;
+
+    while (1)
+    {
+        if ((port->ci & (1 << slot)) == 0)
+            break;
+        if (port->int_status & (1 << 30))
+        {
+            kdebug_outf("\nkfs: sata err!");
+            return;
+        }
+
+        asm("hlt");
+    }
+
+    if (port->int_status & (1 << 30))
+    {
+        kdebug_outf("\nkfs: sata err!");
+        return;
+    }
+
+    uint32_t commandsets = *(uint32_t *)(buffer_ptr + ATA_IDENT_COMMANDSETS);
+
+    if (commandsets & (1 << 26))
+        drive->sectors = *(uint32_t *)(buffer_ptr + ATA_IDENT_MAX_LBA_EXT);
+    else
+        drive->sectors = *(uint32_t *)(buffer_ptr + ATA_IDENT_MAX_LBA);
+
+    drive->sector_size = 512;
+
+    for (int n = 0; n < 40; n += 2)
+    {
+        drive->model[n] = buffer_ptr[ATA_IDENT_MODEL + n + 1];
+        drive->model[n + 1] = buffer_ptr[ATA_IDENT_MODEL + n];
+    }
+    drive->model[40] = 0;
+    str_trim(drive->model);
+}
+
 void kfs_satainit(kpci_device *ahci_device)
 {
     kdebug_outf("\nkfs_i: sata device detected");
@@ -196,6 +288,11 @@ void kfs_satainit(kpci_device *ahci_device)
     ahci_base = (uint64_t)kmem_palloc(76, kmem_paging_1kb);
     kmem_pageentry(ahci_base, ahci_base, 76 * 0x1000,
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
+
+    kfs_satadmabuffer = kmem_palloc(8, kmem_paging_1kb);
+    kmem_pageentry((uint64_t)kfs_satadmabuffer, (uint64_t)kfs_satadmabuffer, 0x8000,
+        kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
+    memset(kfs_satadmabuffer, 0, 0x8000);
 
     for (int i = 0; i < 32; i++)
     {
@@ -244,28 +341,14 @@ void kfs_satainit(kpci_device *ahci_device)
         kfs_satarebase(&hba_registers->ports[i], i);
         kdebug_outf(" CLB%x FB%x", hba_registers->ports[i].clb, hba_registers->ports[i].fb);
 
+        kfs_sataident(drive_info);
+
         kfs_drive *drive = kmem_kalloc(sizeof(kfs_drive));
         drive->drive_data = drive_info;
         drive->drive_type = KFS_SATA;
         
         kfs_adddrive(drive);
     }
-
-    kfs_satadmabuffer = kmem_palloc(8, kmem_paging_1kb);
-    kmem_pageentry((uint64_t)kfs_satadmabuffer, (uint64_t)kfs_satadmabuffer, 0x8000,
-        kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
-}
-
-int kfs_getcmdslot(ahci_hbaport *port)
-{
-    uint32_t slots = port->sata_control | port->ci;
-    for (int i = 0; i < slots; i++)
-    {
-        if ((slots & 1) == 0)
-            return i;
-        slots >>= 1;
-    }
-    return -1;
 }
 
 int kfs_satadma(kfs_satadrive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr)
@@ -286,17 +369,29 @@ int kfs_satadma(kfs_satadrive *drive, size_t lba, size_t sec_count, uint8_t read
     ahci_cmdtbl *cmdtbl = (ahci_cmdtbl *)(uintptr_t)cmd->ctba;
     memset(cmdtbl, 0, sizeof(ahci_cmdtbl) + (cmd->prdtl - 1)*sizeof(ahci_prdt_entry));
 
-    //16 sectors per, just 1 for PoC
+    uint8_t *buffer_ptr = (uint8_t *)kfs_satadmabuffer;
 
-    cmdtbl->prdt_entry[0].dba_low = (uint32_t)((uintptr_t)kfs_satadmabuffer & 0xFFFFFFFF);
-    cmdtbl->prdt_entry[0].dbc = 511;
-    cmdtbl->prdt_entry[0].i = 1;
+    size_t count_loop = sec_count;
+    int i = 0;
+    for (; i < cmd->prdtl - 1; i++)
+    {
+        cmdtbl->prdt_entry[i].dba_low = (uint32_t)((uintptr_t)buffer_ptr & 0xFFFFFFFF);
+        cmdtbl->prdt_entry[i].dbc = 8191;
+        cmdtbl->prdt_entry[i].i = 1;
+        buffer_ptr = (uint8_t *)((uintptr_t)buffer_ptr + 8192);
+        count_loop -= 16;
+    }
+
+    cmdtbl->prdt_entry[i].dba_low = (uint32_t)((uintptr_t)buffer_ptr & 0xFFFFFFFF);
+    cmdtbl->prdt_entry[i].dbc = (count_loop << 9) - 1;
+    cmdtbl->prdt_entry[i].i = 1;
 
     ahci_fis_h2d *cmdfis = (ahci_fis_h2d *)&cmdtbl->cmd_fis;
+    memset(cmdfis, 0, sizeof(ahci_fis_h2d));
 
     cmdfis->fis_type = 0x27;
     cmdfis->c = 1;
-    cmdfis->command = 0x25;
+    cmdfis->command = ATA_CMD_READ_DMA_EXT;
 
     cmdfis->lba0 = lba & 0xFF;
     cmdfis->lba1 = (lba >> 8) & 0xFF;
@@ -310,7 +405,7 @@ int kfs_satadma(kfs_satadrive *drive, size_t lba, size_t sec_count, uint8_t read
     cmdfis->count_low = sec_count & 0xFF;
     cmdfis->count_high = (sec_count >> 8) & 0xFF;
 
-    while ((port->tfd & (0x80 | 0x08)) && ctr < 1000000)
+    while ((port->tfd & (ATA_STATUS_BUSY | ATA_STATUS_DRQ)) && ctr < 1000000)
         ctr++;
 
     if (ctr == 1000000)
@@ -340,37 +435,7 @@ int kfs_satadma(kfs_satadrive *drive, size_t lba, size_t sec_count, uint8_t read
         return -1;
     }
 
-    memcpy(addr, kfs_satadmabuffer, 512);
+    memcpy(addr, kfs_satadmabuffer, drive->sector_size * sec_count);
 
     return 0;
-}
-
-int kfs_sata_mbrtest(kfs_satadrive *drive)
-{
-    uint8_t *addr = kmem_alloc(1);
-    int result = kfs_satadma(drive, 0, 1, 1, addr);
-
-    if (result != -1)
-    {
-        kdebug_outf("\nkfs_test: satadma output");
-        for (int i = 0; i < 512; i += 32)
-        {
-            kdebug_outf("\n");
-            for (int j = 0; j < 32; j++)
-                kdebug_outf("%x", addr[i + j]);
-        }
-        
-        if (addr[510] == 0x55 && addr[511] == 0xaa)
-            kdebug_outf("\nkfs_test: successfully found MBR signature!");
-        else
-            kdebug_outf("\nkfs_test: no read error - unknown format");
-
-        result = 1;
-    }
-    else
-        kdebug_outf("\nkfs_test: unable to read");
-
-    kmem_free(addr, 1);
-
-    return -1;
 }

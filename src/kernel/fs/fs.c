@@ -44,10 +44,17 @@ void kfs_printdir(kfs_partition *partition, char *absolutepath)
 
 void kfs_printpartition(kfs_partition *part)
 {
-    if (part->drive->drive_type == 1)
+    switch (part->fs)
     {
-        kfs_patadrive *drive = (kfs_patadrive *)part->drive->drive_data;
-        kterm_putf(" PATA drive%d c%d label [%s]", drive->drive, drive->channel, drive->model);
+        case KFS_FAT16:
+            kterm_putf(" FAT16");
+            break;
+        case KFS_FAT32:
+            kterm_putf(" FAT32");
+            break;
+        default:
+            kterm_putf(" Unknown FS");
+            break;
     }
 }
 
@@ -64,8 +71,15 @@ void kfs_printinfo()
             if (drive->drive_type == KFS_PATA)
             {
                 kfs_patadrive *patadrive = (kfs_patadrive *)drive->drive_data;
+                kterm_putf("\n %2d - PATA device (Port %d) ", i, patadrive->drive);
+                if (patadrive->type == 1)
+                    kterm_putf("ATAPI");
+                else
+                    kterm_putf("ATA");
+
+                kterm_putf(" [%s]", patadrive->model);
+
                 uint64_t size = patadrive->sectors * patadrive->sector_size;
-                kterm_putf("\n %2d - PATA device [%s]", i, patadrive->model);
                 kterm_putf("\n    - %d MB", size / 1024 / 1024);
             }
             else if (drive->drive_type == KFS_SATA)
@@ -78,6 +92,11 @@ void kfs_printinfo()
                     kterm_putf("ATAPI");
                 else
                     kterm_putf("Other(%d)", satadrive->type);
+
+                kterm_putf(" [%s]", satadrive->model);
+
+                uint64_t size = satadrive->sectors * satadrive->sector_size;
+                kterm_putf("\n    - %d MB", size / 1024 / 1024);
             }
             else
                 kterm_putf("\n %d - Drive detected, unknown", i);
@@ -91,38 +110,51 @@ void kfs_printinfo()
 
 int kfs_readsector(kfs_drive *drive, size_t lba, size_t sec_count, uint8_t read, void *addr)
 {
-    int result = 0;
+    int result = -1;
     if (drive->drive_type == KFS_PATA)
         result = kfs_patadma((kfs_patadrive *)drive->drive_data, lba, sec_count, read, addr);
     else if (drive->drive_type == KFS_SATA)
-        kdebug_outf("\nkfs_readsector: sata not impl yet");
+        result = kfs_satadma((kfs_satadrive *)drive->drive_data, lba, sec_count, read, addr);
     return result;
 }
 
 int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, void *addr)
 {
     int result = 0;
-    if (partition->drive->drive_type == KFS_PATA)
+    size_t sector_size = 0;
+    
+    switch (partition->drive->drive_type)
     {
-        size_t sector_size = ((kfs_patadrive *)partition->drive->drive_data)->sector_size;
-        size_t sectors = (length + sector_size - 1) / sector_size;
-        kterm_putf("\n%d sectors", sectors);
-        size_t sector;
-        for (sector = 0; sectors - sector > 64; sector += 64)
-        {
-            result = kfs_readsector(partition->drive, lba + sector, 64, read, addr + (sector_size * sector));
-
-            if (result != 0)
-                return result;
-        }
-        if (sectors - sector)
-        {
-            result = kfs_readsector(partition->drive, lba + sector, sectors - sector, read, addr + (sector_size * sector));
-
-            if (result != 0)
-                return result;
-        }
+        case KFS_PATA:
+            sector_size = ((kfs_patadrive *)partition->drive->drive_data)->sector_size;
+            break;
+        case KFS_SATA:
+            sector_size = ((kfs_satadrive *)partition->drive->drive_data)->sector_size;
+            break;
+        default:
+            kdebug_outf("\nkfs: read unknown drive %d", partition->drive->drive_type);
+            return -1;
     }
+
+    size_t sectors = (length + sector_size - 1) / sector_size;
+
+    kterm_putf("\n%d sectors", sectors);
+    size_t sector;
+    for (sector = 0; sectors - sector > 64; sector += 64)
+    {
+        result = kfs_readsector(partition->drive, lba + sector, 64, read, addr + (sector_size * sector));
+
+        if (result != 0)
+            return result;
+    }
+    if (sectors - sector)
+    {
+        result = kfs_readsector(partition->drive, lba + sector, sectors - sector, read, addr + (sector_size * sector));
+
+        if (result != 0)
+            return result;
+    }
+
     return result;
 }
 
@@ -191,6 +223,28 @@ void kfs_removedrive(kfs_drive *drive)
         kdebug_outf("\nkfs: attempting to remove unmapped drive!");
 }
 
+int kfs_mbrtest(kfs_drive *drive)
+{
+    uint8_t *addr = kmem_alloc(1);
+    int result = kfs_readsector(drive, 0, 1, 1, addr);
+
+    if (result != -1)
+    {
+        if (addr[510] == 0x55 && addr[511] == 0xaa)
+            kdebug_outf("\nkfs_test: successfully found MBR signature!");
+        else
+            kdebug_outf("\nkfs_test: no read error - unknown format");
+
+        result = 1;
+    }
+    else
+        kdebug_outf("\nkfs_test: unable to read");
+
+    kmem_free(addr, 1);
+
+    return result;
+}
+
 void kfs_init()
 {
     size_t i = 0;
@@ -208,20 +262,9 @@ void kfs_init()
         if (kfs_drives[i])
         {
             kfs_drive *drive = kfs_drives[i];
-            int working = 0;
-            switch (drive->drive_type)
-            {
-                case KFS_PATA:
-                    working = kfs_pata_mbrtest((kfs_patadrive *)drive->drive_data);
-                    break;
-                case KFS_SATA:
-                    working = kfs_sata_mbrtest((kfs_satadrive *)drive->drive_data);
-                    break;
-                default:
-                    break;
-            }
+            int mbr = kfs_mbrtest(drive);
 
-            if (working > 0)
+            if (mbr != -1)
                 kfs_detectfat(drive);
         }
     }

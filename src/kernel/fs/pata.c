@@ -13,25 +13,6 @@
 #include <fs/fs_ata.h>
 #include <fs/fs.h>
 
-#define PATA_PRIMARY   0
-#define PATA_SECONDARY 1
-
-#define PATA_BASE_PRIMARY   0x1F0
-#define PATA_CTRL_PRIMARY   0x3F6
-#define PATA_BASE_SECONDARY 0x170
-#define PATA_CTRL_SECONDARY 0x376
-
-#define PATA_STATUS_BUSY  0x80
-#define PATA_STATUS_DRQ   0x08
-#define PATA_STATUS_ERROR 0x1
-
-#define PATA_IDENT_SIGNATURE    0
-#define PATA_IDENT_MODEL        54
-#define PATA_IDENT_CAPABILITIES 98
-#define PATA_IDENT_MAX_LBA      120
-#define PATA_IDENT_COMMANDSETS  164
-#define PATA_IDENT_MAX_LBA_EXT  200
-
 #define PATA_REG_DATA     0
 #define PATA_REG_ERROR    1
 #define PATA_REG_FEATURES 1
@@ -154,29 +135,29 @@ void kfs_patainit(kpci_device *ide_device)
 
     uint32_t bar4 = kpci_configread(ide_device, PCI_OFFSET_HDR0_BAR4);
 
-    kfs_channel[PATA_PRIMARY].base = PATA_BASE_PRIMARY;
-    kfs_channel[PATA_SECONDARY].base = PATA_BASE_SECONDARY;
-    kfs_channel[PATA_PRIMARY].ctrl = PATA_CTRL_PRIMARY;
-    kfs_channel[PATA_SECONDARY].ctrl = PATA_CTRL_SECONDARY;
-    kfs_channel[PATA_PRIMARY].bmide = bar4 & 0xFFFFFFFC;
-    kfs_channel[PATA_SECONDARY].bmide = (bar4 & 0xFFFFFFFC) + 8;
+    kfs_channel[ATA_PRIMARY].base = ATA_BASE_PRIMARY;
+    kfs_channel[ATA_SECONDARY].base = ATA_BASE_SECONDARY;
+    kfs_channel[ATA_PRIMARY].ctrl = ATA_CTRL_PRIMARY;
+    kfs_channel[ATA_SECONDARY].ctrl = ATA_CTRL_SECONDARY;
+    kfs_channel[ATA_PRIMARY].bmide = bar4 & 0xFFFFFFFC;
+    kfs_channel[ATA_SECONDARY].bmide = (bar4 & 0xFFFFFFFC) + 8;
 
-    outb(kfs_channel[PATA_PRIMARY].ctrl, 4);
-    outb(kfs_channel[PATA_SECONDARY].ctrl, 4);
+    outb(kfs_channel[ATA_PRIMARY].ctrl, 4);
+    outb(kfs_channel[ATA_SECONDARY].ctrl, 4);
     ksleep(1);
 
-    outb(kfs_channel[PATA_PRIMARY].ctrl, 0);
-    outb(kfs_channel[PATA_SECONDARY].ctrl, 0);
+    outb(kfs_channel[ATA_PRIMARY].ctrl, 0);
+    outb(kfs_channel[ATA_SECONDARY].ctrl, 0);
     ksleep(2);
 
-    kfs_pataread(PATA_PRIMARY, PATA_REG_ERROR);
-    kfs_pataread(PATA_SECONDARY, PATA_REG_ERROR);
+    kfs_pataread(ATA_PRIMARY, PATA_REG_ERROR);
+    kfs_pataread(ATA_SECONDARY, PATA_REG_ERROR);
 
-    kfs_patawrite(PATA_PRIMARY, PATA_REG_CONTROL, 2);
-    kfs_patawrite(PATA_PRIMARY, PATA_REG_CONTROL, 2);
+    kfs_patawrite(ATA_PRIMARY, PATA_REG_CONTROL, 2);
+    kfs_patawrite(ATA_PRIMARY, PATA_REG_CONTROL, 2);
     ksleep(5);
 
-    uint8_t packet, status, error = 0, count = 0;
+    uint8_t packet = 0, status = 0, error = 0, count = 0;
 
     for (int i = 0; i < 2; i++)
     {
@@ -192,7 +173,7 @@ void kfs_patainit(kpci_device *ide_device)
             kfs_patawrite(i, PATA_REG_LBA1, 0);
             kfs_patawrite(i, PATA_REG_LBA2, 0);
 
-            kfs_patawrite(i, PATA_REG_COMMAND, 0xEC);
+            kfs_patawrite(i, PATA_REG_COMMAND, ATA_CMD_IDENT);
             ksleep(1);
 
             if (kfs_pataread(i, PATA_REG_STATUS) == 0)
@@ -201,12 +182,12 @@ void kfs_patainit(kpci_device *ide_device)
             while (1)
             {
                 status = kfs_pataread(i, PATA_REG_STATUS);
-                if (status & PATA_STATUS_ERROR)
+                if (status & ATA_STATUS_ERROR)
                 {
                     error = 1;
                     break;
                 }
-                if (!(status & PATA_STATUS_BUSY) && (status & PATA_STATUS_DRQ))
+                if (!(status & ATA_STATUS_BUSY) && (status & ATA_STATUS_DRQ))
                     break;
             }
 
@@ -223,7 +204,7 @@ void kfs_patainit(kpci_device *ide_device)
                 else
                     continue;
                 
-                kfs_patawrite(i, PATA_REG_COMMAND, 0xA1);
+                kfs_patawrite(i, PATA_REG_COMMAND, ATA_CMD_IDENT_PACKET);
                 ksleep(1);
             }
 
@@ -238,26 +219,26 @@ void kfs_patainit(kpci_device *ide_device)
             kfs_patadrives[count].type = packet;
             kfs_patadrives[count].channel = i;
             kfs_patadrives[count].drive = j;
-            kfs_patadrives[count].signature = *(uint16_t *)(read_buffer + PATA_IDENT_SIGNATURE);
-            kfs_patadrives[count].capabilities = *(uint16_t *)(read_buffer + PATA_IDENT_CAPABILITIES);
+            kfs_patadrives[count].signature = *(uint16_t *)(read_buffer + ATA_IDENT_SIGNATURE);
+            kfs_patadrives[count].capabilities = *(uint16_t *)(read_buffer + ATA_IDENT_CAPABILITIES);
             kfs_patadrives[count].mdma = *(uint16_t *)(read_buffer + 126);
             kfs_patadrives[count].udma = *(uint16_t *)(read_buffer + 176);
-            kfs_patadrives[count].commandsets = *(uint32_t *)(read_buffer + PATA_IDENT_COMMANDSETS);
+            kfs_patadrives[count].commandsets = *(uint32_t *)(read_buffer + ATA_IDENT_COMMANDSETS);
 
             if (kfs_patadrives[count].commandsets & (1 << 26))
-                kfs_patadrives[count].sectors = *(uint32_t *)(read_buffer + PATA_IDENT_MAX_LBA_EXT);
+                kfs_patadrives[count].sectors = *(uint32_t *)(read_buffer + ATA_IDENT_MAX_LBA_EXT);
             else
-                kfs_patadrives[count].sectors = *(uint32_t *)(read_buffer + PATA_IDENT_MAX_LBA);
+                kfs_patadrives[count].sectors = *(uint32_t *)(read_buffer + ATA_IDENT_MAX_LBA);
 
             for (int n = 0; n < 40; n += 2)
             {
-                kfs_patadrives[count].model[n] = read_buffer[PATA_IDENT_MODEL + n + 1];
-                kfs_patadrives[count].model[n + 1] = read_buffer[PATA_IDENT_MODEL + n];
+                kfs_patadrives[count].model[n] = read_buffer[ATA_IDENT_MODEL + n + 1];
+                kfs_patadrives[count].model[n + 1] = read_buffer[ATA_IDENT_MODEL + n];
             }
             kfs_patadrives[count].model[40] = 0;
             str_trim(kfs_patadrives[count].model);
 
-            kfs_patawrite(i, PATA_REG_COMMAND, 0xEC);
+            kfs_patawrite(i, PATA_REG_COMMAND, ATA_CMD_IDENT);
             ksleep(1);
 
             for (int n = 0; n < 128; n++)
@@ -320,7 +301,7 @@ int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read
     //send prdt phys addr to bm prdt reg
     outl(kfs_channel[drive->channel].bmide + 4, (uint32_t)((uintptr_t)kfs_prdt) & 0xFFFFFFFF);
 
-    while (kfs_pataread(drive->channel, PATA_REG_STATUS) & PATA_STATUS_BUSY);
+    while (kfs_pataread(drive->channel, PATA_REG_STATUS) & ATA_STATUS_BUSY);
 
     //select drive
     kfs_patawrite(drive->channel, PATA_REG_HDDEVSEL, 0xE0 | (drive->drive << 4));
@@ -337,7 +318,7 @@ int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read
     kfs_patawrite(drive->channel, PATA_REG_LBA1, (lba >> 8) & 0xFF);
     kfs_patawrite(drive->channel, PATA_REG_LBA2, (lba >> 16) & 0xFF);
 
-    while (kfs_pataread(drive->channel, PATA_REG_STATUS) & PATA_STATUS_BUSY);
+    while (kfs_pataread(drive->channel, PATA_REG_STATUS) & ATA_STATUS_BUSY);
     
     //send dma transfer command to ata controller
     kfs_patawrite(drive->channel, PATA_REG_COMMAND, read ? 0x25 : 0x35);
@@ -367,36 +348,4 @@ int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read
     memcpy(addr, kfs_patadmabuffer, drive->sector_size * sec_count);
 
     return 0;
-}
-
-int kfs_pata_mbrtest(kfs_patadrive *drive)
-{
-#ifdef AQUA_DEBUG
-    uint64_t size = drive->sectors * drive->sector_size;
-    kdebug_outf("\r\nkfs_test: pata device %d channel %d named '%s' size %d mb", drive->drive, 
-        drive->channel, drive->model, size / 1024 / 1024);
-#endif
-	
-    kdebug_outf("\r\nkfs_test: bus master register %x sector size %d",
-        kfs_channel[drive->channel].bmide, drive->sector_size);
-    
-    uint8_t *addr = kmem_alloc(1);
-    int result = kfs_patadma(drive, 0, 1, 1, addr);
-
-    if (result != -1)
-    {
-        kdebug_outf("\nkfs_test: %2x %2x", addr[510], addr[511]);
-        if (addr[510] == 0x55 && addr[511] == 0xaa)
-            kdebug_outf("\nkfs_test: successfully found MBR signature!");
-        else
-            kdebug_outf("\nkfs_test: no read error - unknown format");
-
-        result = 1;
-    }
-    else
-        kdebug_outf("\nkfs_test: unable to read");
-
-    kmem_free(addr, 1);
-
-    return result;
 }
