@@ -435,7 +435,7 @@ int kfs_satadma(kfs_satadrive *drive, size_t lba, size_t sec_count, uint8_t read
         return -1;
     }
 
-    memcpy(addr, kfs_satadmabuffer, drive->sector_size * sec_count);
+    memcpy_ssealign(addr, kfs_satadmabuffer, drive->sector_size * sec_count);
 
     return 0;
 }

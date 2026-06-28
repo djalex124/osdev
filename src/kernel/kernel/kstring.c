@@ -1,3 +1,4 @@
+#include <x86intrin.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -23,16 +24,14 @@ void* memcpy_ssealign(void* restrict dstptr, const void* restrict srcptr, size_t
     size_t count = (size/64);
     for (size_t i = 0; i < count; i++)
     {
-        __asm__ __volatile__ (
-            "movups (%0), %%xmm0\n"
-            "movups 16(%0), %%xmm1\n"
-            "movups 32(%0), %%xmm2\n"
-            "movups 48(%0), %%xmm3\n"
-            "movntdq %%xmm0, (%1)\n"
-            "movntdq %%xmm1, 16(%1)\n"
-            "movntdq %%xmm2, 32(%1)\n"
-            "movntdq %%xmm3, 48(%1)\n"
-            :: "r"(from), "r"(to) : "memory");
+        __m128 a = _mm_load_ps((float *)from);
+        __m128 b = _mm_load_ps((float *)(from + 16));
+        __m128 c = _mm_load_ps((float *)(from + 32));
+        __m128 d = _mm_load_ps((float *)(from + 48));
+        _mm_stream_ps((float *)to, a);
+        _mm_stream_ps((float *)(to + 16), b);
+        _mm_stream_ps((float *)(to + 32), c);
+        _mm_stream_ps((float *)(to + 48), d);
 
         from += 64;
         to += 64;
@@ -60,10 +59,20 @@ char* str_trim(char* s)
 
 size_t str_len(const char* s)
 {
-    size_t len = 0;
-    while (s[len])
-        len++;
-    return len;
+    const char* ptr = s;
+    __m128i zero = _mm_setzero_si128();
+
+    while (1)
+    {
+        __m128i chars = _mm_loadu_si128((const __m128i *)ptr);
+        __m128i cmp = _mm_cmpeq_epi8(chars, zero);
+        int mask = _mm_movemask_epi8(cmp);
+
+        if (mask != 0)
+            return (ptr - s) + __builtin_ctz(mask);
+
+        ptr += 16;
+    }
 }
 
 int strn_cmp(const char* a, const char* b, size_t n)

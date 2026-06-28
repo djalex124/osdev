@@ -345,7 +345,7 @@ int kfs_patadma(kfs_patadrive *drive, size_t lba, size_t sec_count, uint8_t read
         return -1;
     }
 
-    memcpy(addr, kfs_patadmabuffer, drive->sector_size * sec_count);
+    memcpy_ssealign(addr, kfs_patadmabuffer, drive->sector_size * sec_count);
 
     return 0;
 }
