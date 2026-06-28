@@ -150,7 +150,4 @@ typedef struct
     uint8_t enteries[];
 }__attribute__((packed)) acpi_madt;
 
-void kacpi_processapic(acpi_madt *madt);
-void kacpi_processdsdt(acpi_dsdt *dsdt);
-
 void kacpi_shutdown();
