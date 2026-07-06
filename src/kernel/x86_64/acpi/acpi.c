@@ -1,4 +1,6 @@
 #include <x86_64/acpi/acpi.h>
+#include <x86_64/acpi/apic.h>
+#include <x86_64/acpi/aml.h>
 
 #include <x86_64/port.h>
 
@@ -40,6 +42,15 @@ void kacpi_processtable(acpi_sdt_header *h)
             kacpi_fail(__LINE__);
 
         kacpi_processapic(madt);
+    }
+    else if (strn_cmp("FACP", header->signature, 4) == 0)
+    {
+        acpi_fadt *fadt = (acpi_fadt *)header;
+
+        if (kacpi_sdtchecksum((acpi_sdt_header *)header) != 0)
+            kacpi_fail(__LINE__);
+
+        kacpi_processdsdt(fadt->dsdt);
     }
     else if (strn_cmp("MCFG", header->signature, 4) == 0)
     {
@@ -110,5 +121,6 @@ void kacpi_init()
 
 void kacpi_shutdown()
 {
+    //get SLP_TYPa from AML \_S5 object
     kterm_putf("\nacpi not yet implemented!");
 }

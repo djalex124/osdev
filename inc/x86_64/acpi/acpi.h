@@ -112,7 +112,7 @@ typedef struct
     acpi_gas x_pm_timer_block;
     acpi_gas x_gpe0_block;
     acpi_gas x_gpe1_block;
-}acpi_fadt;
+}__attribute__((packed)) acpi_fadt;
 
 typedef struct
 {
