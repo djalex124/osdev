@@ -13,6 +13,8 @@
 
 char kacpi_crashmessage[35];
 
+acpi_fadt *fadt_ptr = 0;
+
 void kacpi_fail(int line)
 {
     memcpy(kacpi_crashmessage, "Failed to read ACPI tables! L:", 30);
@@ -50,6 +52,7 @@ void kacpi_processtable(acpi_sdt_header *h)
         if (kacpi_sdtchecksum((acpi_sdt_header *)header) != 0)
             kacpi_fail(__LINE__);
 
+        fadt_ptr = fadt;
         kacpi_processdsdt(fadt->dsdt);
     }
     else if (strn_cmp("MCFG", header->signature, 4) == 0)
@@ -121,6 +124,45 @@ void kacpi_init()
 
 void kacpi_shutdown()
 {
-    //get SLP_TYPa from AML \_S5 object
-    kterm_putf("\nacpi not yet implemented!");
+    //get SLP_TYPx from AML \_S5 object
+    aml_method *tts = (aml_method *)kacpi_aml_findtreename(kacpi_aml_root, "_TTS");
+    aml_method *pts = (aml_method *)kacpi_aml_findtreename(kacpi_aml_root, "_PTS");
+    aml_name *s5 = (aml_name *)kacpi_aml_findtreename(kacpi_aml_root, "_S5_");
+
+    if (s5 == NULL)
+        kcrash("acpi not yet implemented!");
+
+    if (pts == NULL)
+        kdebug_outf("\nkacpi: no pts found?");
+
+    aml_termlist *sleep_args = kmem_kalloc(sizeof(aml_termlist));
+    aml_termarg *sleep_arg = kmem_kalloc(sizeof(aml_termarg));
+    sleep_args->term_obj = sleep_arg;
+    sleep_arg->op_code[0] = AML_OP_BYTECONST;
+    ((aml_byteconst *)sleep_arg)->byteconst = 5;
+
+    if (tts)
+        kacpi_aml_runmethod(tts, sleep_args);
+
+    if (pts)
+        kacpi_aml_runmethod(pts, sleep_args);
+
+    //SLP_TYPa is stored in first entry
+    aml_packagelist *package_list = ((aml_package *)s5->datarefobj)->packageelementlist;
+    aml_op *package_val = ((aml_packageelement_op *)package_list->element)->value;
+    uint64_t SLP_TYPa = 0;
+    kacpi_aml_intfromop(package_val, &SLP_TYPa);
+    
+    //SLP_TYPb is stored in second entry
+    package_list = package_list->next;
+    package_val = ((aml_packageelement_op *)package_list->element)->value;
+    uint64_t SLP_TYPb = 0;
+    kacpi_aml_intfromop(package_val, &SLP_TYPb);
+
+    //SLP_EN == 1 << 13
+    kdebug_outf("\nkacpi: sending shutdown signal");
+    kdebug_outf("\nkacpi: [%x] [%x]", fadt_ptr->pm1a_control_block, fadt_ptr->pm1b_control_block);
+    outw(((uint16_t)fadt_ptr->pm1a_control_block), SLP_TYPa | (1 << 13));
+    if (fadt_ptr->pm1b_control_block)
+        outw(((uint16_t)fadt_ptr->pm1b_control_block), SLP_TYPb | (1 << 13));
 }

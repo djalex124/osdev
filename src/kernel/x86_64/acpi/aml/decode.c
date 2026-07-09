@@ -12,31 +12,38 @@ char *nullstring = "\0";
 
 aml_op *kacpi_aml_processop();
 
-uint64_t kacpi_aml_intfromop(aml_op *op)
+int kacpi_aml_intfromop(aml_op *op, uint64_t *value)
 {
     switch (op->op_code[0])
     {
         case AML_OP_ZERO:
-            return 0;
+            *value = 0;
+            return 1;
         case AML_OP_ONE:
+            *value = 1;
             return 1;
         case AML_OP_ONES:
+            *value = 1;
             return 1;
         case AML_OP_BYTECONST:
             aml_byteconst *byteconst = (aml_byteconst *)op;
-            return byteconst->byteconst;
+            *value = byteconst->byteconst;
+            return 1;
         case AML_OP_WORDCONST:
             aml_wordconst *wordconst = (aml_wordconst *)op;
-            return wordconst->wordconst;
+            *value = wordconst->wordconst;
+            return 1;
         case AML_OP_DWORDCONST:
             aml_dwordconst *dwordconst = (aml_dwordconst *)op;
-            return dwordconst->dwordconst;
+            *value = dwordconst->dwordconst;
+            return 1;
         case AML_OP_QWORDCONST:
             aml_qwordconst *qwordconst = (aml_qwordconst *)op;
-            return qwordconst->qwordconst;
+            *value = qwordconst->qwordconst;
+            return 1;
         default:
-            kdebug_outf("\nunable to parse op %x into int", op->op_code[0]);
-            while (1);
+            //kdebug_outf("\nunable to parse op %x into int", op->op_code[0]);
+            return 0;
             break;
     }
 }
@@ -218,14 +225,14 @@ aml_packagelist *kacpi_aml_packagelist(uint64_t length)
             case AML_OPEXT_PREFIX:
             case AML_OP_PACKAGE:
             case AML_OP_VARPACKAGE:
-                packagelist_ptr->element = kmem_kalloc(9);
+                packagelist_ptr->element = kmem_kalloc(sizeof(aml_packageelement_op));
                 packagelist_ptr->element->fieldtype = 0;
-                ((aml_op **)packagelist_ptr->element->fielddata)[0] = kacpi_aml_processop();
+                ((aml_packageelement_op *)packagelist_ptr->element)->value = kacpi_aml_processop();
                 break;
             default:
-                packagelist_ptr->element = kmem_kalloc(9);
+                packagelist_ptr->element = kmem_kalloc(sizeof(aml_packageelement_name));
                 packagelist_ptr->element->fieldtype = 1;
-                ((char **)packagelist_ptr->element->fielddata)[0] = kacpi_aml_namestring();
+                ((aml_packageelement_name *)packagelist_ptr->element)->name = kacpi_aml_namestring();
                 break;
         }
         packagelist_ptr->next = kmem_kalloc(sizeof(aml_packagelist));
@@ -249,17 +256,17 @@ aml_fieldlist *kacpi_aml_fieldlist(uint64_t length)
         switch (*aml)
         {
             case AML_FIELD_RESERVED:
-                fieldlist_ptr->element = kmem_kalloc(9);
+                fieldlist_ptr->element = kmem_kalloc(sizeof(aml_fieldelement_resv));
                 fieldlist_ptr->element->fieldtype = AML_FIELD_RESERVED;
                 aml++;
-                *(uint32_t *)fieldlist_ptr->element->fielddata = kacpi_aml_pkglength();
+                ((aml_fieldelement_resv *)fieldlist_ptr->element)->len = kacpi_aml_pkglength();
                 break;
             case AML_FIELD_ACCESS:
-                fieldlist_ptr->element = kmem_kalloc(3);
+                fieldlist_ptr->element = kmem_kalloc(sizeof(aml_fieldelement_access));
                 fieldlist_ptr->element->fieldtype = AML_FIELD_ACCESS;
                 aml++;
-                fieldlist_ptr->element->fielddata[0] = kacpi_aml_getbyte();
-                fieldlist_ptr->element->fielddata[1] = kacpi_aml_getbyte();
+                ((aml_fieldelement_access *)fieldlist_ptr->element)->data[0] = kacpi_aml_getbyte();
+                ((aml_fieldelement_access *)fieldlist_ptr->element)->data[1] = kacpi_aml_getbyte();
                 break;
             case AML_FIELD_CONNECT:
                 kdebug_outf("\nconnect field not done yet");
@@ -270,10 +277,10 @@ aml_fieldlist *kacpi_aml_fieldlist(uint64_t length)
                 while (1);
                 break;
             default:
-                fieldlist_ptr->element = kmem_kalloc(13);
+                fieldlist_ptr->element = kmem_kalloc(sizeof(aml_fieldelement_default));
                 fieldlist_ptr->element->fieldtype = 4;
-                ((char **)fieldlist_ptr->element->fielddata)[0] = kacpi_aml_namepath();
-                ((uint32_t *)fieldlist_ptr->element->fielddata)[2] = kacpi_aml_pkglength();
+                ((aml_fieldelement_default *)fieldlist_ptr->element)->name = kacpi_aml_namepath();
+                ((aml_fieldelement_default *)fieldlist_ptr->element)->len = kacpi_aml_pkglength();
                 break;
         }
         fieldlist_ptr->next = kmem_kalloc(sizeof(aml_fieldlist));
@@ -285,9 +292,10 @@ aml_fieldlist *kacpi_aml_fieldlist(uint64_t length)
 
 aml_termlist *kacpi_aml_termlist(uint64_t length, char *name)
 {
-    aml_termlist *termlist = kmem_kalloc(sizeof(aml_termlist));
     if (length == 0)
-        return termlist;
+        return NULL;
+
+    aml_termlist *termlist = kmem_kalloc(sizeof(aml_termlist));
 
     uint64_t end_list = length + (uint64_t)aml;
     aml_termlist *termlist_ptr = termlist;
@@ -381,10 +389,15 @@ aml_op *kacpi_aml_processop()
             buffer->op_code[0] = op;
             buffer->pkglength = kacpi_aml_pkglength();
             buffer->buffersize = kacpi_aml_processop();
-            distance = kacpi_aml_intfromop(buffer->buffersize);
-            buffer->bytelist = kmem_kalloc(distance);
-            memcpy(buffer->bytelist, aml, distance);
-            aml += distance;
+            int getint = kacpi_aml_intfromop(buffer->buffersize, &distance);
+            if (getint == 1)
+            {
+                buffer->bytelist = kmem_kalloc(distance);
+                memcpy(buffer->bytelist, aml, distance);
+                aml += distance;
+            }
+            else
+                buffer->bytelist = 0;
             break;
         case AML_OP_PACKAGE:
             aml_package *package = kmem_kalloc(sizeof(aml_package));
@@ -414,8 +427,9 @@ aml_op *kacpi_aml_processop()
             method->pkglength = kacpi_aml_pkglength();
             method->namestring = kacpi_aml_namestring();
             method->methodflags = kacpi_aml_getbyte();
-            aml = (uint8_t *)(distance + method->pkglength);
-            //method->termlist = kacpi_aml_termlist(method->pkglength - distance, method->namestring);
+            method->start = (uint64_t)aml;
+            method->termlength = method->pkglength - ((uint64_t)aml - distance);
+            aml += method->termlength;
             break;
         case AML_OP_EXTERNAL:
             aml_external *external = kmem_kalloc(sizeof(aml_external));
@@ -795,7 +809,9 @@ aml_op *kacpi_aml_processop()
             current_op->op_code[0] = op;
             break;
         case 'A' ... 'Z':
-        case '_':
+        case AML_ROOTCHAR:
+        case AML_PREFIXCHAR:
+        case AML_NAMECHAR:
             aml_methodinvocation *methodinvocation = kmem_kalloc(sizeof(aml_methodinvocation));
             current_op = (aml_op *)methodinvocation;
             methodinvocation->op_code[0] = 0xFE;
@@ -827,9 +843,10 @@ aml_op *kacpi_aml_processop()
                 object = kacpi_aml_findtreename(kacpi_aml_root, methodinvocation->namestring);
 
             if (object == NULL)
-                kdebug_outf("\nobject not found!");
-            else
-                kacpi_aml_printop(object);
+            {
+                //kdebug_outf("\nobject not found! assuming future reference...");
+                break;
+            }
 
             methodinvocation->method = object;
 
@@ -862,6 +879,41 @@ aml_op *kacpi_aml_processop()
     return current_op;
 }
 
+void kacpi_aml_generatemethod(aml_termlist *termlist)
+{
+    aml_termlist *termlist_ptr = termlist;
+
+    while (termlist_ptr)
+    {
+        aml_op *obj = termlist_ptr->term_obj;
+        if (obj == NULL)
+            break;
+
+        if (obj->op_code[0] == AML_OP_METHOD)
+        {
+            aml_method *method = (aml_method *)obj;
+            if (method->termlist == NULL)
+            {
+                parent_termlist = termlist;
+
+                aml = (uint8_t *)method->start;
+                method->termlist = kacpi_aml_termlist(method->termlength, method->namestring);
+            }
+        }
+
+        if (obj->op_code[0] == AML_OP_SCOPE ||
+            obj->op_code[0] == AML_OP_METHOD ||
+            (obj->op_code[0] == AML_OPEXT_PREFIX && obj->op_code[1] == AML_OPEXT_DEVICE))
+        {
+            aml_termlist *list = get_termlist(obj);
+            if ((list != NULL) && (list != termlist))
+                kacpi_aml_generatemethod(list);
+        }
+
+        termlist_ptr = termlist_ptr->next;
+    }
+}
+
 void kacpi_aml_generatetree(uint8_t *aml_ptr, size_t length, aml_termlist *tree)
 {
     aml_termlist *tree_ptr = tree;
@@ -879,4 +931,6 @@ void kacpi_aml_generatetree(uint8_t *aml_ptr, size_t length, aml_termlist *tree)
         tree_ptr->next = kmem_kalloc(sizeof(aml_termlist));
         tree_ptr = tree_ptr->next;
     }
+
+    kacpi_aml_generatemethod(tree);
 }

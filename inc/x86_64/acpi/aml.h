@@ -163,6 +163,37 @@ typedef struct aml_termlist_s
 typedef struct
 {
     uint8_t fieldtype;
+    uint32_t len;
+} aml_fieldelement_resv;
+
+typedef struct
+{
+    uint8_t fieldtype;
+    uint8_t data[2];
+} aml_fieldelement_access;
+
+typedef struct
+{
+    uint8_t fieldtype;
+    char *name;
+    uint32_t len;
+} aml_fieldelement_default;
+
+typedef struct
+{
+    uint8_t fieldtype;
+    aml_op *value;
+} aml_packageelement_op;
+
+typedef struct
+{
+    uint8_t fieldtype;
+    char *name;
+} aml_packageelement_name;
+
+typedef struct
+{
+    uint8_t fieldtype;
     uint8_t fielddata[];
 } aml_fieldelement, aml_packageelement;
 
@@ -233,6 +264,8 @@ typedef struct
     char *namestring;
     uint8_t methodflags;
     aml_termlist *termlist;
+    uint64_t start;
+    uint32_t termlength;
 } aml_method;
 
 typedef struct
@@ -567,12 +600,15 @@ typedef struct
 
 aml_op *kacpi_aml_findtreename(aml_termlist *start, char *fullname);
 char *kacpi_aml_gettreename(aml_termlist *tree);
+void kacpi_aml_runmethod(aml_method *method, aml_termlist *list);
 void kacpi_aml_printdevices();
 
 void kacpi_aml_generatetree(uint8_t *aml_ptr, size_t length, aml_termlist *tree);
 void kacpi_aml_printtermlist(aml_termlist *tl);
-void kacpi_aml_printop(aml_op *op);
+void kacpi_aml_printop(const aml_op *op);
 
 void kacpi_processdsdt(uint64_t dsdt_addr);
+int kacpi_aml_intfromop(aml_op *op, uint64_t *value);
+aml_termlist *get_termlist(aml_op *op);
 
 extern aml_termlist *kacpi_aml_root;

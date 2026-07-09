@@ -24,7 +24,7 @@ aml_op *kacpi_aml_findtreename(aml_termlist *start, char *name)
     aml_termlist *tree_ptr = start;
 
     char *startname = kacpi_aml_gettreename(tree_ptr);
-    kdebug_outf("\nlooking for [%s][%s]", startname, name);
+    //kdebug_outf("\nlooking for [%s][%s]", startname, name);
 
     while (tree_ptr != NULL)
     {
@@ -32,7 +32,7 @@ aml_op *kacpi_aml_findtreename(aml_termlist *start, char *name)
         if (obj == NULL)
             break;
 
-        kdebug_outf("\nobj %x%x", obj->op_code[0], obj->op_code[1]);
+        //kdebug_outf("\nobj %2x%2x", obj->op_code[0], obj->op_code[1]);
 
         char *current_name = 0;
 
@@ -50,13 +50,24 @@ aml_op *kacpi_aml_findtreename(aml_termlist *start, char *name)
                 {
                     if (fieldlist_ptr->element->fieldtype == 4)
                     {
-                        kdebug_outf("\n[%s][%s] vs [%s][%s]", current_name, ((char **)fieldlist_ptr->element->fielddata)[0], startname, name);
-                        if ((str_cmp(current_name, startname) == 0) &&
-                            (str_cmp(((char **)fieldlist_ptr->element->fielddata)[0], name) == 0))
+                        char *fieldname = ((aml_fieldelement_default *)fieldlist_ptr->element)->name;
+                        //kdebug_outf("\n[%s][%s] vs [%s][%s]", current_name, fieldname, startname, name);
+                        if (((str_cmp(current_name, startname) == 0) &&
+                            (str_cmp(fieldname, name) == 0)))
                         {
                             kmem_kfree(current_name);
                             kmem_kfree(startname);
                             return obj;
+                        }
+                        else if (name[0] == AML_ROOTCHAR && (str_len(current_name) + 4) == str_len(name))
+                        {
+                            if ((strn_cmp(current_name, name, str_len(current_name)) == 0) &&
+                                strn_cmp(fieldname, name + str_len(current_name), 4) == 0)
+                            {
+                                kmem_kfree(current_name);
+                                kmem_kfree(startname);
+                                return obj;
+                            }
                         }
                     }
                 }
@@ -75,13 +86,23 @@ aml_op *kacpi_aml_findtreename(aml_termlist *start, char *name)
 
             if (checkname)
             {
-                kdebug_outf("\n[%s][%s] vs [%s][%s]", current_name, checkname, startname, name);
+                //kdebug_outf("\n[%s][%s] vs [%s][%s]", current_name, checkname, startname, name);
                 if ((str_cmp(current_name, startname) == 0) &&
                     (str_cmp(checkname, name) == 0))
                 {
                     kmem_kfree(current_name);
                     kmem_kfree(startname);
                     return obj;
+                }
+                else if (name[0] == AML_ROOTCHAR && (str_len(current_name) + 4) == str_len(name))
+                {
+                    if ((strn_cmp(current_name, name, str_len(current_name)) == 0) &&
+                        strn_cmp(checkname, name + str_len(current_name), 4) == 0)
+                    {
+                        kmem_kfree(current_name);
+                        kmem_kfree(startname);
+                        return obj;
+                    }
                 }
             }
         }
@@ -94,7 +115,7 @@ aml_op *kacpi_aml_findtreename(aml_termlist *start, char *name)
             (obj->op_code[0] == AML_OPEXT_PREFIX && obj->op_code[1] == AML_OPEXT_DEVICE))
         {
             aml_termlist *list = get_termlist(obj);
-            kdebug_outf("\nlist %x treeptr %x", list, tree_ptr);
+            //kdebug_outf("\nlist %x treeptr %x", list, tree_ptr);
             if (list && (list != tree_ptr))
             {
                 aml_op *check = kacpi_aml_findtreename(list, name);
@@ -118,7 +139,7 @@ char *kacpi_aml_gettreename(aml_termlist *tree)
     aml_termlist *tree_ptr = tree;
     char *tree_name = NULL;
 
-    kdebug_outf("\nget name ");
+    //kdebug_outf("\nget name ");
 
     while (tree_ptr)
     {
@@ -129,18 +150,6 @@ char *kacpi_aml_gettreename(aml_termlist *tree)
                 tree_name = kmem_kalloc(str_len(tree_ptr->listname) + 1);
                 memcpy(tree_name, tree_ptr->listname, str_len(tree_ptr->listname));
             }
-            else if (tree_name[0] == AML_PREFIXCHAR)
-            {
-                size_t prefix = 0;
-                while (tree_name[prefix] == AML_PREFIXCHAR)
-                    prefix++;
-
-                char *new = kmem_kalloc(str_len(tree_name) - 4 * prefix + str_len(tree_ptr->listname) - prefix + 1);
-                memcpy(new, tree_name, str_len(tree_name) - 4 * prefix);
-                memcpy(new + str_len(tree_name) - 4 * prefix, tree_ptr->listname + prefix, str_len(tree_ptr->listname) - prefix);
-                kmem_kfree(tree_name);
-                tree_name = new;
-            }
             else
             {
                 char *new = kmem_kalloc(str_len(tree_name) + str_len(tree_ptr->listname) + 1);
@@ -150,17 +159,86 @@ char *kacpi_aml_gettreename(aml_termlist *tree)
                 tree_name = new;
             }
 
-            if (tree_name[0] == AML_ROOTCHAR)
-                break;
+            if (tree_name[0] == AML_PREFIXCHAR)
+            {
+                //kdebug_outf("\nsolving prefix?");
+
+                size_t prefix = 0;
+                while (tree_name[prefix] == AML_PREFIXCHAR)
+                    prefix++;
+
+                char *name = tree_name + prefix;
+
+                while (prefix > 0 && tree_ptr)
+                {
+                    if (tree_ptr->listname)
+                        prefix--;
+                    tree_ptr = tree_ptr->parent;
+                }
+
+                char *prefix_name = kacpi_aml_gettreename(tree_ptr);
+
+                char *new = kmem_kalloc(str_len(prefix_name) + str_len(name) + 1);
+                memcpy(new, prefix_name, str_len(prefix_name));
+                memcpy(new + str_len(prefix_name), name, str_len(name));
+
+                kmem_kfree(tree_name);
+                kmem_kfree(prefix_name);
+
+                return new;
+            }
         }
 
+        if (tree_name[0] == AML_ROOTCHAR)
+            break;
         tree_ptr = tree_ptr->parent;
     }
 
-    if (tree_name != NULL)
-        kdebug_outf("[%s]", tree_name);
+    //if (tree_name != NULL)
+    //    kdebug_outf("[%s]", tree_name);
 
     return tree_name;
+}
+
+void kacpi_aml_runtermlist(aml_op *op)
+{
+    if (op == NULL)
+        return;
+    
+    //kdebug_outf("\n op %x %x", op->op_code[0], op->op_code[1]);
+
+    switch (op->op_code[0])
+    {
+        case 0xFE:
+            aml_methodinvocation *mi = (aml_methodinvocation *)op;
+            if (mi->termlist)
+            {
+                kdebug_outf("METHOD");
+                kacpi_aml_runmethod((aml_method *)mi->method, mi->termlist);
+            }
+            else if (mi->method)
+                kdebug_outf("FIELD");
+            else
+                kdebug_outf("FUTURE OBJ");
+            break;
+        default:
+            kdebug_outf("\nrun unknown op %x", op->op_code[0]);
+            break;
+    }
+}
+
+void kacpi_aml_runmethod(aml_method *method, aml_termlist *list)
+{
+    char *name = kacpi_aml_gettreename(method->termlist);
+    kdebug_outf("\nrun method %s", name);
+    kmem_kfree(name);
+
+    aml_termlist *list_ptr = method->termlist;
+    while (list_ptr)
+    {
+        kacpi_aml_runtermlist(list_ptr->term_obj);
+        list_ptr = list_ptr->next;
+    }
 }
 
 void kacpi_aml_printdevices()

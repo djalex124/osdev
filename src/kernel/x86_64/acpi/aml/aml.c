@@ -6,7 +6,7 @@
 
 #include <mm/mem.h>
 
-void kacpi_aml_printop(aml_op *op);
+void kacpi_aml_printop(const aml_op *op);
 
 size_t indent = 0;
 
@@ -71,13 +71,32 @@ void kacpi_aml_printfield(aml_fieldlist *fieldlist)
         print_indent();
         kdebug_outf("list entry %d", fieldlist_ptr->element->fieldtype);
         if (fieldlist_ptr->element->fieldtype == 4)
-            kdebug_outf(" [%s]", ((char **)fieldlist_ptr->element->fielddata)[0]);
+            kdebug_outf(" [%s]", ((aml_fieldelement_default *)fieldlist_ptr->element)->name);
         fieldlist_ptr = fieldlist_ptr->next;
     }
 }
 
-void kacpi_aml_printop(aml_op *op)
+void kacpi_aml_printpackage(aml_packagelist *packagelist)
 {
+    aml_packagelist *packagelist_ptr = packagelist;
+    while (packagelist_ptr != NULL)
+    {
+        if (packagelist_ptr->element == NULL)
+            break;
+        print_indent();
+        kdebug_outf("element ");
+        if (packagelist_ptr->element->fieldtype == 0)
+            kacpi_aml_printop(((aml_packageelement_op *)packagelist_ptr->element)->value);
+        else if (packagelist_ptr->element->fieldtype == 1)
+            kdebug_outf("[%s]", ((aml_packageelement_name *)packagelist_ptr->element)->name);
+        packagelist_ptr = packagelist_ptr->next;
+    }
+}
+
+void kacpi_aml_printop(const aml_op *op)
+{
+    if (op == NULL)
+        return;
     indent++;
     switch (op->op_code[0])
     {
@@ -122,12 +141,6 @@ void kacpi_aml_printop(aml_op *op)
             aml_qwordconst *qwordconst = (aml_qwordconst *)op;
             kdebug_outf("0x%x", qwordconst->qwordconst);
             break;
-        case AML_OP_METHOD:
-            aml_method *method = (aml_method *)op;
-            print_indent();
-            kdebug_outf("method [%s] flags[%x]", method->namestring, method->methodflags);
-            kacpi_aml_printtermlist(method->termlist);
-            break;
         case AML_OP_SCOPE:
             aml_scope *scope = (aml_scope *)op;
             print_indent();
@@ -139,6 +152,17 @@ void kacpi_aml_printop(aml_op *op)
             kdebug_outf("buffer sz[");
             kacpi_aml_printop(buffer->buffersize);
             kdebug_outf("]");
+            break;
+        case AML_OP_PACKAGE:
+            aml_package *package = (aml_package *)op;
+            kdebug_outf("package elements[0x%x]", package->numelements);
+            kacpi_aml_printpackage(package->packageelementlist);
+            break;
+        case AML_OP_METHOD:
+            aml_method *method = (aml_method *)op;
+            print_indent();
+            kdebug_outf("method [%s] flags[%x]", method->namestring, method->methodflags);
+            kacpi_aml_printtermlist(method->termlist);
             break;
         case AML_OP_STORE:
             aml_store *store = (aml_store *)op;
@@ -226,6 +250,27 @@ void kacpi_aml_printop(aml_op *op)
             kacpi_aml_printtarget(amlsizeof->supername);
             kdebug_outf("]");
             break;
+        case AML_OP_CREATEDWF ... AML_OP_CREATEBIF:
+        case AML_OP_CREATEQWF:
+            aml_createdwordfield *cdwf = (aml_createdwordfield *)op;
+            print_indent();
+            kdebug_outf("create ");
+            if (op->op_code[0] == AML_OP_CREATEDWF)
+                kdebug_outf("dword field");
+            else if (op->op_code[0] == AML_OP_CREATEWF)
+                kdebug_outf("word field");
+            else if (op->op_code[0] == AML_OP_CREATEBYF)
+                kdebug_outf("byte field");
+            else if (op->op_code[0] == AML_OP_CREATEBIF)
+                kdebug_outf("bit field");
+            else
+                kdebug_outf("qword field");
+            kdebug_outf(" source[");
+            kacpi_aml_printop(cdwf->sourcebuff);
+            kdebug_outf("] index[");
+            kacpi_aml_printop(cdwf->index);
+            kdebug_outf("] name[%s]", cdwf->namestring);
+            break;
         case AML_OP_LAND ... AML_OP_LOR:
         case AML_OP_LEQUAL ... AML_OP_LLESS:
             aml_land *land = (aml_land *)op;
@@ -311,6 +356,15 @@ void kacpi_aml_printop(aml_op *op)
                     print_indent();
                     kdebug_outf("mutex [%s] sync[%x]", mutex->namestring, mutex->syncflags);
                     break;
+                case AML_OPEXT_CONDREFOF:
+                    aml_condrefof *condrefof = (aml_condrefof *)op;
+                    print_indent();
+                    kdebug_outf("condrefof [");
+                    kacpi_aml_printtarget(condrefof->supername);
+                    kdebug_outf("] [");
+                    kacpi_aml_printtarget(condrefof->target);
+                    kdebug_outf("]");
+                    break;
                 case AML_OPEXT_ACQUIRE:
                     aml_acquire *acquire = (aml_acquire *)op;
                     print_indent();
@@ -377,11 +431,14 @@ void kacpi_aml_printop(aml_op *op)
             break;
         case 0xFE:
             aml_methodinvocation *mi = (aml_methodinvocation *)op;
+            print_indent();
             if (mi->termlist)
-                kdebug_outf("METHOD [");
+                kdebug_outf("METHOD");
+            else if (mi->method)
+                kdebug_outf("FIELD");
             else
-                kdebug_outf("FIELD [");
-            kdebug_outf("%s]", mi->namestring);
+                kdebug_outf("FUTURE OBJ");
+            kdebug_outf(" [%s]", mi->namestring);
             break;
         default:
             kdebug_outf("print unknown %x", op->op_code[0]);
