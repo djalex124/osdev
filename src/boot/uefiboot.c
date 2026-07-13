@@ -1,6 +1,8 @@
 #include <efi.h>
 #include <efilib.h>
 
+#include <kernel/kernel.h>
+
 typedef uint64_t Elf64_Addr;
 
 #define SELFMAG     4
@@ -79,6 +81,7 @@ void (*kentry)(boot_table* table, UINTN* page_table);
 UINTN debug_symbols = 0;
 #endif
 EFI_INPUT_KEY key;
+INTN boot_timer = 4;
 
 EFI_STATUS load_graphics()
 {
@@ -102,14 +105,6 @@ EFI_STATUS load_graphics()
 
     s = uefi_call_wrapper(gop->SetMode, 2, gop, mode_native);
     assert(s);
-
-#ifdef AQUA_DEBUG
-    Print(L"[INFO]: This is a debugging enabled build!\r\n");
-#endif
-
-    Print(L"[OK]: GOP - address 0x%x size 0x%x width %dx%d ppsl %d format %x\r\n",
-        gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize, gop->Mode->Info->HorizontalResolution,
-        gop->Mode->Info->VerticalResolution, gop->Mode->Info->PixelsPerScanLine, gop->Mode->Info->PixelFormat);
 
     return 0;
 }
@@ -352,14 +347,28 @@ void boot_menu_graphics()
         uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 2);
         Print(L"Page (%d/%d)\r\n", page, gop->Mode->MaxMode / 10);
         UINTN last = (gop->Mode->MaxMode < page * 10)?gop->Mode->MaxMode:(page * 10);
-        for (UINTN index = (page - 1) * 10; index < last; index++)
+        for (UINTN index = (page - 1) * 10; index < last; index += 2)
         {
             uefi_call_wrapper(gop->QueryMode, 4, gop, 
                 index, &gop_info_size, &gop_info);
-            Print(L"[%d]: %dx%d", index - (page - 1) * 10, gop_info->HorizontalResolution,
+            Print(L"[%d]: %4dx%4d", index - (page - 1) * 10, gop_info->HorizontalResolution,
                 gop_info->VerticalResolution);
             if (index == gop->Mode->Mode)
-                Print(L" *");
+                Print(L" * ");
+            else
+                Print(L" | ");
+            if (index + 1 <= last)
+            {
+                uefi_call_wrapper(gop->QueryMode, 4, gop, 
+                    index + 1, &gop_info_size, &gop_info);
+                Print(L"[%d]: %4dx%4d", index + 1 - (page - 1) * 10, gop_info->HorizontalResolution,
+                    gop_info->VerticalResolution);
+                if (index + 1 == gop->Mode->Mode)
+                    Print(L" *");
+                else
+                    Print(L" |");
+            }
+            
             Print(L"\r\n");
         }
 
@@ -399,15 +408,30 @@ void boot_menu_graphics()
     key.UnicodeChar = 0;
     
     boot_menu_reset();
-    Print(L"Welcome to ConcatenOS pre-boot environment!"); 
+    AsciiPrint("<AQUA ");
+    AsciiPrint(AQUA_VER_STRING); 
+    AsciiPrint(" pre-boot>");
+}
+
+void boot_dec_timer()
+{
+    boot_timer--;
 }
 
 void boot_menu()
 {
+    EFI_EVENT boot_timer_event;
     uefi_call_wrapper(ST->ConIn->Reset, 2, ST->ConIn, FALSE);
+    uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, FALSE);
+    uefi_call_wrapper(BS->CreateEvent, 5, EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_CALLBACK,
+        (EFI_EVENT_NOTIFY)boot_dec_timer, NULL, &boot_timer_event);
+
+    BOOLEAN key_changed = FALSE;
 
     boot_menu_reset();
-    Print(L"Welcome to ConcatenOS pre-boot environment!"); 
+    AsciiPrint("<AQUA ");
+    AsciiPrint(AQUA_VER_STRING); 
+    AsciiPrint(" pre-boot>");
 
     do
     {
@@ -428,9 +452,30 @@ void boot_menu()
 #endif
 
         Print(L"\r\nPress [enter] to boot.");
+        
+        if (!key_changed)
+        {
+            Print(L"\r\n\r\nAutomatically booting in %d seconds.", boot_timer);
+            uefi_call_wrapper(BS->SetTimer, 3, boot_timer_event, TimerRelative, 10000000);
+        }
 
-        uefi_call_wrapper(BS->WaitForEvent, 3, 1, &ST->ConIn->WaitForKey, NULL);
-        uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key);
+        INTN last_timer = boot_timer;
+        UINTN last_key = key.UnicodeChar;
+        while (last_key == key.UnicodeChar && last_timer == boot_timer)
+            uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key);
+
+        if (last_key != key.UnicodeChar && !key_changed)
+        {
+            key_changed = TRUE;
+
+            boot_menu_reset();
+            AsciiPrint("<AQUA ");
+            AsciiPrint(AQUA_VER_STRING); 
+            AsciiPrint(" pre-boot>");
+        }
+
+        if (boot_timer == 0)
+            break;
 
         if (key.UnicodeChar == 0x67)
             boot_menu_graphics();
@@ -451,11 +496,13 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_tab
     EFI_STATUS s;
     
     InitializeLib(image_handle, system_table);
+    uefi_call_wrapper(BS->SetWatchdogTimer, 4, 0, 0, 0, NULL);
 
     s = load_graphics();
     assert(s);
 
     boot_menu();
+    boot_menu_reset();
 
     s = load_kernel(image_handle);
     assert(s);

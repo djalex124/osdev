@@ -633,8 +633,8 @@ void kterm_init()
 
     kterm_clr(bg);
 
-    cx = 0;
-    cy = 0;
+    cx = (cw / 2) - 11;
+    cy = (ch / 2) - 1;
     kterm_nhputf("Starting ConcatenOS...");
     
     kterm_draw = 1;

@@ -43,7 +43,7 @@ obj/%.o: src/%.S
 
 obj/boot/uefiboot.o: src/boot/uefiboot.c
 	@mkdir -p obj/boot
-	@$(efi_cc) $(debug_flag) -MMD -MP -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o obj/boot/uefiboot.o
+	@$(efi_cc) $(debug_flag) -DAQUA_VER_BUILD=$(kernel_build) -MMD -MP -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o obj/boot/uefiboot.o
 
 drive/EFI/BOOT/BOOTX64.EFI: obj/boot/uefiboot.o
 	@$(efi_ld) -shared -Bsymbolic -L$(gnu_efi) -T$(gnu_efi)/elf_x86_64_efi.lds $(gnu_efi)/crt0-efi-x86_64.o obj/boot/uefiboot.o -o obj/boot/boot.so -lgnuefi -lefi
