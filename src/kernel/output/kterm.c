@@ -597,6 +597,7 @@ void kterm_processinput()
 
 void kterm_loop()
 {
+    kterm_clr(bg);
     kkeyboard_setinput(*kterm_input);
     
     kterm_putf("Welcome to ConcatenOS!");
@@ -631,6 +632,10 @@ void kterm_init()
     kdebug_outf("\nkterm: kterm_gbuffer %x", (uintptr_t)kterm_gbuffer);
 
     kterm_clr(bg);
+
+    cx = 0;
+    cy = 0;
+    kterm_nhputf("Starting ConcatenOS...");
     
     kterm_draw = 1;
     kscreen_copy();

@@ -6,6 +6,8 @@
 
 #include <mm/mem.h>
 
+#ifdef AQUA_DEBUG
+
 void kacpi_aml_printop(const aml_op *op);
 
 size_t indent = 0;
@@ -250,6 +252,15 @@ void kacpi_aml_printop(const aml_op *op)
             kacpi_aml_printtarget(amlsizeof->supername);
             kdebug_outf("]");
             break;
+        case AML_OP_NOTIFY:
+            aml_notify *notify = (aml_notify *)op;
+            print_indent();
+            kdebug_outf("notify object[");
+            kacpi_aml_printtarget(notify->notifyobject);
+            kdebug_outf("] value[");
+            kacpi_aml_printop(notify->notifyvalue);
+            kdebug_outf("]");
+            break;
         case AML_OP_CREATEDWF ... AML_OP_CREATEBIF:
         case AML_OP_CREATEQWF:
             aml_createdwordfield *cdwf = (aml_createdwordfield *)op;
@@ -447,6 +458,14 @@ void kacpi_aml_printop(const aml_op *op)
     indent--;
 }
 
+#else
+
+void kacpi_aml_printtermlist(aml_termlist *tl) {}
+void kacpi_aml_printtarget(aml_target *target) {}
+void kacpi_aml_printop(const aml_op *op) {}
+
+#endif
+
 aml_termlist *kacpi_aml_root;
 
 void kacpi_processdsdt(uint64_t dsdt_addr)
@@ -460,11 +479,13 @@ void kacpi_processdsdt(uint64_t dsdt_addr)
     //  - Enable ACPI mode and install events/interrupts
 
     uint8_t *aml = (uint8_t *)((uintptr_t)dsdt->aml);
-
     kacpi_aml_root = kmem_kalloc(sizeof(aml_termlist));
-    kacpi_aml_generatetree(aml, dsdt->h.length - sizeof(acpi_sdt_header), kacpi_aml_root);
 
-    kdebug_outf("\n\nkacpi: some aml hex codes - ");
-    kacpi_aml_printtermlist(kacpi_aml_root);
-    kdebug_outf("\n");
+    uint64_t count = __builtin_ia32_rdtsc();
+    kacpi_aml_generatetree(aml, dsdt->h.length - sizeof(acpi_sdt_header), kacpi_aml_root);
+    count = __builtin_ia32_rdtsc() - count;
+
+    kdebug_outf("\nkacpi: [0x%x] cycles to build AML tree", count);
+
+    kacpi_aml_printdevices();
 }

@@ -3,6 +3,7 @@
 #include <kernel/kstring.h>
 #include <kernel/kernel.h>
 #include <kernel/debug.h>
+#include <kernel/crash.h>
 
 #include <sched/sync.h>
 
@@ -51,7 +52,7 @@ void kmem_simplify(kmem_heapblock *block)
             free_block->next->prev = free_block;
     }
 
-    while (free_block->prev != NULL && free_block->prev->used == 0)
+    if (free_block->prev != NULL && free_block->prev->used == 0)
     {
         free_block = free_block->prev;
         free_block->size += free_block->next->size + sizeof(kmem_heapblock);
@@ -67,11 +68,11 @@ void* kmem_kalloc(uint64_t size)
     ksync_mutex_acq(&kmem_heap_lock);
 
     kmem_heapblock *heap_ptr = heap_start;
-    while (heap_ptr != NULL)
+    while ((uint64_t)heap_ptr + size < (uint64_t)heap_ptr + 0x1000 * kmem_heapsize)
     {
-        if ((heap_ptr->used == 0) && (heap_ptr->size >= size + sizeof(kmem_heapblock)))
+        if (heap_ptr->used == 0 && heap_ptr->size >= size)
         {
-            if (heap_ptr->size > size + sizeof(kmem_heapblock) * 2)
+            if (heap_ptr->size >= size + sizeof(kmem_heapblock))
             {
                 kmem_heapblock *split_block = (kmem_heapblock *)((uint64_t)heap_ptr + size + sizeof(kmem_heapblock));
                 split_block->size = heap_ptr->size - (size + sizeof(kmem_heapblock));
@@ -84,10 +85,13 @@ void* kmem_kalloc(uint64_t size)
 
                 heap_ptr->size = size;
                 heap_ptr->next = split_block;
-                heap_ptr->used = 1;
             }
-            else
-                heap_ptr->used = 1;
+            else if (heap_ptr->size > size)
+                size = heap_ptr->size;
+
+            if (heap_ptr->next != NULL)
+                heap_ptr->next->prev = heap_ptr;
+            heap_ptr->used = 1;
             
             void *return_addr = (void *)((uint64_t)heap_ptr + sizeof(kmem_heapblock));
             memset(return_addr, 0, size);
@@ -100,6 +104,8 @@ void* kmem_kalloc(uint64_t size)
         heap_ptr = heap_ptr->next;
     }
 
+    kcrash("Heap OOM");
+
     ksync_mutex_rel(&kmem_heap_lock);
     return NULL;
 }
@@ -110,9 +116,13 @@ void kmem_kfree(void *addr)
     ksync_mutex_acq(&kmem_heap_lock);
 
     kmem_heapblock *free_block = (kmem_heapblock *)((uint64_t)addr - sizeof(kmem_heapblock));
-    free_block->used = 0;
-
-    kmem_simplify(free_block);
+    if (free_block->used == 0)
+        kcrash("Heap freeing unused memory");
+    else
+    {
+        free_block->used = 0;
+        kmem_simplify(free_block);
+    }
 
     ksync_mutex_rel(&kmem_heap_lock);
 }

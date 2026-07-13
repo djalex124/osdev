@@ -134,7 +134,7 @@ char *kacpi_aml_namestring()
     char first_char = *aml;
 
     if (first_char == 0)
-        return nullstring;
+        return NULL;
     else if (first_char == AML_ROOTCHAR)
     {
         aml++;
@@ -142,7 +142,8 @@ char *kacpi_aml_namestring()
         namestring = kmem_kalloc(str_len(namepath) + 2);
         memcpy(namestring + 1, namepath, str_len(namepath));
         namestring[0] = AML_ROOTCHAR;
-        kmem_kfree(namepath);
+        if (namepath != nullstring)
+            kmem_kfree(namepath);
     }
     else if (first_char == AML_PREFIXCHAR)
     {
@@ -154,7 +155,8 @@ char *kacpi_aml_namestring()
         namestring = kmem_kalloc(str_len(namepath) + prefix_count + 1);
         memcpy(namestring + prefix_count, namepath, str_len(namepath));
         memset(namestring, AML_PREFIXCHAR, prefix_count);
-        kmem_kfree(namepath);
+        if (namepath != nullstring)
+            kmem_kfree(namepath);
     }
     else
         return kacpi_aml_namepath();
@@ -223,6 +225,7 @@ aml_packagelist *kacpi_aml_packagelist(uint64_t length)
             case AML_OP_ONE:
             case AML_OP_ONES:
             case AML_OPEXT_PREFIX:
+            case AML_OP_BUFFER:
             case AML_OP_PACKAGE:
             case AML_OP_VARPACKAGE:
                 packagelist_ptr->element = kmem_kalloc(sizeof(aml_packageelement_op));
@@ -306,6 +309,7 @@ aml_termlist *kacpi_aml_termlist(uint64_t length, char *name)
     while ((uint64_t)aml < end_list)
     {
         termlist_ptr->parent = last_parent;
+        termlist_ptr->front = termlist;
         termlist_ptr->listname = name;
         aml_op *op = kacpi_aml_processop();
         termlist_ptr->term_obj = op;
@@ -317,6 +321,9 @@ aml_termlist *kacpi_aml_termlist(uint64_t length, char *name)
 
     return termlist;
 }
+
+aml_termlist *aml_methods = 0;
+aml_termlist *aml_methods_ptr = 0;
 
 aml_op *kacpi_aml_processop()
 {
@@ -430,6 +437,18 @@ aml_op *kacpi_aml_processop()
             method->start = (uint64_t)aml;
             method->termlength = method->pkglength - ((uint64_t)aml - distance);
             aml += method->termlength;
+            if (aml_methods == 0)
+            {
+                aml_methods = kmem_kalloc(sizeof(aml_termlist));
+                aml_methods_ptr = aml_methods;
+            }
+            else
+            {
+                aml_methods_ptr->next = kmem_kalloc(sizeof(aml_termlist));
+                aml_methods_ptr = aml_methods_ptr->next;
+            }
+            aml_methods_ptr->term_obj = current_op;
+            aml_methods_ptr->parent = parent_termlist;
             break;
         case AML_OP_EXTERNAL:
             aml_external *external = kmem_kalloc(sizeof(aml_external));
@@ -827,16 +846,19 @@ aml_op *kacpi_aml_processop()
 
                 object = kacpi_aml_findtreename(named_parent, methodinvocation->namestring);
                 
-                while (object == NULL)
+                if (methodinvocation->namestring[0] != AML_PREFIXCHAR)
                 {
-                    if (named_parent->parent == 0)
-                        break;
-                    named_parent = named_parent->parent;
-
-                    while (named_parent->listname == 0 && named_parent->parent)
+                    while (object == NULL)
+                    {
+                        if (named_parent->parent == 0)
+                            break;
                         named_parent = named_parent->parent;
-                    
-                    object = kacpi_aml_findtreename(named_parent, methodinvocation->namestring);
+
+                        while (named_parent->listname == 0 && named_parent->parent)
+                            named_parent = named_parent->parent;
+                        
+                        object = kacpi_aml_findtreename(named_parent, methodinvocation->namestring);
+                    }
                 }
             }
             else
@@ -879,39 +901,41 @@ aml_op *kacpi_aml_processop()
     return current_op;
 }
 
-void kacpi_aml_generatemethod(aml_termlist *termlist)
+void kacpi_aml_generatemethods()
 {
-    aml_termlist *termlist_ptr = termlist;
+    aml_termlist *method_ptr = aml_methods;
 
-    while (termlist_ptr)
+    while (1)
     {
-        aml_op *obj = termlist_ptr->term_obj;
-        if (obj == NULL)
-            break;
-
-        if (obj->op_code[0] == AML_OP_METHOD)
+        if (method_ptr->term_obj != 0)
         {
-            aml_method *method = (aml_method *)obj;
+            aml_method *method = (aml_method *)method_ptr->term_obj;
             if (method->termlist == NULL)
             {
-                parent_termlist = termlist;
+                parent_termlist = method_ptr->parent;
 
                 aml = (uint8_t *)method->start;
                 method->termlist = kacpi_aml_termlist(method->termlength, method->namestring);
             }
         }
-
-        if (obj->op_code[0] == AML_OP_SCOPE ||
-            obj->op_code[0] == AML_OP_METHOD ||
-            (obj->op_code[0] == AML_OPEXT_PREFIX && obj->op_code[1] == AML_OPEXT_DEVICE))
-        {
-            aml_termlist *list = get_termlist(obj);
-            if ((list != NULL) && (list != termlist))
-                kacpi_aml_generatemethod(list);
-        }
-
-        termlist_ptr = termlist_ptr->next;
+        if (method_ptr->next == 0)
+            break;
+        method_ptr = method_ptr->next;
     }
+
+    method_ptr = aml_methods;
+
+    while (1)
+    {
+        if (method_ptr->next == 0)
+            break;
+
+        aml_termlist *next = method_ptr->next;
+        kmem_kfree(method_ptr);
+        method_ptr = next;
+    }
+
+    kmem_kfree(method_ptr);
 }
 
 void kacpi_aml_generatetree(uint8_t *aml_ptr, size_t length, aml_termlist *tree)
@@ -925,12 +949,14 @@ void kacpi_aml_generatetree(uint8_t *aml_ptr, size_t length, aml_termlist *tree)
     while ((size_t)aml < aml_end)
     {
         aml_op *op = kacpi_aml_processop();
+        tree_ptr->front = tree;
         tree_ptr->term_obj = op;
         tree_ptr->parent = 0;
+        tree_ptr->fullname = "\\";
         tree_ptr->listname = "\\";
         tree_ptr->next = kmem_kalloc(sizeof(aml_termlist));
         tree_ptr = tree_ptr->next;
     }
 
-    kacpi_aml_generatemethod(tree);
+    kacpi_aml_generatemethods();
 }

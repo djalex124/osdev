@@ -161,6 +161,7 @@ void kacpi_shutdown()
 
     //SLP_EN == 1 << 13
     kdebug_outf("\nkacpi: sending shutdown signal");
+    kdebug_outf("\nkacpi: [%x] [%x]", SLP_TYPa, SLP_TYPb);
     kdebug_outf("\nkacpi: [%x] [%x]", fadt_ptr->pm1a_control_block, fadt_ptr->pm1b_control_block);
     outw(((uint16_t)fadt_ptr->pm1a_control_block), SLP_TYPa | (1 << 13));
     if (fadt_ptr->pm1b_control_block)

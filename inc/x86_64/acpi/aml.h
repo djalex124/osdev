@@ -155,6 +155,8 @@ typedef struct
 typedef struct aml_termlist_s
 {
     struct aml_termlist_s *parent;
+    struct aml_termlist_s *front;
+    char *fullname;
     char *listname;
     aml_op *term_obj;
     struct aml_termlist_s *next;
@@ -605,6 +607,7 @@ void kacpi_aml_printdevices();
 
 void kacpi_aml_generatetree(uint8_t *aml_ptr, size_t length, aml_termlist *tree);
 void kacpi_aml_printtermlist(aml_termlist *tl);
+void kacpi_aml_printtarget(aml_target *target);
 void kacpi_aml_printop(const aml_op *op);
 
 void kacpi_processdsdt(uint64_t dsdt_addr);
