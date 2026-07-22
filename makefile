@@ -33,11 +33,15 @@ drive/dbg_kernel.bin: $(obj) bin/link.ld
 	@$(objcopy) --strip-debug drive/kernel.bin
 	@cp bin/kernel.map drive/kernel.map
 
-obj/%.o: src/%.c 
+obj/kernel/kernel/kstring.o: src/kernel/kernel/kstring.c
 	@mkdir -p $(@D)
 	@$(gcc) $(debug_flag) $(kernel_flags) -c -MMD -MP $< -o $@ -lgcc
 
-obj/%.o: src/%.S 
+obj/kernel/%.o: src/kernel/%.c 
+	@mkdir -p $(@D)
+	@$(gcc) $(debug_flag) $(kernel_flags) -mno-sse -c -MMD -MP $< -o $@ -lgcc
+
+obj/kernel/%.o: src/kernel/%.S 
 	@mkdir -p $(@D)
 	@$(gcc) $(debug_flag) $(kernel_flags) -c -DASSEMBLY -MMD -MP $< -o $@ -lgcc
 
@@ -51,7 +55,10 @@ drive/EFI/BOOT/BOOTX64.EFI: obj/boot/uefiboot.o
 	@mkdir -p drive/EFI/BOOT
 	@mv drive/boot.efi drive/EFI/BOOT/BOOTX64.EFI
 
-build_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin
+drive/test.bin: src/programs/test.c
+	@$(gcc) -ffreestanding -fno-pie -mcmodel=large -mno-red-zone -Wall -c $< -o $@
+
+build_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin drive/test.bin
 
 run: build_run
 	@qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
@@ -59,20 +66,21 @@ run: build_run
 					    -drive file=fat:rw:drive/,format=raw,media=disk -m 512 -smp 2
 
 build_debug: debug_flag += -DAQUA_DEBUG
-build_debug: drive/EFI/BOOT/BOOTX64.EFI drive/dbg_kernel.bin
+build_debug: drive/EFI/BOOT/BOOTX64.EFI drive/dbg_kernel.bin drive/test.bin
 
 debug: build_debug
 	@qemu-system-x86_64 -drive if=pflash,format=raw,unit=0,file=firmware/OVMF_CODE.fd,readonly=on \
 					    -drive if=pflash,format=raw,unit=1,file=firmware/OVMF_VARS.fd \
 					    -drive file=fat:rw:drive/,format=raw,media=disk -m 512 -s -serial stdio -smp 2
 
-image_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin
+image_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin drive/test.bin
 	@dd if=/dev/zero of=bin/dev.img count=10 bs=1M
 	@mkfs.vfat bin/dev.img
 
 	@mcopy -i bin/dev.img drive/kernel.bin ::/
 	@mcopy -i bin/dev.img drive/startup.nsh ::/
 	@mcopy -i bin/dev.img drive/image.tga ::/
+	@mcopy -i bin/dev.img drive/test.bin ::/
 	@mmd -i bin/dev.img ::EFI
 	@mmd -i bin/dev.img ::EFI/BOOT
 	@mcopy -i bin/dev.img drive/EFI/BOOT/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI
@@ -81,7 +89,7 @@ image_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin
 	@rm bin/dev.img
 
 image_debug: debug_flag += -DAQUA_DEBUG
-image_debug: drive/EFI/BOOT/BOOTX64.EFI drive/dbg_kernel.bin
+image_debug: drive/EFI/BOOT/BOOTX64.EFI drive/dbg_kernel.bin drive/test.bin
 	@dd if=/dev/zero of=bin/dev.img count=10 bs=1M
 	@mkfs.vfat bin/dev.img
 
@@ -89,6 +97,7 @@ image_debug: drive/EFI/BOOT/BOOTX64.EFI drive/dbg_kernel.bin
 	@mcopy -i bin/dev.img drive/kernel.map ::/
 	@mcopy -i bin/dev.img drive/startup.nsh ::/
 	@mcopy -i bin/dev.img drive/image.tga ::/
+	@mcopy -i bin/dev.img drive/test.bin ::/
 	@mmd -i bin/dev.img ::EFI
 	@mmd -i bin/dev.img ::EFI/BOOT
 	@mcopy -i bin/dev.img drive/EFI/BOOT/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI
@@ -100,5 +109,5 @@ clean:
 	@rm -f bin/link.ld bin/kernel.map
 	@rm -r obj/
 	@rm -f drive/EFI/BOOT/BOOTX64.EFI
-	@rm -f drive/kernel.bin drive/dbg_kernel.bin drive/kernel.map
+	@rm -f drive/kernel.bin drive/dbg_kernel.bin drive/kernel.map drive/test.bin
 	@rm -f bin/dev.qcow2

@@ -7,6 +7,7 @@
 #include <kernel/debug.h>
 
 #include <x86_64/desc.h>
+#include <x86_64/call.h>
 #include <x86_64/port.h>
 
 const char* kdesc_ints[] =
@@ -108,28 +109,34 @@ void kwrapper_isr(kframe_int *k)
     kcrash(error_message);
 }
 
-typedef void (*kdesc_irqfunc)(void);
-kdesc_irqfunc kdesc_irqs[16];
+typedef void (*kdesc_irqfunc)(kframe_int *);
+kdesc_irqfunc kdesc_irqs[224];
 
-extern uint8_t kacpi_apic_enabled;
-extern void kacpi_apic_eoi();
+void kwrapper_pit_eoi(uint8_t int_no)
+{
+    if (int_no >= 8)
+        outb(0xA0, 0x20);
+    outb(0x20, 0x20);
+}
 
-void kwrapper_irq(kframe_int *k)
+void (*kwrapper_eoi)(uint8_t);
+
+void kwrapper_seteoi(void *function)
+{
+    kwrapper_eoi = function;
+}
+
+kframe_int *kwrapper_irq(kframe_int *k)
 {
     if (kdesc_irqs[k->int_no])
     {
-        void (*function)() = kdesc_irqs[k->int_no];
-        function();
+        void (*function)(kframe_int *) = kdesc_irqs[k->int_no];
+        function(k);
     }
 
-    if (kacpi_apic_enabled == 0)
-    {
-        if (k->int_no >= 8)
-            outb(0xA0, 0x20);
-        outb(0x20, 0x20);
-    }
-    else
-        kacpi_apic_eoi();
+    kwrapper_eoi(k->int_no);
+
+    return k;
 }
 
 gdt_entry kgdt_table[6];
@@ -213,6 +220,8 @@ extern void kirq13();
 extern void kirq14();
 extern void kirq15();
 
+extern void kirq32();
+
 void kdesc_earlyirq1()
 {
     inb(0x60);
@@ -220,19 +229,19 @@ void kdesc_earlyirq1()
 
 void kdesc_setinterruptfunc(uint16_t irq, void* function)
 {
-    if (irq >= 0 && irq <= 15)
+    if (irq >= 0 && irq <= 223)
         kdesc_irqs[irq] = (kdesc_irqfunc)function;
 }
 
 void kdesc_removeinterruptfunc(uint16_t irq)
 {
-    if (irq >= 0 && irq <= 15)
+    if (irq >= 0 && irq <= 223)
         kdesc_irqs[irq] = 0;
 }
 
 void kdesc_remapinterruptfunc(uint16_t from, uint16_t to)
 {
-    if ((from >= 0 && from <= 15) && (to >= 0 && to <= 15))
+    if ((from >= 0 && from <= 223) && (to >= 0 && to <= 223))
     {
         kdesc_irqs[to] = kdesc_irqs[from];
         kdesc_irqs[from] = 0;
@@ -250,6 +259,7 @@ void kdesc_install()
     kdesc_setgdt(3, 0, 0xFFFFFFFF, 0xFA, 0xAF);
     kdesc_setgdt(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);
     kdesc_setgdt(5, (uint64_t)&k_temptss, sizeof(kernel_tss), 0x89, 0);
+    //k_temptss.rsp0 = (uint64_t)kdesc_syscallstack;
 
     kidt.base = (uint64_t)&kidt_table;
     kidt.limit = (sizeof(idt_entry) * 256) - 1;
@@ -304,6 +314,8 @@ void kdesc_install()
     kdesc_setidt(46, (uint64_t)kirq14, 0x8E);
     kdesc_setidt(47, (uint64_t)kirq15, 0x8E);
 
+    kdesc_setidt(64, (uint64_t)kirq32, 0xEE);
+
     outb(0x20, 0x11);
     outb(0xA0, 0x11);
     outb(0x21, 0x20);
@@ -323,5 +335,9 @@ void kdesc_install()
 
     kdesc_setinterruptfunc(1, &kdesc_earlyirq1);
 
+    kwrapper_seteoi(kwrapper_pit_eoi);
+
     kdebug_outf("\nkdesc: interrupt descriptors set");
+
+    kcall_init();
 }

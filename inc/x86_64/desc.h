@@ -77,4 +77,6 @@ void kdesc_setinterruptfunc(uint16_t irq, void* function);
 void kdesc_removeinterruptfunc(uint16_t irq);
 void kdesc_remapinterruptfunc(uint16_t from, uint16_t to);
 
+void kwrapper_seteoi(void *function);
+
 void kdesc_install();

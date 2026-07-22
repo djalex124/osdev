@@ -909,13 +909,13 @@ void kacpi_aml_generatemethods()
     {
         if (method_ptr->term_obj != 0)
         {
-            aml_method *method = (aml_method *)method_ptr->term_obj;
-            if (method->termlist == NULL)
+            aml_method *gen_method = (aml_method *)method_ptr->term_obj;
+            if (gen_method->termlist == NULL)
             {
                 parent_termlist = method_ptr->parent;
 
-                aml = (uint8_t *)method->start;
-                method->termlist = kacpi_aml_termlist(method->termlength, method->namestring);
+                aml = (uint8_t *)gen_method->start;
+                gen_method->termlist = kacpi_aml_termlist(gen_method->termlength, gen_method->namestring);
             }
         }
         if (method_ptr->next == 0)
@@ -938,9 +938,12 @@ void kacpi_aml_generatemethods()
     kmem_kfree(method_ptr);
 }
 
+char *root_name = "\\";
+
 void kacpi_aml_generatetree(uint8_t *aml_ptr, size_t length, aml_termlist *tree)
 {
-    aml_termlist *tree_ptr = tree;
+    aml_termlist *root_tree = tree;
+    aml_termlist *tree_ptr = root_tree;
     parent_termlist = tree;
 
     aml = aml_ptr;
@@ -949,11 +952,11 @@ void kacpi_aml_generatetree(uint8_t *aml_ptr, size_t length, aml_termlist *tree)
     while ((size_t)aml < aml_end)
     {
         aml_op *op = kacpi_aml_processop();
-        tree_ptr->front = tree;
+        tree_ptr->front = root_tree;
         tree_ptr->term_obj = op;
         tree_ptr->parent = 0;
-        tree_ptr->fullname = "\\";
-        tree_ptr->listname = "\\";
+        tree_ptr->fullname = root_name;
+        tree_ptr->listname = root_name;
         tree_ptr->next = kmem_kalloc(sizeof(aml_termlist));
         tree_ptr = tree_ptr->next;
     }

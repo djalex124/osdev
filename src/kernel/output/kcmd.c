@@ -7,6 +7,7 @@
 
 #include <kernel/kstring.h>
 #include <kernel/crash.h>
+#include <kernel/elf.h>
 
 #include <output/image.h>
 #include <output/kterm.h>
@@ -21,6 +22,38 @@
 #define kcmd_strequal(s1, s2) (str_cmp(s1, s2) == 0)
 
 extern uint8_t kacpi_apsrunning;
+
+uint8_t *kcmd_getfile(char *name, size_t *file_length)
+{
+    uint8_t *file = 0;
+    
+    if (kterm_getpartition() == -1)
+    {
+        kterm_putf("\nInvalid partition selection.");
+        return file;
+    }
+
+    kfs_partition *selected_partition = k_infotable.kfs_partitions[kterm_getpartition()];
+
+    if ((uint64_t)selected_partition == 0)
+    {
+        kterm_putf("\nPartition does not exist.");
+        kterm_setpartition(-1);
+        return file;
+    }
+    
+    char *filename = name;
+
+    char *relpath = kterm_getrelpath(filename);
+    char *abspath = kterm_getabspath(relpath);
+    
+    file = kfs_readfile(selected_partition, abspath, file_length);
+
+    kmem_kfree(relpath);
+    kmem_kfree(abspath);
+
+    return file;
+}
 
 void kcmd_cd(char *kterm_argv[], int kterm_argc)
 {
@@ -212,6 +245,7 @@ void kcmd_help()
     kterm_putf("\n info - prints current AQUA build information");
     kterm_putf("\n info [subcommand] - gives specific environment info");
     kterm_putf("\n read_file [filename] - attempt read of file on current partition");
+    kterm_putf("\n run [filename] - attempt to execute given file");
     kterm_putf("\n shutdown - attempts acpi shutdown");
     kterm_putf("\n test - test random features");
     kterm_putf("\n test [subcommand] - tests specific features");
@@ -223,36 +257,8 @@ void kcmd_image(char *kterm_argv[], int kterm_argc)
     if (kterm_argc < 2)
         kterm_putf("\nNot enough arguments.");
 
-    if (kterm_getpartition() == -1)
-    {
-        kterm_putf("\nInvalid partition selection.");
-        return;
-    }
-
-    kfs_partition *selected_partition = k_infotable.kfs_partitions[kterm_getpartition()];
-
-    if ((uint64_t)selected_partition == 0)
-    {
-        kterm_putf("\nPartition does not exist.");
-        kterm_setpartition(-1);
-        return;
-    }
-
-    char *filename = 0;
-    if (kterm_argv[1])
-        filename = kterm_argv[1];
-
     size_t file_length;
-    uint8_t *file = 0;
-    size_t image_pages = 0;
-
-    char *relpath = kterm_getrelpath(filename);
-    char *abspath = kterm_getabspath(relpath);
-
-    file = kfs_readfile(selected_partition, abspath, &file_length);
-
-    kmem_kfree(relpath);
-    kmem_kfree(abspath);
+    uint8_t *file = kcmd_getfile(kterm_argv[1], &file_length);
     
     if ((uint64_t)file == 0)
     {
@@ -261,6 +267,7 @@ void kcmd_image(char *kterm_argv[], int kterm_argc)
     }
 
     uint32_t *image_pixels = 0;
+    size_t image_pages = 0;
 
     if (kimage_istga(file) == 1)
         image_pixels = kimage_getbuftga(file, (int)file_length, &image_pages);
@@ -357,35 +364,8 @@ void kcmd_readfile(char *kterm_argv[], int kterm_argc)
         return;
     }
 
-    if (kterm_getpartition() == -1)
-    {
-        kterm_putf("\nInvalid partition selection.");
-        return;
-    }
-
-    kfs_partition *selected_partition = k_infotable.kfs_partitions[kterm_getpartition()];
-
-    if ((uint64_t)selected_partition == 0)
-    {
-        kterm_putf("\nPartition does not exist.");
-        kterm_setpartition(-1);
-        return;
-    }
-    
-    char *filename = 0;
-    if (kterm_argv[1])
-        filename = kterm_argv[1];
-
     size_t file_length;
-    uint8_t *file = 0;
-
-    char *relpath = kterm_getrelpath(filename);
-    char *abspath = kterm_getabspath(relpath);
-    
-    file = kfs_readfile(selected_partition, abspath, &file_length);
-
-    kmem_kfree(relpath);
-    kmem_kfree(abspath);
+    uint8_t *file = kcmd_getfile(kterm_argv[1], &file_length);
 
     if ((uint64_t)file)
     {
@@ -397,6 +377,26 @@ void kcmd_readfile(char *kterm_argv[], int kterm_argc)
                 file[i + 4], file[i + 5], file[i + 6], file[i + 7]);
         for (; i < file_length; i++)
             kterm_putf("%2x", file[i]);
+        kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
+    }
+    else
+        kterm_putf("\nFile not found!");
+}
+
+void kcmd_run(char *kterm_argv[], int kterm_argc)
+{
+    if (kterm_argc < 2)
+    {
+        kterm_putf("\nNot enough arguments.");
+        return;
+    }
+
+    size_t file_length;
+    uint8_t *file = kcmd_getfile(kterm_argv[1], &file_length);
+
+    if ((uint64_t)file)
+    {
+        kelf_run(file);
         kmem_free(file, (file_length + 0x1000 - 1) / 0x1000);
     }
     else
@@ -492,6 +492,8 @@ void kcmd_runcommand(char *kterm_argv[], int kterm_argc)
         kcmd_info(kterm_argv, kterm_argc);
     else if (kcmd_strequal(kterm_argv[0], "read_file"))
         kcmd_readfile(kterm_argv, kterm_argc);
+    else if (kcmd_strequal(kterm_argv[0], "run"))
+        kcmd_run(kterm_argv, kterm_argc);
     else if (kcmd_strequal(kterm_argv[0], "shutdown"))
         kcmd_shutdown();
     else if (kcmd_strequal(kterm_argv[0], "test"))

@@ -46,7 +46,6 @@ uint8_t lapic_ids[kacpi_max_processors];
 uint64_t kacpi_lapic_base = 0;
 uint64_t kacpi_ioapic_base = 0;
 uint8_t kacpi_gsi_base = 0;
-uint8_t kacpi_apic_enabled = 0;
 
 void kacpi_startaps(uint8_t total_processors)
 {
@@ -140,7 +139,7 @@ void kacpi_ioredtbl(acpi_madt *madt)
     kmem_pageentry(kacpi_ioapic_base, kacpi_ioapic_base, 0x1000,
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
 
-    kacpi_apic_enabled = 1;
+    kwrapper_seteoi(kacpi_apic_eoi);
 
     if (madt->flags)
     {

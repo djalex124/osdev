@@ -138,7 +138,6 @@ int kfs_read(kfs_partition *partition, size_t lba, size_t length, uint8_t read, 
 
     size_t sectors = (length + sector_size - 1) / sector_size;
 
-    kterm_putf("\n%d sectors", sectors);
     size_t sector;
     for (sector = 0; sectors - sector > 64; sector += 64)
     {
