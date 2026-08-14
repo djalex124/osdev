@@ -27,6 +27,18 @@ kmem_virtmap *kernel_vmmap_start = 0;
 uint8_t kmem_virt_use_1gb = 0;
 atomic_flag kmem_virt_lock;
 
+uint64_t kmem_pagegetcr3()
+{
+	uint64_t cr3 = 0;
+	asm volatile ("mov %%cr3, %0" : "=r"(cr3));
+	return cr3;
+}
+
+void kmem_pagesetcr3(uint64_t cr3)
+{
+	asm volatile("mov %0, %%cr3" ::"r"(cr3));
+}
+
 uint32_t kmem_virtmapnew(uint32_t prev, uint32_t next, uint8_t used, uint64_t start, size_t length)
 {
     uint32_t entry_count = 0;
@@ -160,7 +172,6 @@ void kmem_virtmapfree(uint64_t addr)
     (void)kmem_virtmaptrymerge(addr_space->prev, addr_space->current);
 }
 
-uint64_t *ptab4;
 uint8_t paging_ready = 0;
 
 uint64_t kmem_newpagetable()
@@ -192,7 +203,7 @@ static inline uint64_t *kmem_pagegettable(uint64_t *pt, size_t index)
 }
 
 //assumes that all inputs are page aligned
-void kmem_pageentry(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing)
+void kmem_pageentry(uint64_t pt4, uint64_t physical, uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing)
 {
 #ifdef AQUA_DEBUG_MEM
 	kdebug_outf("\nkm_pe: %x to %x size %x", physical, address, size);
@@ -201,6 +212,8 @@ void kmem_pageentry(uint64_t physical, uint64_t address, uint64_t size, uint16_t
 
 	if (sizing == kmem_paging_1gb && kmem_virt_use_1gb == 0)
 		sizing = kmem_paging_2mb;
+
+	uint64_t *ptab4 = (uint64_t *)pt4;
 
 	while (size)
 	{
@@ -266,12 +279,14 @@ void kmem_pageentry(uint64_t physical, uint64_t address, uint64_t size, uint16_t
 }
 
 //assumes that all inputs are page aligned
-void kmem_unpageentry(uint64_t address, uint64_t size)
+void kmem_unpageentry(uint64_t pt4, uint64_t address, uint64_t size)
 {
 #ifdef AQUA_DEBUG_MEM
 	kdebug_outf("\nkm_upe: %x size %x", address, size);
 #endif
 	size += address & 0xFFF;
+
+	uint64_t *ptab4 = (uint64_t *)pt4;
 
 	while (size)
 	{
@@ -335,13 +350,15 @@ void kmem_unpageentry(uint64_t address, uint64_t size)
 }
 
 //gives physical address given virtual page
-void* kmem_getphysical(uint64_t *virt)
+void* kmem_getphysical(uint64_t pt4, uint64_t *virt)
 {
 	uint64_t *pt3, *pt2, *pt1;
 	size_t p4_index = ((uint64_t)virt >> 39) & 0x1FF;
 	size_t p3_index = ((uint64_t)virt >> 30) & 0x1FF;
 	size_t p2_index = ((uint64_t)virt >> 21) & 0x1FF;
 	size_t p1_index = ((uint64_t)virt >> 12) & 0x1FF;
+
+	uint64_t *ptab4 = (uint64_t *)pt4;
 
 	if (!(ptab4[p4_index] & 0x1))
 		kcrash("Translating non-existent page entry");
@@ -378,10 +395,6 @@ void* kmem_page(uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing)
 
 	ksync_mutex_acq(&kmem_virt_lock);
 
-#ifdef AQUA_DEBUG_MEM
-	kdebug_outf("\nkm_vp: paging %x, %x len", address, size);
-#endif
-
 	switch (sizing)
 	{
 		case kmem_paging_1kb:
@@ -411,14 +424,14 @@ void* kmem_page(uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing)
 	if (kernel_vmmap_max)
     {
         uint64_t virtual_mapping = (uint64_t)kmem_virtmapalloc(size, sizing);
-		kmem_pageentry(address, virtual_mapping, size, flags, sizing);
+		kmem_pageentry(k_ptab4, address, virtual_mapping, size, flags, sizing);
 
 		ksync_mutex_rel(&kmem_virt_lock);
 		
         return (void *)(virtual_mapping + offset);
     }
 
-    kmem_pageentry(address, address, size, flags, sizing);
+    kmem_pageentry(k_ptab4, address, address, size, flags, sizing);
 
 	ksync_mutex_rel(&kmem_virt_lock);
 
@@ -436,7 +449,7 @@ void kmem_unpage(void *address, uint64_t size)
     if (kernel_vmmap_max)
         kmem_virtmapfree(addr);
 
-    kmem_unpageentry(addr, size);
+    kmem_unpageentry(k_ptab4, addr, size);
 
 	ksync_mutex_rel(&kmem_virt_lock);
 }
@@ -461,15 +474,16 @@ void kmem_vmminit(uint64_t phys_low, uint64_t phys_hi)
 
 	uint64_t *pt4 = (uint64_t *)kmem_palloc(1, kmem_paging_1kb);
 	memset(pt4, 0, 0x1000);
-	ptab4 = pt4;
+	k_ptab4 = (uint64_t)pt4;
+	kmem_pageentry(k_ptab4, k_ptab4, k_ptab4, 0x1000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
 
 	uint64_t gb_low = ((phys_low * 0x1000 + 0x40000000 - 1) / 0x40000000) * 0x40000000;
 	uint64_t gb_hi = 0;
-	kmem_pageentry(0, kernel_virtual, gb_low, kmem_paging_present | kmem_paging_writable, kmem_paging_1gb);
+	kmem_pageentry(k_ptab4, 0, kernel_virtual, gb_low, kmem_paging_present | kmem_paging_writable, kmem_paging_1gb);
 	if (phys_hi)
 	{
 		gb_hi = (((phys_hi * 0x1000) - 0x100000000 + 0x40000000 - 1) / 0x40000000) * 0x40000000;
-		kmem_pageentry(0x100000000, kernel_virtual + 0x100000000, gb_hi, kmem_paging_present | kmem_paging_writable, kmem_paging_1gb);
+		kmem_pageentry(k_ptab4, 0x100000000, kernel_virtual + 0x100000000, gb_hi, kmem_paging_present | kmem_paging_writable, kmem_paging_1gb);
 	}
 
 	kdebug_outf("\nkm_iv: pre-paging memory done");
@@ -478,8 +492,6 @@ void kmem_vmminit(uint64_t phys_low, uint64_t phys_hi)
 	
 	asm volatile("mov %0, %%cr3" ::"r"((uintptr_t)pt4));
 	paging_ready = 1;
-
-	ptab4 = (uint64_t *)virt_from_phys((uint64_t)pt4);
 	
 	kernel_vmmap_start = (void *)(k_boottable.safe_mem - 0x1000);
     kernel_vmmap_max = (0x1000 / sizeof(kmem_virtmap)) - 1;
@@ -524,6 +536,8 @@ void kmem_vmm_traverse(uint64_t cr2)
 	size_t p3_index = ((uint64_t)cr2 >> 30) & 0x1FF;
 	size_t p2_index = ((uint64_t)cr2 >> 21) & 0x1FF;
 	size_t p1_index = ((uint64_t)cr2 >> 12) & 0x1FF;
+
+	uint64_t *ptab4 = (uint64_t *)kmem_pagegetcr3();
 
 	kdebug_outf("\nkm_vmt: crash occured at ");
 

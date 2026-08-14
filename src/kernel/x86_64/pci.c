@@ -399,7 +399,7 @@ void kpci_init()
             kdebug_outf("\nkpci_i:   busses %d-%d", baa->pci_busnum, baa->pci_busnumend);
 
             // identity map every pci bus in config range
-            kmem_pageentry(baa->ecm_baseaddr, baa->ecm_baseaddr, (baa->pci_busnumend + 1) * 32 * 0x1000,
+            kmem_pageentry(k_ptab4, baa->ecm_baseaddr, baa->ecm_baseaddr, (baa->pci_busnumend + 1) * 32 * 0x1000,
                 kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
         }
 

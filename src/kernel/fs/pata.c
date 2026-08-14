@@ -1,6 +1,7 @@
 #define pata_file
 
 #include <kernel/kstring.h>
+#include <kernel/kernel.h>
 #include <kernel/debug.h>
 
 #include <x86_64/desc.h>
@@ -88,11 +89,11 @@ uint64_t *kfs_prdt = 0;
 void kfs_patainit(kpci_device *ide_device)
 {
     kfs_patadmabuffer = kmem_palloc(8, kmem_paging_1kb);
-    kmem_pageentry((uint64_t)kfs_patadmabuffer, (uint64_t)kfs_patadmabuffer, 0x8000,
+    kmem_pageentry(k_ptab4, (uint64_t)kfs_patadmabuffer, (uint64_t)kfs_patadmabuffer, 0x8000,
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
 
     kfs_prdt = kmem_palloc(1, kmem_paging_1kb);
-    kmem_pageentry((uint64_t)kfs_prdt, (uint64_t)kfs_prdt, 0x1000,
+    kmem_pageentry(k_ptab4, (uint64_t)kfs_prdt, (uint64_t)kfs_prdt, 0x1000,
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
     
     uint8_t progif = kpci_configread(ide_device, PCI_OFFSET_PROGIF) & 0xFF;

@@ -1,4 +1,5 @@
 #include <kernel/kstring.h>
+#include <kernel/kernel.h>
 #include <kernel/debug.h>
 
 #include <x86_64/acpi/acpi.h>
@@ -16,6 +17,7 @@ uint8_t kacpi_apsrunning = 0;
 volatile uint8_t bsplock = 0;
 
 volatile uint64_t kacpi_apstacks = 0;
+uint64_t ap_ptab4 = 0;
 
 extern void ap_trampoline();
 
@@ -39,6 +41,7 @@ void kacpi_aploop()
 
 #define kacpi_max_processors 32
 uint8_t lapic_ids[kacpi_max_processors];
+uint8_t boot_id = 0;
 
 #define lapic_write(addr, off, val) *((volatile uint32_t *)(addr + off)) = val
 #define lapic_read(addr, off) *((volatile uint32_t *)(addr + off))
@@ -52,12 +55,10 @@ void kacpi_startaps(uint8_t total_processors)
     kdebug_outf("\nkacpi: attempting to init %d processors", total_processors);
     uint64_t lapic_base = kacpi_lapic_base;
 
-    uint8_t current_apicid = 0;
-    asm volatile ("mov $1, %%rax; cpuid; shr $24, %%rbx;" : "=b"(current_apicid) : : );
+    asm volatile ("mov $1, %%rax; cpuid; shr $24, %%rbx;" : "=b"(boot_id) : : );
 
-    kdebug_outf("\nkacpi: smp startup code at 0x%x", (uint64_t)kacpi_apstartup);
-
-    kmem_pageentry(0x8000, 0x8000, 0x4000, kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
+    kmem_pageentry(k_ptab4, 0x8000, 0x8000, 0x4000,
+        kmem_paging_present | kmem_paging_writable, kmem_paging_1kb);
 
     //first 2mb should be identity mapped
     memcpy(kacpi_apstartup, &ap_trampoline, 0x1000);
@@ -75,13 +76,12 @@ void kacpi_startaps(uint8_t total_processors)
     //1 page of stack per processor to start
     kacpi_apstacks = (uint64_t)kmem_alloc(total_processors - 1);
 
-    kdebug_outf("\nkacpi: lapic base at 0x%x", lapic_base);
-    kmem_pageentry(lapic_base, lapic_base, 0x1000,
+    kmem_pageentry(k_ptab4, lapic_base, lapic_base, 0x1000,
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
 
     for (int i = 0; i < total_processors; i++)
     {
-        if (lapic_ids[i] == current_apicid)
+        if (lapic_ids[i] == boot_id)
         {
             kdebug_outf("\nkacpi: processor %d id %d already started", i, lapic_ids[i]);
             continue;
@@ -136,7 +136,7 @@ void kacpi_ioredtbl_entry(uint8_t entry, union ioredtbl_entry *tbl_entry)
 
 void kacpi_ioredtbl(acpi_madt *madt)
 {
-    kmem_pageentry(kacpi_ioapic_base, kacpi_ioapic_base, 0x1000,
+    kmem_pageentry(k_ptab4, kacpi_ioapic_base, kacpi_ioapic_base, 0x1000,
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
 
     kwrapper_seteoi(kacpi_apic_eoi);
@@ -155,7 +155,8 @@ void kacpi_ioredtbl(acpi_madt *madt)
             isa_entry.trigger_mode = 0;
             isa_entry.mask = 0;
             isa_entry.reserved = 0;
-            isa_entry.destination = 0;
+            isa_entry.destination = boot_id;
+            //destination should be boot processor
 
             kacpi_ioredtbl_entry(i, &isa_entry);
         }
@@ -182,7 +183,8 @@ void kacpi_ioredtbl(acpi_madt *madt)
                 isa_entry.trigger_mode = (flag_trigger == 0 || flag_trigger == 1) ? 0 : 1;
                 isa_entry.mask = 0;
                 isa_entry.reserved = 0;
-                isa_entry.destination = 0;
+                isa_entry.destination = boot_id;
+                //destination should be boot processor
 
                 kacpi_ioredtbl_entry(entry2->irq_source, &isa_entry);
 
@@ -199,7 +201,7 @@ void kacpi_ioredtbl(acpi_madt *madt)
 
 void kacpi_processapic(acpi_madt *madt)
 {
-    kdebug_outf("\nkacpi: processing APIC table\n - madt flags %b lapic addr 0x%x", madt->flags, madt->local_apic_addr);
+    kdebug_outf("\nkacpi: madt flags %b lapic addr 0x%x", madt->flags, madt->local_apic_addr);
     acpi_madt_header *ptr = (acpi_madt_header *)madt->enteries;
     uint64_t lapic_base = madt->local_apic_addr;
     int total_processors = 0;
@@ -210,7 +212,7 @@ void kacpi_processapic(acpi_madt *madt)
         {
             case 0:
                 acpi_madt_type0 *entry0 = (acpi_madt_type0 *)ptr;
-                kdebug_outf("\n - processor local apic: processor_id %d id %d flags %2b", 
+                kdebug_outf("\nkacpi: processor_id %d id %d flags %2b", 
                     entry0->acpi_processor_id, entry0->apic_id, entry0->flags);
                 if (total_processors == kacpi_max_processors)
                 {
@@ -222,18 +224,23 @@ void kacpi_processapic(acpi_madt *madt)
                 break;
             case 5:
                 acpi_madt_type5 *entry5 = (acpi_madt_type5 *)ptr;
-                kdebug_outf("\n - local apic override: addr 0x%x", 
-                    entry5->local_apic_addr);
+                //kdebug_outf("\n - local apic override: addr 0x%x", 
+                //    entry5->local_apic_addr);
                 lapic_base = entry5->local_apic_addr;
                 break;
             case 1:
                 acpi_madt_type1 *entry1 = (acpi_madt_type1 *)ptr;
-                kdebug_outf("\n - i/o apic: apic id %d apic addr 0x%x GSI base 0x%x",
-                    entry1->io_apic_id, entry1->io_apic_addr, entry1->gsi_base);
+                //kdebug_outf("\n - i/o apic: apic id %d apic addr 0x%x GSI base 0x%x",
+                //    entry1->io_apic_id, entry1->io_apic_addr, entry1->gsi_base);
+                if (kacpi_ioapic_base != 0)
+                {
+                    kdebug_outf("\nkacpi: double i/o apic not supported yet...");
+                    break;
+                }
                 kacpi_ioapic_base = entry1->io_apic_addr;
                 kacpi_gsi_base = entry1->gsi_base;
                 break;
-#ifdef AQUA_DEBUG
+/*
             case 2:
                 acpi_madt_type2 *entry2 = (acpi_madt_type2 *)ptr;
                 kdebug_outf("\n - i/o apic interrupt source override: bus source %d irq source %d gsi 0x%x flags %b",
@@ -254,9 +261,9 @@ void kacpi_processapic(acpi_madt *madt)
                 kdebug_outf("\n - local x2apic: local x2apic id %d flags %b acpi id 0x%x", 
                     entry9->processor_x2apic_id, entry9->flags, entry9->acpi_id);
                 break;
-#endif
+*/
             default:
-                kdebug_outf("\n - unknown madt entry (skipping)");
+                //kdebug_outf("\n - unknown madt entry (skipping)");
                 break;
         }
         ptr = (acpi_madt_header *)((uint64_t)ptr + ptr->entry_length);
@@ -264,8 +271,6 @@ void kacpi_processapic(acpi_madt *madt)
 
     kacpi_lapic_base = lapic_base;
     kacpi_startaps(total_processors);
-
-    kdebug_outf("\nkacpi: configuring apic");
 
     asm("cli");
 

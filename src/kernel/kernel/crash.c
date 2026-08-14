@@ -1,6 +1,7 @@
 #include <kernel/kstring.h>
 #include <kernel/kernel.h>
 #include <kernel/debug.h>
+#include <kernel/elf.h>
 
 #include <output/screen.h>
 #include <output/kterm.h>
@@ -8,7 +9,6 @@
 #include <x86_64/desc.h>
 
 #include <stdint.h>
-#include <elf.h>
 
 extern int cw, ch;
 uint8_t screen = 0;
@@ -31,15 +31,14 @@ void kcrash_initsym()
     debug_addr = ((uint64_t)_end / 0x1000) * 0x1000;
 
     Elf64_Ehdr *debug_ehdr = (Elf64_Ehdr *)debug_addr;
-    if (debug_ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
-        debug_ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
-        debug_ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
-        debug_ehdr->e_ident[EI_MAG3] != ELFMAG3 ||
+    if (debug_ehdr->e_ident[0] != 0x7F ||
+        debug_ehdr->e_ident[1] != 'E' ||
+        debug_ehdr->e_ident[2] != 'L' ||
+        debug_ehdr->e_ident[3] != 'F' ||
         debug_ehdr->e_ident[EI_CLASS] != ELFCLASS64 ||
         debug_ehdr->e_ident[EI_DATA] != ELFDATA2LSB ||
         debug_ehdr->e_type != ET_EXEC ||
-        debug_ehdr->e_machine != EM_X86_64 ||
-        debug_ehdr->e_version != EV_CURRENT)
+        debug_ehdr->e_machine != 62)
     {
         kdebug_outf("\nkcrash: unable to read debug information!");
         return;
@@ -211,6 +210,13 @@ const char* kdbg_ats[] =
 };
 */
 
+#define is_flag(x) ((x == 0x21) || (x == 0x27) || (x == 0x34) || (x == 0x3C) || \
+    (x == 0x3F) || (x == 0x4B) || (x == 0x53) || (x == 0x61) || (x == 0x62) || \
+    (x == 0x63) || (x == 0x66) || (x == 0x67) || (x == 0x68) || (x == 0x6A) || \
+    (x == 0x6C) || (x == 0x6D) || (x == 0x77) || (x == 0x78) || (x == 0x7A) || \
+    (x == 0x7B) || (x == 0x7C) || (x == 0x82) || (x == 0x87) || (x == 0x89) || \
+    (x == 0x8A))
+
 void kcrash_checkcu(uint64_t compunit, uint64_t rip)
 {
     compilation_unit *cu = (compilation_unit *)compunit;
@@ -241,29 +247,18 @@ void kcrash_checkcu(uint64_t compunit, uint64_t rip)
             //if (abbrev_check == block->type)
             //    kdebug_outf("\nkdbg: <%x><%x>: Abbrev Num %d (%s)", level, (uint64_t)pointer - debug_info, abbrev_check, kdbg_tags[block->tag]);
 
-            if ((abbrev_check == block->type) && (block->children == 1))
+            if ((abbrev_check == block->type) && (block->children == 1) && (abbrev_check != 0))
                 level++;
             
             for (index = 0; ; index += 2)
             {
                 if (abbrev_check == 0)
                     break;
-                else if (block->data[index] == 0xB7 || block->data[index] == 0xB8 || block->data[index] == 0x82)
-                {
-                    index--;
-                    continue;
-                }
-                else if (block->data[index] == 0x21)
-                    index += 2;
 
-                if (block->data[index] == 0x90)
+                if (is_flag(block->data[index]))
                 {
-                    size += 1;
-                    continue;
-                }
-                else if (block->data[index] == 0x91)
-                {
-                    size += 4;
+                    if (block->data[index + 1] != 0x19)
+                        index -= 1;
                     continue;
                 }
 

@@ -58,9 +58,11 @@ void kwrapper_isr(kframe_int *k)
     }
     else if (k->int_no == 0xE)
     {
-        uint64_t cr2;
-        asm volatile ("mov %%cr2, %0" : "=r"(cr2));
-        kdebug_outf("\nkisr: cr2 [0x%x]", cr2);
+        uint64_t cr;
+        asm volatile ("mov %%cr2, %0" : "=r"(cr));
+        kdebug_outf("\nkisr: cr2 [0x%x]", cr);
+        asm volatile ("mov %%cr3, %0" : "=r"(cr));
+        kdebug_outf(" cr3 [0x%x]", cr);
         kdebug_outf("\nkisr: pf code: |");
         if (k->err_code & 1)
         {    
@@ -88,7 +90,7 @@ void kwrapper_isr(kframe_int *k)
             kdebug_outf("sgx violation|");
 
 #ifdef AQUA_DEBUG_MEM
-        kmem_vmm_traverse(cr2);
+        kmem_vmm_traverse(cr);
 #endif
     }
 #endif

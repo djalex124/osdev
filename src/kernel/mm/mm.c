@@ -157,7 +157,7 @@ void* kmem_alloc(size_t pages)
 //frees pages in kernel space
 void kmem_free(void *addr, size_t pages)
 {
-    void *phys = kmem_getphysical(addr);
+    void *phys = kmem_getphysical(k_ptab4, addr);
 #ifdef AQUA_DEBUG_MEM
     kdebug_outf("\nkm_f: freeing %x", phys);
 #endif

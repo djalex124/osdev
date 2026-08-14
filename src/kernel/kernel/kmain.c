@@ -25,6 +25,7 @@
 
 boot_table k_boottable;
 info_table k_infotable;
+uint64_t k_ptab4;
 
 void kmain(boot_table *table)
 {

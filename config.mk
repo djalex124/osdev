@@ -1,10 +1,11 @@
-gcc = x86_64-elf-gcc
-objcopy = x86_64-elf-objcopy
+gcc := x86_64-elf-gcc
+ld := x86_64-elf-ld
+objcopy := objcopy
 
 kernel_headers := /usr/include
 
-efi_cc := x86_64-linux-gnu-gcc
-efi_ld := x86_64-linux-gnu-ld
+efi_cc := gcc
+efi_ld := ld
 
-gnu_efi_inc := /usr/include/efi
-gnu_efi_lib := /usr/lib
+gnu_efi_inc := /usr/include/efi -I/usr/include/efi/x86_64
+gnu_efi := /usr/lib64

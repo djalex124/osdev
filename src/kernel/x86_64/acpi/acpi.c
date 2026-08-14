@@ -70,7 +70,6 @@ void kacpi_init()
 {
     acpi_rsdp *table = (acpi_rsdp *)virt_from_phys(k_boottable.rsdp);
 
-    kdebug_outf("\nkacpi_i: signature [%8s]", table->signature);
     if (!str_cmp(table->signature, "RSD PTR "))
         kacpi_fail(__LINE__);
 

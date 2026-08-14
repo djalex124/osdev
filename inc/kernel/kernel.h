@@ -61,4 +61,5 @@ typedef struct {
 #ifndef kernel_file
 extern boot_table k_boottable;
 extern info_table k_infotable;
+extern uint64_t k_ptab4;
 #endif

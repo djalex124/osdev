@@ -27,10 +27,13 @@ void kmem_vmminit(uint64_t low_size, uint64_t high_size);
 #include <kernel/kernel.h>
 void kmem_init(boot_table *table);
 
-void kmem_pageentry(uint64_t physical, uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing);
-void kmem_unpageentry(uint64_t address, uint64_t size);
+uint64_t kmem_pagegetcr3();
+void kmem_pagesetcr3(uint64_t ptab4);
 
-void* kmem_getphysical(uint64_t *virt);
+void kmem_pageentry(uint64_t ptab4, uint64_t physical, uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing);
+void kmem_unpageentry(uint64_t ptab4, uint64_t address, uint64_t size);
+void* kmem_getphysical(uint64_t ptab4, uint64_t *virt);
+
 void* kmem_page(uint64_t address, uint64_t size, uint16_t flags, uint8_t sizing);
 void kmem_unpage(void *address, uint64_t size);
 

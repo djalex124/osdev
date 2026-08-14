@@ -38,6 +38,7 @@ boot_table* table;
 UINTN kernel_size = 0;
 void (*kentry)(boot_table* table, UINTN* page_table);
 #ifdef AQUA_DEBUG
+UINTN debug_size = 0;
 UINTN debug_symbols = 0;
 #endif
 EFI_INPUT_KEY key;
@@ -68,6 +69,44 @@ EFI_STATUS load_graphics()
 
     return 0;
 }
+
+#ifdef AQUA_DEBUG
+EFI_STATUS load_debugsymbols(EFI_FILE_HANDLE root)
+{
+    EFI_STATUS s;
+    CHAR16 *debug_name = L"kernel.map";
+    EFI_FILE_HANDLE debug_file;
+    s = uefi_call_wrapper(root->Open, 5, root, &debug_file, 
+        debug_name, EFI_FILE_MODE_READ, 
+        EFI_FILE_READ_ONLY | EFI_FILE_HIDDEN | EFI_FILE_SYSTEM);
+    assert(s);
+
+    Print(L"[OK]: Locate debug symbols\r\n");
+
+    UINTN debug_start = 0x100000 + kernel_size;
+    EFI_FILE_INFO *debug_info = LibFileInfo(debug_file);
+
+    if ((UINTN)debug_info == 0)
+        assert(EFI_LOAD_ERROR);
+
+    debug_size = (debug_info->FileSize + 0x1000 - 1) / 0x1000;
+
+    s = uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, 
+        EfiLoaderCode, debug_size, (EFI_PHYSICAL_ADDRESS)debug_start);
+    assert(s);
+
+    s = uefi_call_wrapper(debug_file->Read, 3, debug_file, 
+        &(debug_info->FileSize), (EFI_PHYSICAL_ADDRESS)debug_start);
+    assert(s);
+
+    Print(L"[OK]: Debug info loaded [0x%x - 0x%x]\r\n", 
+        debug_start, debug_start + debug_size * 0x1000);
+
+    kernel_size += debug_size * 0x1000;
+
+    uefi_call_wrapper(debug_file->Close, 1, debug_file);
+}
+#endif
 
 EFI_STATUS load_kernel(EFI_HANDLE image_handle)
 {
@@ -147,38 +186,10 @@ EFI_STATUS load_kernel(EFI_HANDLE image_handle)
 
 #ifdef AQUA_DEBUG
     if (debug_symbols)
-    {
-        CHAR16 *debug_name = L"kernel.map";
-        EFI_FILE_HANDLE debug_file;
-        s = uefi_call_wrapper(root->Open, 5, root, &debug_file, 
-            debug_name, EFI_FILE_MODE_READ, 
-            EFI_FILE_READ_ONLY | EFI_FILE_HIDDEN | EFI_FILE_SYSTEM);
-        assert(s);
-
-        Print(L"[OK]: Locate debug symbols\r\n");
-
-        UINTN debug_start = 0x100000 + kernel_size;
-        EFI_FILE_INFO *debug_info = LibFileInfo(debug_file);
-
-        UINTN debug_size = (debug_info->FileSize + 0x1000 - 1) / 0x1000;
-
-        if ((UINTN)debug_info == 0)
-            assert(EFI_LOAD_ERROR);
-
-        s = uefi_call_wrapper(BS->AllocatePages, 4, AllocateAnyPages, 
-            EfiLoaderCode, debug_size, (EFI_PHYSICAL_ADDRESS)debug_start);
-        assert(s);
-
-        s = uefi_call_wrapper(file->Read, 3, debug_file, 
-            &(debug_info->FileSize), (EFI_PHYSICAL_ADDRESS)debug_start);
-        assert(s);
-
-        Print(L"[OK]: Debug info loaded [0x%x - 0x%x]\r\n", 
-            debug_start, debug_start + debug_size * 0x1000);
-
-        kernel_size += debug_size * 0x1000;
-    }
+        load_debugsymbols(root);
 #endif
+
+    uefi_call_wrapper(root->Close, 1, root);
 
     return 0;
 }

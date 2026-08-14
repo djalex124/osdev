@@ -4,8 +4,10 @@ build_speed = -O2
 
 kernel_build = $$(cat build.txt)
 
-kernel_flags = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$(kernel_build) -gdwarf -fno-pie -mcmodel=large -mno-red-zone -Wall
-kernel_link  = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf -fno-pie -T bin/link.ld
+uefi_flags = -DAQUA_VER_BUILD=$(kernel_build) -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -mno-sse
+
+kernel_flags = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -DAQUA_VER_BUILD=$(kernel_build) -gdwarf-5 -gstrict-dwarf -fno-pie -mcmodel=large -mno-red-zone -Wall
+kernel_link  = -ffreestanding -I$(kernel_headers) -Iinc -fno-omit-frame-pointer $(build_speed) -gdwarf-5 -gstrict-dwarf -fno-pie -T bin/link.ld
 
 debug_flag =
 
@@ -47,7 +49,7 @@ obj/kernel/%.o: src/kernel/%.S
 
 obj/boot/uefiboot.o: src/boot/uefiboot.c
 	@mkdir -p obj/boot
-	@$(efi_cc) $(debug_flag) -DAQUA_VER_BUILD=$(kernel_build) -MMD -MP -Iinc -I$(gnu_efi_inc) $(build_speed) -fpic -ffreestanding -fno-stack-protector -fno-stack-check -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -c src/boot/uefiboot.c -o obj/boot/uefiboot.o
+	@$(efi_cc) $(debug_flag) $(uefi_flags) -c -MMD -MP src/boot/uefiboot.c -o obj/boot/uefiboot.o
 
 drive/EFI/BOOT/BOOTX64.EFI: obj/boot/uefiboot.o
 	@$(efi_ld) -shared -Bsymbolic -L$(gnu_efi) -T$(gnu_efi)/elf_x86_64_efi.lds $(gnu_efi)/crt0-efi-x86_64.o obj/boot/uefiboot.o -o obj/boot/boot.so -lgnuefi -lefi
@@ -55,8 +57,21 @@ drive/EFI/BOOT/BOOTX64.EFI: obj/boot/uefiboot.o
 	@mkdir -p drive/EFI/BOOT
 	@mv drive/boot.efi drive/EFI/BOOT/BOOTX64.EFI
 
-drive/test.bin: src/programs/test.c
-	@$(gcc) -ffreestanding -fno-pie -mcmodel=large -mno-red-zone -Wall -c $< -o $@
+src_platform := $(shell find src/programs/platform/ -name '*.S')
+obj_platform_a := obj/programs/platform/crt0.o obj/programs/platform/crti.o obj/programs/platform/crtbegin.o
+obj_platform_b := obj/programs/platform/crtend.o obj/programs/platform/crtn.o
+
+obj/programs/platform/%.o: src/programs/platform/%.S
+	@mkdir -p $(@D)
+	@$(gcc) -ffreestanding -fno-pie -mno-red-zone -c $< -o $@
+
+obj/programs/platform/crtbegin.o obj/programs/platform/crtend.o:
+	@mkdir -p $(@D)
+	@OBJ=$(shell $(gcc) -ffreestanding -print-file-name=$(@F)) && cp "$$OBJ" $@
+
+drive/test.bin: $(obj_platform_a) $(obj_platform_b)
+	@$(gcc) -ffreestanding -fno-pie -mcmodel=large -mno-red-zone -Wall -c src/programs/test.c -o obj/programs/test.o
+	@$(ld) -no-pie $(obj_platform_a) obj/programs/test.o $(obj_platform_b) -o drive/test.bin
 
 build_run: drive/EFI/BOOT/BOOTX64.EFI drive/kernel.bin drive/test.bin
 

@@ -1,6 +1,7 @@
 #define sata_file
 
 #include <kernel/kstring.h>
+#include <kernel/kernel.h>
 #include <kernel/debug.h>
 
 #include <x86_64/pci.h>
@@ -265,7 +266,7 @@ void kfs_satainit(kpci_device *ahci_device)
     uint32_t *abar = (uint32_t *)(uint64_t)(kpci_configread(ahci_device, PCI_OFFSET_HDR0_BAR5));
     kdebug_outf("\nkfs_i: ABAR at 0x%x", abar);
 
-    kmem_pageentry((uint64_t)abar, (uint64_t)abar, 0x2000, 
+    kmem_pageentry(k_ptab4, (uint64_t)abar, (uint64_t)abar, 0x2000, 
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
     // largest abar is 0x1100
 
@@ -286,11 +287,11 @@ void kfs_satainit(kpci_device *ahci_device)
 #endif
 
     ahci_base = (uint64_t)kmem_palloc(76, kmem_paging_1kb);
-    kmem_pageentry(ahci_base, ahci_base, 76 * 0x1000,
+    kmem_pageentry(k_ptab4, ahci_base, ahci_base, 76 * 0x1000,
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
 
     kfs_satadmabuffer = kmem_palloc(8, kmem_paging_1kb);
-    kmem_pageentry((uint64_t)kfs_satadmabuffer, (uint64_t)kfs_satadmabuffer, 0x8000,
+    kmem_pageentry(k_ptab4, (uint64_t)kfs_satadmabuffer, (uint64_t)kfs_satadmabuffer, 0x8000,
         kmem_paging_present | kmem_paging_writable | kmem_paging_no_cache, kmem_paging_1kb);
     memset(kfs_satadmabuffer, 0, 0x8000);
 

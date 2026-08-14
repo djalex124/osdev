@@ -58,10 +58,8 @@ long_mode:
 .extern kgdt
     lgdt phys_from_virt(kgdt)
 
-.extern ptab4
-    movabs ptab4, %rax
-    movabs $kernel_virtual, %rbx
-    subq %rbx, %rax
+.extern k_ptab4
+    movabs k_ptab4, %rax
     mov %rax, %cr3
     
     mov $1, %rax
